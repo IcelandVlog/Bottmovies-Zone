@@ -1838,38 +1838,38 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
 
     // ---- Spanish (es) — generic code + regional/locale variants ----
     es: 'Spanish', spa: 'Spanish', spanish: 'Spanish',
-    'es-es': 'Spanish (Spain)', 'es-419': 'Spanish (Latin American)',
-    'es-la': 'Spanish (Latin American)', 'es-mx': 'Spanish (Mexico)',
-    'es-ar': 'Spanish (Argentina)', 'es-us': 'Spanish (US)',
+    'es-ES': 'Spanish (Spain)', 'es-419': 'Spanish (Latin American)',
+    'es-LA': 'Spanish (Latin American)', 'es-MX': 'Spanish (Mexico)',
+    'es-AR': 'Spanish (Argentina)', 'es-US': 'Spanish (US)',
 
     // ---- French (fr) — generic code + regional/locale variants ----
     fr: 'French', fre: 'French', fra: 'French', french: 'French',
-    'fr-fr': 'French (France)', 'fr-ca': 'French (Canada)',
-    'fr-be': 'French (Belgium)', 'fr-ch': 'French (Switzerland)',
+    'fr-FR': 'French (France)', 'fr-CA': 'French (Canada)',
+    'fr-BE': 'French (Belgium)', 'fr-CH': 'French (Switzerland)',
 
     // ---- Portuguese (pt) — generic code + regional/locale variants ----
     pt: 'Portuguese', por: 'Portuguese', portuguese: 'Portuguese',
-    'pt-br': 'Portuguese (Brazil)', 'pt-pt': 'Portuguese (Portugal)',
+    'pt-BR': 'Portuguese (Brazil)', 'pt-PT': 'Portuguese (Portugal)',
 
     // ---- Chinese (zh) — generic code + regional/script variants ----
     zh: 'Chinese', chi: 'Chinese', zho: 'Chinese', chinese: 'Chinese',
-    'zh-cn': 'Chinese (Simplified)', 'zh-sg': 'Chinese (Simplified)',
-    'zh-hans': 'Chinese (Simplified)',
-    'zh-tw': 'Chinese (Traditional)', 'zh-hk': 'Chinese (Traditional)',
-    'zh-mo': 'Chinese (Traditional)', 'zh-hant': 'Chinese (Traditional)',
+    'zh-CN': 'Chinese (Simplified)', 'zh-SG': 'Chinese (Simplified)',
+    'zh-HANS': 'Chinese (Simplified)',
+    'zh-TW': 'Chinese (Traditional)', 'zh-HK': 'Chinese (Traditional)',
+    'zh-mo': 'Chinese (Traditional)', 'zh-HANT': 'Chinese (Traditional)',
     // cmn (ISO 639-3) is specifically Mandarin — kept distinct from generic 'zh'/'Chinese'
     cmn: 'Mandarin', mandarin: 'Mandarin',
     yue: 'Cantonese', cantonese: 'Cantonese',
 
     // ---- English (en) — a few common locale variants ----
-    'en-us': 'English (US)', 'en-gb': 'English (UK)',
-    'en-au': 'English (Australia)', 'en-in': 'English (India)',
+    'en-US': 'English (US)', 'en-GB': 'English (UK)',
+    'en-AU': 'English (Australia)', 'en-IN': 'English (India)',
 
     // ---- German (de) / Italian (it) / Russian (ru) / Arabic (ar) locale variants ----
-    'de-de': 'German (Germany)', 'de-at': 'German (Austria)', 'de-ch': 'German (Switzerland)',
-    'it-it': 'Italian (Italy)', 'it-ch': 'Italian (Switzerland)',
-    'ru-ru': 'Russian (Russia)',
-    'ar-sa': 'Arabic (Saudi Arabia)', 'ar-eg': 'Arabic (Egypt)',
+    'de-DE': 'German (Germany)', 'de-AT': 'German (Austria)', 'de-CH': 'German (Switzerland)',
+    'it-IT': 'Italian (Italy)', 'it-CH': 'Italian (Switzerland)',
+    'ru-RU': 'Russian (Russia)',
+    'ar-SA': 'Arabic (Saudi Arabia)', 'ar-EG': 'Arabic (Egypt)',
 
     la: 'Latin American'
 };
