@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Broken Links - BOTTMOVIES</title>
+<link rel="shortcut icon" href="https://raw.githubusercontent.com/IcelandVlog/B.OTP/refs/heads/main/logo1.png" type="image/x-icon"/>
+<script>
+  // থিম আগে থেকে সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
+  (function(){
+      try {
+          if (localStorage.getItem('bottmovies_theme') === 'light') {
+              document.documentElement.classList.add('light-mode');
+          }
+      } catch(e) {}
+  })();
+</script>
+<style>
+    /* Base Dark Theme Styles */
+    :root {
+        --bg-color: #0b0b0c;
+        --text-main: #e0e0e0;
+        --text-strong: #ffffff;
+        --text-muted: #888;
+        --accent-color: #007bff;
+        --accent-hover: #0056b3;
+        --danger-color: #ff0000;
+        --border-color: #222;
+        --card-bg: #111112;
+        --card-border: #222;
+        --card-border-hover: #333;
+        --lang-btn-bg: #1a1a1a;
+        --lang-btn-border: #333;
+        --lang-btn-hover-bg: #2a2a2a;
+    }
+
+    html.light-mode {
+        --bg-color: #f2f4f7;
+        --text-main: #333a45;
+        --text-strong: #14161c;
+        --text-muted: #6b7280;
+        --accent-color: #007bff;
+        --accent-hover: #0056b3;
+        --danger-color: #d32f2f;
+        --border-color: #dde1e8;
+        --card-bg: #ffffff;
+        --card-border: #e5e8ee;
+        --card-border-hover: #c7ccd6;
+        --lang-btn-bg: #f1f3f7;
+        --lang-btn-border: #dde1e8;
+        --lang-btn-hover-bg: #e5e8ee;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Content Area Styles */
+    .content-container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .breadcrumb { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+    .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--text-strong); }
+    .breadcrumb .breadcrumb-current { color: #22c55e; font-weight: 600; }
+
+    .page-title { font-size: 32px; font-weight: normal; margin-bottom: 30px; color: var(--text-strong); }
+
+    .section-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-subtitle { font-size: 24px; color: var(--danger-color); font-weight: normal; margin: 0; }
+
+    /* BN/EN Toggle - segmented control, active side is highlighted */
+    .lang-toggle-group {
+        display: flex;
+        background-color: var(--lang-btn-bg);
+        border: 1px solid var(--lang-btn-border);
+        border-radius: 20px;
+        padding: 3px;
+        gap: 2px;
+    }
+    .lang-toggle-option {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 7px 16px;
+        border-radius: 16px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 13px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .lang-toggle-option:hover { color: var(--text-strong); }
+    .lang-toggle-option.active { background-color: var(--accent-color); color: #ffffff; }
+
+    /* Step Card Styles */
+    .step-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        transition: transform 0.2s, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .step-card:hover { border-color: var(--card-border-hover); }
+
+    .step-text {
+        font-size: 17px;
+        line-height: 1.6;
+        color: var(--text-main);
+    }
+    .step-text strong {
+        color: var(--text-strong);
+    }
+    .step-text ul {
+        margin: 12px 0 0 0;
+        padding-left: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .note-text {
+        color: var(--accent-color);
+        font-weight: bold;
+        font-size: 18px;
+        margin-top: 40px;
+        margin-bottom: 40px;
+    }
+
+    /* ==================== LIVE "REPORT" COMMENT THREAD ====================
+       Same site-wide theme variables as the rest of this page. No login,
+       no email - just a name + comment text, saved to Supabase.
+       See link_report_comments_schema.sql for the one-time DB setup. */
+    .rc-section { margin-top: 10px; }
+    .rc-section-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 14px;
+        margin-bottom: 22px;
+    }
+    .rc-section-head h2 {
+        font-size: 22px;
+        font-weight: normal;
+        color: var(--text-strong);
+        margin: 0;
+    }
+    .rc-loading, .rc-empty { color: var(--text-muted); font-size: 14px; padding: 14px 0; }
+
+    .rc-list { display: flex; flex-direction: column; gap: 22px; margin-bottom: 10px; }
+    .rc-node { display: flex; gap: 14px; }
+    .rc-avatar {
+        width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+        background: var(--lang-btn-bg); border: 1px solid var(--card-border); color: var(--accent-color);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: bold; font-size: 14px;
+    }
+    .rc-body { flex: 1; min-width: 0; }
+    .rc-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+    .rc-name { font-weight: bold; font-size: 14px; color: var(--text-strong); }
+    .rc-admin-badge {
+        font-size: 10px; letter-spacing: 0.5px; font-weight: bold;
+        color: #ffffff; background: var(--accent-color); padding: 2px 7px; border-radius: 10px; text-transform: uppercase;
+    }
+    .rc-time { color: var(--text-muted); font-size: 12px; }
+    .rc-text { color: var(--text-main); font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; }
+    .rc-actions { margin-top: 6px; }
+    .rc-reply-link { color: var(--accent-color); font-size: 12.5px; font-weight: bold; cursor: pointer; }
+    .rc-reply-link:hover { text-decoration: underline; }
+
+    .rc-reply-form-wrap:not(:empty) {
+        margin-top: 10px; padding: 12px; background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 8px;
+        display: flex; flex-direction: column; gap: 8px;
+    }
+    .rc-replies { margin-top: 16px; padding-left: 18px; border-left: 2px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; }
+    .rc-reply .rc-avatar { width: 30px; height: 30px; font-size: 12px; }
+
+    .rc-input, .rc-textarea {
+        width: 100%; background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px;
+        color: var(--text-main); font-family: inherit; font-size: 13.5px; padding: 10px 12px; outline: none;
+        box-sizing: border-box;
+    }
+    .rc-textarea { resize: vertical; min-height: 44px; }
+    .rc-input:focus, .rc-textarea:focus { border-color: var(--accent-color); }
+    .rc-input::placeholder, .rc-textarea::placeholder { color: var(--text-muted); }
+
+    .rc-form-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .rc-btn-cancel {
+        background: transparent; border: none; color: var(--text-muted); font-size: 12.5px; font-weight: bold; cursor: pointer; padding: 8px 6px;
+    }
+    .rc-btn-cancel:hover { color: var(--text-strong); }
+    .rc-btn-submit {
+        background: var(--accent-color); color: #ffffff; border: none; font-weight: bold; font-size: 12.5px;
+        letter-spacing: 0.3px; padding: 9px 18px; border-radius: 6px; cursor: pointer; transition: background .2s;
+    }
+    .rc-btn-submit:hover { background: var(--accent-hover); }
+    .rc-btn-submit:disabled { opacity: 0.6; cursor: default; }
+
+    .rc-older-btn {
+        display: block; margin: 6px auto 30px; background: var(--lang-btn-bg); border: 1px solid var(--lang-btn-border);
+        color: var(--text-main); font-size: 12.5px; font-weight: bold; letter-spacing: 0.3px;
+        padding: 10px 22px; border-radius: 20px; cursor: pointer;
+    }
+    .rc-older-btn:hover { background: var(--lang-btn-hover-bg); }
+
+    .rc-composer {
+        margin-top: 10px; padding: 25px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px;
+        display: flex; flex-direction: column; gap: 12px;
+    }
+    .rc-composer h3 {
+        font-size: 18px; font-weight: bold; color: var(--text-strong); margin: 0 0 2px 0;
+    }
+    .rc-composer .rc-btn-submit { align-self: flex-start; }
+    .rc-form-msg { font-size: 12.5px; color: var(--danger-color); min-height: 14px; }
+    .rc-form-msg.success { color: #2e7d32; }
+
+    /* =========================================
+       CHAT WIDGET STYLES
+       ========================================= */
+
+    /* Floating Message Button */
+    #chat-widget-btn {
+        position: fixed;
+        bottom: 25px;
+        right: 25px;
+        width: 60px;
+        height: 60px;
+        background-color: #2b6cb0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        z-index: 999999;
+        transition: transform 0.2s ease;
+    }
+    #chat-widget-btn:hover {
+        transform: scale(1.08);
+    }
+
+    /* Light/Dark Theme Toggle Button (mirrors the chat button, on the left side) */
+    #theme-toggle-btn {
+        position: fixed;
+        bottom: 25px;
+        left: 25px;
+        width: 60px;
+        height: 60px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        z-index: 999999;
+        transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    #theme-toggle-btn:hover {
+        transform: scale(1.08);
+    }
+    #theme-toggle-btn svg { width: 28px; height: 28px; display: block; }
+    #theme-toggle-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Chat Box Container */
+    #chat-widget-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 350px;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 40px);
+        background-color: #0d1321;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 35px rgba(0,0,0,0.8);
+        display: none;
+        flex-direction: column;
+        z-index: 999999;
+        border: 1px solid #1e293b;
+    }
+
+    .chat-header {
+        background-color: #000000;
+        padding: 15px;
+        color: white;
+        text-align: center;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .chat-close-btn {
+        position: absolute;
+        top: 12px;
+        right: 15px;
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    .chat-close-btn:hover {
+        color: #ff4d4d;
+    }
+
+    .chat-header-title {
+        background-color: #1a1a1a;
+        border-radius: 20px;
+        padding: 5px 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        margin-bottom: 12px;
+        font-weight: bold;
+    }
+
+    .chat-avatars {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 8px;
+    }
+    .chat-avatar {
+        width: 42px;
+        height: 42px;
+        background-color: #555;
+        border-radius: 50%;
+        border: 3px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .chat-avatar.support {
+        background-color: #2b6cb0;
+        margin-left: -12px;
+    }
+
+    .chat-header-profile { font-size: 15px; font-weight: bold; }
+    .chat-header-status { font-size: 11px; color: #888; margin-top: 4px; }
+
+    .chat-body {
+        padding: 15px;
+        flex-grow: 1;
+        min-height: 180px;
+        max-height: 320px;
+        overflow-y: auto;
+        background-color: #0d1321;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .chat-message-container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        max-width: 82%;
+    }
+    .chat-message-container.sent { align-self: flex-end; align-items: flex-end; }
+    .chat-message-container.received { align-self: flex-start; align-items: flex-start; }
+
+    .chat-message {
+        position: relative;
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 14px;
+        font-size: 13.5px;
+        line-height: 1.4;
+        word-wrap: break-word;
+        box-sizing: border-box;
+    }
+    .chat-message.received {
+        background-color: #1e293b;
+        color: #e2e8f0;
+        border-bottom-left-radius: 2px;
+    }
+    .chat-message.sent {
+        background-color: #2b6cb0;
+        color: white;
+        border-bottom-right-radius: 2px;
+    }
+    .chat-message img {
+        max-width: 100%;
+        border-radius: 8px;
+        margin-top: 6px;
+    }
+
+    .msg-react-btn {
+        display: none;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        cursor: pointer;
+        color: #94a3b8;
+        z-index: 5;
+    }
+    .chat-message-container.sent .msg-react-btn { left: -30px; }
+    .chat-message-container.received .msg-react-btn { right: -30px; }
+    .chat-message-container:hover .msg-react-btn { display: flex; }
+
+    .quick-react-bar {
+        display: none;
+        position: absolute;
+        top: -32px;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 20px;
+        padding: 3px 8px;
+        gap: 6px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        z-index: 10;
+    }
+    .quick-react-bar span {
+        cursor: pointer;
+        font-size: 14px;
+        transition: transform 0.15s;
+    }
+    .quick-react-bar span:hover {
+        transform: scale(1.3);
+    }
+
+    .reaction-badge {
+        display: none;
+        font-size: 12px;
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 2px 6px;
+        margin-top: -8px;
+        z-index: 2;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    .reaction-badge.active {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .chat-footer {
+        background-color: #0d1321;
+        padding: 10px 15px 15px 15px;
+        border-top: 1px solid #1e293b;
+        flex-shrink: 0;
+        position: relative;
+    }
+    .chat-input-wrapper {
+        display: flex;
+        align-items: center;
+        background-color: #1e293b;
+        border-radius: 20px;
+        padding: 4px 10px;
+        border: 1px solid #334155;
+    }
+    #chat-input-text {
+        flex-grow: 1;
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 8px;
+        outline: none;
+        font-size: 13.5px;
+    }
+    #chat-input-text::placeholder { color: #94a3b8; }
+
+    .chat-icon-btn {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s;
+    }
+    .chat-icon-btn:hover { color: #fff; }
+    .send-btn { color: #60a5fa; margin-left: 4px; }
+    .send-btn:hover { color: #93c5fd; }
+
+    .chat-brand {
+        text-align: center;
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 8px;
+    }
+    .chat-brand strong { color: #94a3b8; }
+
+    #emoji-picker {
+        display: none;
+        position: absolute;
+        bottom: 60px;
+        right: 15px;
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 8px;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        z-index: 100;
+    }
+    #emoji-picker span {
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px;
+        text-align: center;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+    #emoji-picker span:hover {
+        background-color: #334155;
+    }
+
+    #file-preview {
+        display: none;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: #60a5fa;
+        background: #1e293b;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+    }
+</style>
+</head>
+<body>
+
+<main class="content-container">
+    <div class="breadcrumb" id="breadcrumbText">
+        <a href="index.html">Home</a> » <a href="How-to-Download.html">How to Download</a> » <span class="breadcrumb-current">Report Broken Links</span>
+    </div>
+
+    <h1 class="page-title" id="pageTitle">Report Broken Links.</h1>
+
+    <!-- Section Header with Subtitle and BN/EN Button -->
+    <div class="section-header-flex">
+        <h2 class="page-subtitle" id="pageSubtitle">How to Report:</h2>
+        <div class="lang-toggle-group" id="langToggleGroup">
+            <button type="button" class="lang-toggle-option active" data-lang="en" onclick="setLanguage('en')">EN</button>
+            <button type="button" class="lang-toggle-option" data-lang="bn" onclick="setLanguage('bn')">বাং</button>
+        </div>
+    </div>
+
+    <!-- Steps Container -->
+    <div id="steps-container">
+        <div class="step-card" data-step="1">
+            <div class="step-text" data-en="▪ <strong>Step 1:</strong> Make sure the link is really broken - refresh the page or try a different browser first." data-bn="▪ <strong>ধাপ ১:</strong> প্রথমে নিশ্চিত হন লিংকটি সত্যিই কাজ করছে না - পেজ রিফ্রেশ করে বা অন্য ব্রাউজারে চেষ্টা করে দেখুন।">
+                ▪ <strong>Step 1:</strong> Make sure the link is really broken - refresh the page or try a different browser first.
+            </div>
+        </div>
+
+        <div class="step-card" data-step="2">
+            <div class="step-text" data-en="▪ <strong>Step 2:</strong> Copy the full download link URL from the movie/series page." data-bn="▪ <strong>ধাপ ২:</strong> মুভি/সিরিজ পেজ থেকে ভাঙা ডাউনলোড লিংকের সম্পূর্ণ URL টি কপি করুন।">
+                ▪ <strong>Step 2:</strong> Copy the full download link URL from the movie/series page.
+            </div>
+        </div>
+
+        <div class="step-card" data-step="3">
+            <div class="step-text" data-en="▪ <strong>Step 3:</strong> Write down exactly what's wrong - for example: won't play, black screen, or link not found." data-bn="▪ <strong>ধাপ ৩:</strong> ঠিক কী সমস্যা হচ্ছে তা লিখুন - যেমন: ভিডিও লোড হচ্ছে না, শুধু কালো স্ক্রিন দেখাচ্ছে, বা লিংক পাওয়া যাচ্ছে না।">
+                ▪ <strong>Step 3:</strong> Write down exactly what's wrong - for example: won't play, black screen, or link not found.
+            </div>
+        </div>
+
+        <div class="step-card" data-step="4">
+            <div class="step-text" data-en="▪ <strong>Step 4:</strong> Mention it in this format:" data-bn="▪ <strong>ধাপ ৪:</strong> নিচের ফরম্যাটে উল্লেখ করুন:">
+                ▪ <strong>Step 4:</strong> Mention it in this format:
+            </div>
+            <ul class="step-text" id="formatList">
+                <li data-en="Movie / Series Name (with the year) [ Season and Episode, if series ]" data-bn="Movie / Series Name (সাথে সাল) [ Season ও Episode নাম্বার, যদি সিরিজ হয় ]">Movie / Series Name (with the year) [ Season and Episode, if series ]</li>
+                <li data-en="Print Type (e.g. 480p, 720p or 1080p)" data-bn="Print Type (যেমন - 480p, 720p বা 1080p)">Print Type (e.g. 480p, 720p or 1080p)</li>
+                <li data-en="Link Type (Gdrive, Fast Server, Direct Download, Resume Download)" data-bn="Link Type (Gdrive, Fast Server, Direct Download, Resume Download)">Link Type (Gdrive, Fast Server, Direct Download, Resume Download)</li>
+            </ul>
+        </div>
+
+        <div class="step-card" data-step="5">
+            <div class="step-text" data-en="▪ <strong>Step 5:</strong> Post it as a comment below - no email needed. We usually fix it within 24-48 hours." data-bn="▪ <strong>ধাপ ৫:</strong> নিচের কমেন্ট বক্সে পোস্ট করুন - কোনো ইমেইল লাগবে না। সাধারণত ২৪-৪৮ ঘণ্টার মধ্যে লিংক ঠিক করা হয়।">
+                ▪ <strong>Step 5:</strong> Post it as a comment below - no email needed. We usually fix it within 24-48 hours.
+            </div>
+        </div>
+    </div>
+
+    <div class="note-text" id="noteText" data-en="Note, if you face any Problem please comment down." data-bn="নোটঃ কোনো সমস্যা হলে নিচে কমেন্ট করুন।">
+        Note, if you face any Problem please comment down.
+    </div>
+
+    <!-- ==================== LIVE "REPORT" COMMENT THREAD ==================== -->
+    <section class="rc-section" id="rcSection">
+        <div class="rc-section-head">
+            <h2 id="rcCountLabel">COMMENTS</h2>
+        </div>
+
+        <div class="rc-list" id="rcList">
+            <div class="rc-loading">Loading comments…</div>
+        </div>
+
+        <button type="button" class="rc-older-btn" id="rcOlderBtn" style="display:none;" onclick="loadMoreComments()">« Older Comments</button>
+
+        <div class="rc-composer">
+            <h3 id="rcComposerTitle">ADD COMMENT</h3>
+            <textarea id="rcComposerText" class="rc-textarea" rows="4" placeholder="Comment Text*"></textarea>
+            <input type="text" id="rcComposerName" class="rc-input" placeholder="Name*" maxlength="40">
+            <button type="button" class="rc-btn-submit" id="rcComposerSubmitBtn" onclick="submitTopComment()">SUBMIT COMMENT</button>
+            <div class="rc-form-msg" id="rcComposerMsg"></div>
+        </div>
+    </section>
+</main>
+
+
+<!-- =========================================
+     LIGHT / DARK THEME TOGGLE BUTTON
+     ========================================= -->
+<div id="theme-toggle-btn" onclick="toggleThemeMode()" title="Switch light/dark mode">
+    <span id="theme-toggle-icon"></span>
+</div>
+
+<!-- Message Button (Blue Circle Icon) -->
+<div id="chat-widget-btn" onclick="openChat()" title="Open Messages">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+        <polyline points="22,6 12,13 2,6"></polyline>
+    </svg>
+</div>
+
+<!-- Chat Window -->
+<div id="chat-widget-container">
+    <div class="chat-header">
+        <button type="button" class="chat-close-btn" onclick="closeChat()" title="Close">✖</button>
+        <div class="chat-header-title">
+            💬 Messages
+        </div>
+        <div class="chat-avatars">
+            <div class="chat-avatar">
+                <svg viewBox="0 0 24 24" fill="#aaa" width="22" height="22"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <div class="chat-avatar support">
+                <svg viewBox="0 0 24 24" fill="white" width="18" height="18"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            </div>
+        </div>
+        <div class="chat-header-profile">Chat with support</div>
+        <div class="chat-header-status">🕒 Last active an hour ago.</div>
+    </div>
+
+    <div class="chat-body" id="chatBody">
+        <!-- Default Welcome Message -->
+    </div>
+
+    <div class="chat-footer">
+        <div id="emoji-picker">
+            <span onclick="insertEmoji('❤️')">❤️</span>
+            <span onclick="insertEmoji('👍')">👍</span>
+            <span onclick="insertEmoji('😂')">😂</span>
+            <span onclick="insertEmoji('🔥')">🔥</span>
+            <span onclick="insertEmoji('😊')">😊</span>
+            <span onclick="insertEmoji('😮')">😮</span>
+            <span onclick="insertEmoji('😢')">😢</span>
+            <span onclick="insertEmoji('🙏')">🙏</span>
+            <span onclick="insertEmoji('👏')">👏</span>
+            <span onclick="insertEmoji('🎉')">🎉</span>
+        </div>
+
+        <div id="file-preview"></div>
+        <div class="chat-input-wrapper">
+            <label for="chat-file-input" class="chat-icon-btn" title="Attach Image">
+                📎
+            </label>
+            <input type="file" id="chat-file-input" accept="image/*" style="display:none;" onchange="handleFileSelect(event)">
+
+            <input type="text" id="chat-input-text" placeholder="Compose your message..." onkeypress="handleEnter(event)">
+
+            <button type="button" class="chat-icon-btn" onclick="toggleEmojiPicker()" title="Add Emoji">🙂</button>
+
+            <button class="chat-icon-btn send-btn" onclick="sendMessage()" title="Send">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+        <div class="chat-brand">We run on <strong>BottMovies</strong></div>
+    </div>
+</div>
+
+<script>
+    /* =========================================
+       LANGUAGE TOGGLE LOGIC
+       ========================================= */
+    let currentLang = 'en';
+
+    function setLanguage(lang) {
+        if (lang !== 'bn' && lang !== 'en') return;
+        currentLang = lang;
+
+        document.querySelectorAll('.lang-toggle-option').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-lang') === currentLang);
+        });
+
+        const pageTitle = document.getElementById('pageTitle');
+        const pageSubtitle = document.getElementById('pageSubtitle');
+        const breadcrumbText = document.getElementById('breadcrumbText');
+        const noteText = document.getElementById('noteText');
+        const rcComposerTitle = document.getElementById('rcComposerTitle');
+        const rcComposerText = document.getElementById('rcComposerText');
+        const rcComposerName = document.getElementById('rcComposerName');
+        const rcComposerSubmitBtn = document.getElementById('rcComposerSubmitBtn');
+
+        if (currentLang === 'bn') {
+            pageTitle.innerText = "রিপোর্ট ব্রোকেন লিংকস।";
+            pageSubtitle.innerText = "রিপোর্ট করার নিয়ম:";
+            breadcrumbText.innerHTML = '<a href="index.html">হোম</a> » <a href="How-to-Download.html">কীভাবে ডাউনলোড করবেন</a> » <span class="breadcrumb-current">রিপোর্ট ব্রোকেন লিংকস</span>';
+            noteText.innerHTML = noteText.getAttribute('data-bn');
+            if (rcComposerTitle) rcComposerTitle.innerText = "কমেন্ট যোগ করুন";
+            if (rcComposerText) rcComposerText.placeholder = "কমেন্ট টেক্সট*";
+            if (rcComposerName) rcComposerName.placeholder = "নাম*";
+            if (rcComposerSubmitBtn) rcComposerSubmitBtn.innerText = "কমেন্ট সাবমিট করুন";
+        } else {
+            pageTitle.innerText = "Report Broken Links.";
+            pageSubtitle.innerText = "How to Report:";
+            breadcrumbText.innerHTML = '<a href="index.html">Home</a> » <a href="How-to-Download.html">How to Download</a> » <span class="breadcrumb-current">Report Broken Links</span>';
+            noteText.innerHTML = noteText.getAttribute('data-en');
+            if (rcComposerTitle) rcComposerTitle.innerText = "ADD COMMENT";
+            if (rcComposerText) rcComposerText.placeholder = "Comment Text*";
+            if (rcComposerName) rcComposerName.placeholder = "Name*";
+            if (rcComposerSubmitBtn) rcComposerSubmitBtn.innerText = "SUBMIT COMMENT";
+        }
+
+        document.querySelectorAll('.step-text').forEach(el => {
+            if (el.hasAttribute('data-bn') || el.hasAttribute('data-en')) {
+                el.innerHTML = el.getAttribute(currentLang === 'bn' ? 'data-bn' : 'data-en');
+            }
+        });
+        document.querySelectorAll('#formatList li').forEach(el => {
+            el.innerText = el.getAttribute(currentLang === 'bn' ? 'data-bn' : 'data-en');
+        });
+    }
+
+    /* =========================================
+       LIGHT / DARK THEME TOGGLE
+       ========================================= */
+    const THEME_STORAGE_KEY = 'bottmovies_theme';
+
+    const THEME_ICON_SUN = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="5" fill="#fbbf24"/>
+        <g stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round">
+            <line x1="12" y1="1" x2="12" y2="3.3"/>
+            <line x1="12" y1="20.7" x2="12" y2="23"/>
+            <line x1="1" y1="12" x2="3.3" y2="12"/>
+            <line x1="20.7" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="4.22" x2="5.87" y2="5.87"/>
+            <line x1="18.13" y1="18.13" x2="19.78" y2="19.78"/>
+            <line x1="4.22" y1="19.78" x2="5.87" y2="18.13"/>
+            <line x1="18.13" y1="5.87" x2="19.78" y2="4.22"/>
+        </g>
+    </svg>`;
+
+    const THEME_ICON_MOON = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20.5 13.6A8.5 8.5 0 1 1 10.4 3.5a6.8 6.8 0 0 0 10.1 10.1z" fill="#14161c"/>
+    </svg>`;
+
+    function getCurrentThemeMode() {
+        return document.documentElement.classList.contains('light-mode') ? 'light' : 'dark';
+    }
+
+    function applyThemeToggleIcon() {
+        const iconWrap = document.getElementById('theme-toggle-icon');
+        if (!iconWrap) return;
+        iconWrap.innerHTML = getCurrentThemeMode() === 'light' ? THEME_ICON_MOON : THEME_ICON_SUN;
+    }
+
+    function setThemeMode(mode) {
+        const isLight = mode === 'light';
+        document.documentElement.classList.toggle('light-mode', isLight);
+        try { localStorage.setItem(THEME_STORAGE_KEY, isLight ? 'light' : 'dark'); } catch (e) {}
+        applyThemeToggleIcon();
+    }
+
+    function toggleThemeMode() {
+        setThemeMode(getCurrentThemeMode() === 'light' ? 'dark' : 'light');
+    }
+
+    document.addEventListener('DOMContentLoaded', applyThemeToggleIcon);
+
+    /* =========================================
+       CHAT TOGGLE & MESSAGE LOGIC
+       ========================================= */
+    let selectedImageBase64 = null;
+    let selectedImageFile = null;
+    let userMessagesList = [];
+
+    window.onload = function() {
+        appendMessage("How can we help with BottMovies?", null, 'received');
+    };
+
+    function openChat() {
+        document.getElementById('chat-widget-container').style.display = 'flex';
+        document.getElementById('chat-widget-btn').style.display = 'none';
+    }
+
+    function closeChat() {
+        if (userMessagesList.length > 0) {
+            sendEmailNotification(userMessagesList);
+        }
+
+        userMessagesList = [];
+        const chatBody = document.getElementById('chatBody');
+        chatBody.innerHTML = '';
+        appendMessage("How can we help with BottMovies?", null, 'received');
+
+        document.getElementById('chat-widget-container').style.display = 'none';
+        document.getElementById('chat-widget-btn').style.display = 'flex';
+        document.getElementById('emoji-picker').style.display = 'none';
+    }
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            selectedImageFile = file;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageBase64 = e.target.result;
+                const preview = document.getElementById('file-preview');
+                preview.style.display = 'block';
+                preview.innerHTML = `📎 ${file.name} <span style="float:right; cursor:pointer; color:#ff4d4d;" onclick="removeFile()">✖</span>`;
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function removeFile() {
+        selectedImageBase64 = null;
+        selectedImageFile = null;
+        document.getElementById('file-preview').style.display = 'none';
+        document.getElementById('chat-file-input').value = '';
+    }
+
+    function handleEnter(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    function toggleEmojiPicker() {
+        const picker = document.getElementById('emoji-picker');
+        picker.style.display = (picker.style.display === 'grid') ? 'none' : 'grid';
+    }
+
+    function insertEmoji(emoji) {
+        const input = document.getElementById('chat-input-text');
+        input.value += emoji;
+        input.focus();
+        document.getElementById('emoji-picker').style.display = 'none';
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chat-input-text');
+        const text = input.value.trim();
+
+        if (!text && !selectedImageBase64) return;
+
+        let imageUrlForEmail = null;
+
+        if (selectedImageFile) {
+            const formData = new FormData();
+            formData.append('image', selectedImageFile);
+
+            try {
+                const res = await fetch('https://api.imgbb.com/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data && data.data && data.data.url) {
+                    imageUrlForEmail = data.data.url;
+                }
+            } catch (err) {
+                console.error("Image Upload Failed:", err);
+            }
+        }
+
+        appendMessage(text, selectedImageBase64, 'sent');
+
+        userMessagesList.push({
+            time: new Date().toLocaleTimeString(),
+            text: text || "[Sent an image]",
+            imageUrl: imageUrlForEmail
+        });
+
+        input.value = '';
+        removeFile();
+        document.getElementById('emoji-picker').style.display = 'none';
+
+        setTimeout(() => {
+            appendMessage("Thank you for your feedback!", null, 'received');
+        }, 1000);
+    }
+
+    function appendMessage(text, imgData, type) {
+        const chatBody = document.getElementById('chatBody');
+
+        const container = document.createElement('div');
+        container.className = `chat-message-container ${type}`;
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message ${type}`;
+
+        if (text) {
+            const p = document.createElement('div');
+            p.textContent = text;
+            msgDiv.appendChild(p);
+        }
+
+        if (imgData) {
+            const img = document.createElement('img');
+            img.src = imgData;
+            msgDiv.appendChild(img);
+        }
+
+        const reactBtn = document.createElement('button');
+        reactBtn.type = 'button';
+        reactBtn.className = 'msg-react-btn';
+        reactBtn.innerHTML = '🙂';
+        reactBtn.onclick = function(e) {
+            e.stopPropagation();
+            toggleQuickReact(this);
+        };
+
+        const reactBar = document.createElement('div');
+        reactBar.className = 'quick-react-bar';
+        const emojis = ['❤️', '👍', '😂', '🔥', '😮', '😢'];
+        emojis.forEach(e => {
+            const s = document.createElement('span');
+            s.textContent = e;
+            s.onclick = function(ev) {
+                ev.stopPropagation();
+                addReaction(this, e);
+            };
+            reactBar.appendChild(s);
+        });
+
+        const badge = document.createElement('div');
+        badge.className = 'reaction-badge';
+        badge.onclick = function() {
+            this.classList.remove('active');
+            this.textContent = '';
+        };
+
+        container.appendChild(reactBar);
+        container.appendChild(msgDiv);
+        container.appendChild(reactBtn);
+        container.appendChild(badge);
+
+        chatBody.appendChild(container);
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function toggleQuickReact(btn) {
+        const bar = btn.previousElementSibling.previousElementSibling;
+        const isVisible = bar.style.display === 'flex';
+        document.querySelectorAll('.quick-react-bar').forEach(b => b.style.display = 'none');
+        bar.style.display = isVisible ? 'none' : 'flex';
+    }
+
+    function addReaction(emojiElement, emoji) {
+        const container = emojiElement.closest('.chat-message-container');
+        const badge = container.querySelector('.reaction-badge');
+        badge.textContent = emoji;
+        badge.classList.add('active');
+        container.querySelector('.quick-react-bar').style.display = 'none';
+    }
+
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.quick-react-bar').forEach(b => b.style.display = 'none');
+    });
+
+    function sendEmailNotification(messages) {
+        let messageBody = "New Support Chat Log from BottMovies:\n\n";
+        messages.forEach((msg) => {
+            messageBody += `[${msg.time}] User: ${msg.text}\n`;
+            if (msg.imageUrl) {
+                messageBody += `📷 Attached Image Link: ${msg.imageUrl}\n`;
+            }
+            messageBody += `-------------------------------\n`;
+        });
+
+        fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                access_key: 'c6dfa988-77b4-45ba-af78-bc53e7af0a83',
+                subject: 'New BottMovies Support Chat Log',
+                from_name: 'BottMovies Chatbot',
+                message: messageBody
+            })
+        }).then(response => {
+            console.log("Chat log email sent successfully.");
+        }).catch(error => {
+            console.error("Error sending chat log to email:", error);
+        });
+    }
+</script>
+
+<!-- ==================== LIVE "REPORT" COMMENT THREAD LOGIC ====================
+     Same Supabase project as the main site. No login, no email - just a
+     name + comment text, saved to the `link_report_comments` table.
+     See link_report_comments_schema.sql for the one-time DB setup. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="text/javascript">
+(function () {
+    const SUPABASE_URL = 'https://borglnmrvjafodkqhhhv.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_Q3WcdMEHLJO7SkO3Sd7BDQ_Ohu8xAp9';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const PAGE_SIZE = 10;
+    let offset = 0;
+    let totalCount = 0;
+    let lastGuestName = '';
+
+    function escapeHtml(str) {
+        return String(str == null ? '' : str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
+    }
+
+    function formatDate(dateStr) {
+        try {
+            return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        } catch (e) { return ''; }
+    }
+
+    function initialOf(name) {
+        return (name || '?').trim().charAt(0).toUpperCase() || '?';
+    }
+
+    function renderReply(r) {
+        return `
+        <div class="rc-node rc-reply">
+            <div class="rc-avatar">${initialOf(r.guest_name)}</div>
+            <div class="rc-body">
+                <div class="rc-meta">
+                    <span class="rc-name">${escapeHtml(r.guest_name || 'Guest')}</span>
+                    ${r.is_admin ? '<span class="rc-admin-badge">Admin</span>' : ''}
+                    <span class="rc-time">${formatDate(r.created_at)}</span>
+                </div>
+                <div class="rc-text">${escapeHtml(r.content)}</div>
+            </div>
+        </div>`;
+    }
+
+    function renderComment(c, replies) {
+        return `
+        <div class="rc-node" data-comment-id="${c.id}">
+            <div class="rc-avatar">${initialOf(c.guest_name)}</div>
+            <div class="rc-body">
+                <div class="rc-meta">
+                    <span class="rc-name">${escapeHtml(c.guest_name || 'Guest')}</span>
+                    ${c.is_admin ? '<span class="rc-admin-badge">Admin</span>' : ''}
+                    <span class="rc-time">${formatDate(c.created_at)}</span>
+                </div>
+                <div class="rc-text">${escapeHtml(c.content)}</div>
+                <div class="rc-actions"><span class="rc-reply-link" onclick="toggleReplyBox(${c.id})">Reply</span></div>
+                <div class="rc-reply-form-wrap" id="replyForm-${c.id}"></div>
+                <div class="rc-replies">${(replies || []).map(renderReply).join('')}</div>
+            </div>
+        </div>`;
+    }
+
+    function updateCountLabel() {
+        const el = document.getElementById('rcCountLabel');
+        if (el) el.textContent = `${totalCount} COMMENT${totalCount === 1 ? '' : 'S'}`;
+    }
+
+    async function loadMoreComments() {
+        const olderBtn = document.getElementById('rcOlderBtn');
+        if (olderBtn) { olderBtn.disabled = true; olderBtn.textContent = 'Loading…'; }
+
+        const { data: topLevel, error } = await sb
+            .from('link_report_comments')
+            .select('*')
+            .is('parent_id', null)
+            .order('created_at', { ascending: false })
+            .range(offset, offset + PAGE_SIZE - 1);
+
+        if (error) {
+            console.error('Load report comments error:', error);
+            const listEl = document.getElementById('rcList');
+            if (offset === 0 && listEl) listEl.innerHTML = '<div class="rc-empty">Couldn\'t load comments right now.</div>';
+            if (olderBtn) { olderBtn.disabled = false; olderBtn.textContent = '« Older Comments'; }
+            return;
+        }
+
+        const listEl = document.getElementById('rcList');
+        if (offset === 0 && listEl) listEl.innerHTML = '';
+
+        if (!topLevel || topLevel.length === 0) {
+            if (offset === 0 && listEl) listEl.innerHTML = '<div class="rc-empty">No comments yet. Be the first to report a broken link.</div>';
+            if (olderBtn) olderBtn.style.display = 'none';
+            return;
+        }
+
+        const ids = topLevel.map(c => c.id);
+        const { data: replies } = await sb
+            .from('link_report_comments')
+            .select('*')
+            .in('parent_id', ids)
+            .order('created_at', { ascending: true });
+
+        const repliesByParent = {};
+        (replies || []).forEach(r => {
+            (repliesByParent[r.parent_id] = repliesByParent[r.parent_id] || []).push(r);
+        });
+
+        if (listEl) {
+            listEl.insertAdjacentHTML('beforeend', topLevel.map(c => renderComment(c, repliesByParent[c.id])).join(''));
+        }
+
+        offset += topLevel.length;
+
+        if (olderBtn) {
+            olderBtn.disabled = false;
+            olderBtn.textContent = '« Older Comments';
+            olderBtn.style.display = offset < totalCount ? 'block' : 'none';
+        }
+    }
+    window.loadMoreComments = loadMoreComments;
+
+    window.toggleReplyBox = function (id) {
+        document.querySelectorAll('.rc-reply-form-wrap').forEach(w => {
+            if (w.id !== `replyForm-${id}`) w.innerHTML = '';
+        });
+        const wrap = document.getElementById(`replyForm-${id}`);
+        if (!wrap) return;
+        if (wrap.innerHTML.trim()) { wrap.innerHTML = ''; return; }
+        wrap.innerHTML = `
+            <input type="text" class="rc-input rc-reply-name" placeholder="Name*" maxlength="40" value="${escapeHtml(lastGuestName)}">
+            <textarea class="rc-textarea rc-reply-text" rows="2" placeholder="Write a reply..."></textarea>
+            <div class="rc-form-actions">
+                <button type="button" class="rc-btn-cancel" onclick="toggleReplyBox(${id})">Cancel</button>
+                <button type="button" class="rc-btn-submit" onclick="submitReply(${id}, this)">Reply</button>
+            </div>`;
+        const ta = wrap.querySelector('.rc-reply-text');
+        if (ta) ta.focus();
+    };
+
+    window.submitReply = async function (parentId, btn) {
+        const wrap = btn.closest('.rc-reply-form-wrap');
+        const nameInput = wrap.querySelector('.rc-reply-name');
+        const textInput = wrap.querySelector('.rc-reply-text');
+        const name = (nameInput.value || '').trim().slice(0, 40) || 'Guest';
+        const text = (textInput.value || '').trim();
+        if (!text) { textInput.focus(); return; }
+
+        btn.disabled = true;
+        btn.textContent = 'Posting…';
+
+        const { data, error } = await sb.from('link_report_comments')
+            .insert([{ guest_name: name, content: text.slice(0, 1000), parent_id: parentId }])
+            .select();
+
+        if (error) {
+            console.error('Reply error:', error);
+            btn.disabled = false;
+            btn.textContent = 'Reply';
+            alert("দুঃখিত, রিপ্লাই পোস্ট করা যায়নি। একটু পর আবার চেষ্টা করুন।");
+            return;
+        }
+
+        lastGuestName = name;
+        wrap.innerHTML = '';
+        const node = wrap.closest('.rc-node');
+        const repliesWrap = node ? node.querySelector('.rc-replies') : null;
+        if (repliesWrap && data && data[0]) repliesWrap.insertAdjacentHTML('beforeend', renderReply(data[0]));
+    };
+
+    window.submitTopComment = async function () {
+        const nameInput = document.getElementById('rcComposerName');
+        const textInput = document.getElementById('rcComposerText');
+        const btn = document.getElementById('rcComposerSubmitBtn');
+        const msgEl = document.getElementById('rcComposerMsg');
+
+        const name = (nameInput.value || '').trim().slice(0, 40);
+        const text = (textInput.value || '').trim();
+
+        if (!name) { if (msgEl) { msgEl.textContent = 'অনুগ্রহ করে আপনার নাম লিখুন।'; msgEl.className = 'rc-form-msg'; } nameInput.focus(); return; }
+        if (!text) { if (msgEl) { msgEl.textContent = 'অনুগ্রহ করে কমেন্ট লিখুন।'; msgEl.className = 'rc-form-msg'; } textInput.focus(); return; }
+
+        btn.disabled = true;
+        btn.textContent = 'Posting…';
+        if (msgEl) msgEl.textContent = '';
+
+        const { data, error } = await sb.from('link_report_comments')
+            .insert([{ guest_name: name, content: text.slice(0, 1000) }])
+            .select();
+
+        btn.disabled = false;
+        btn.textContent = 'SUBMIT COMMENT';
+
+        if (error) {
+            console.error('Submit report comment error:', error);
+            if (msgEl) { msgEl.textContent = 'দুঃখিত, পোস্ট করা যায়নি। একটু পর আবার চেষ্টা করুন।'; msgEl.className = 'rc-form-msg'; }
+            return;
+        }
+
+        lastGuestName = name;
+        textInput.value = '';
+        if (msgEl) { msgEl.textContent = 'ধন্যবাদ, আপনার রিপোর্ট পোস্ট হয়েছে!'; msgEl.className = 'rc-form-msg success'; }
+
+        const listEl = document.getElementById('rcList');
+        if (listEl && data && data[0]) {
+            const empty = listEl.querySelector('.rc-empty');
+            if (empty) empty.remove();
+            listEl.insertAdjacentHTML('afterbegin', renderComment(data[0], []));
+        }
+        totalCount += 1;
+        offset += 1;
+        updateCountLabel();
+    };
+
+    async function init() {
+        const { count } = await sb.from('link_report_comments')
+            .select('id', { count: 'exact', head: true })
+            .is('parent_id', null);
+        totalCount = count || 0;
+        updateCountLabel();
+        await loadMoreComments();
+    }
+
+    init();
+})();
+</script>
+
+</body>
+</html>

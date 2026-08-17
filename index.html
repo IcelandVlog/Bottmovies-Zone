@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bottmovies Zone</title>
+<!-- SharedArrayBuffer fix: ffmpeg.wasm (media scan) দরকার হয় cross-origin isolation, যা এই সার্ভিস ওয়ার্কার দিয়ে হবে (server-এ header সেট করার সুযোগ না থাকলেও কাজ করবে) -->
+<script src="coi-serviceworker.js"></script>
+<script>
+  // থিম সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
+  (function(){
+      try {
+          var savedTheme = localStorage.getItem('bottmovies_theme');
+          if (savedTheme === 'light') {
+              document.documentElement.classList.add('light-mode');
+          }
+      } catch(e) {}
+  })();
+</script>
+<link rel="stylesheet" href="style.css">
+<link rel="shortcut icon" href="favicon.png" type="image/x-icon"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- এডমিন প্যানেলের ভিডিও/ZIP স্ক্যান ফিচারের জন্য (audio/subtitle auto-detect), ব্রাউজারেই লোকালি চলে -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script type="text/javascript">
+  (function(){
+      emailjs.init({
+        publicKey: "cGW3mW99kPaOdcUdq",
+      });
+  })();
+</script>
+</head>
+
+<!-- ডিফল্ট ক্যাটাগরি all রাখা হয়েছে -->
+<body data-category="all">
+
+<header class="main-header">
+<div class="top-bar">
+    <button type="button" class="menu-toggle-btn" id="menuToggleBtn">☰ MENU</button>
+    <a href="#home" class="logo nav-link" data-target="all" id="siteLogo">BOTT<span> MOVIES</span></a>
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="What are you looking for?" autocomplete="off">
+        <button type="button" id="searchBtn">🔍</button>
+        <div class="search-suggestions" id="searchSuggestions"></div>
+    </div>
+
+    <div class="top-right-buttons">
+        <a href="#bangla-dubbed" class="btn-top-bolly nav-link" data-target="bangla-dubbed">Bangla Dubbed</a>
+        <a href="#anime-flix" class="btn-top-anime nav-link" data-target="anime">Anime/Flix</a>
+    </div>
+</div>
+
+<nav class="main-nav" id="mainNav">
+    <ul>
+        <li><a href="#home" class="nav-link active" data-target="all" id="homeMenuLink">HOME</a></li>
+        <li class="has-dropdown">
+            <a href="#" class="dropdown-toggle">MOVIES ▾</a>
+            <ul class="dropdown-menu">
+                <li><a href="#english-movies" class="nav-link" data-target="english" data-banner="English, German, Spanish... Movies">English Movies</a></li>
+                <li><a href="#hindi-movies" class="nav-link" data-target="hindi" data-banner="Hindi, Tamil, Telugu... Movies">Hindi Movies</a></li>
+                <li><a href="#bangla-movies" class="nav-link" data-target="bangla">Bangla Movies</a></li>
+                <li><a href="#korean-movies" class="nav-link" data-target="korean" data-banner="Korean, Chinese, Japanese... Movies">Korean Movies</a></li>
+            </ul>
+        </li>
+        <li class="has-dropdown">
+            <a href="#" class="dropdown-toggle">WEB SERIES ▾</a>
+            <ul class="dropdown-menu">
+                <li><a href="#english-series" class="nav-link" data-target="english-series" data-banner="English, German, Spanish... Series">English Series</a></li>
+                <li><a href="#hindi-series" class="nav-link" data-target="hindi-series" data-banner="Hindi, Tamil, Telugu... Series">Hindi Series</a></li>
+                <li><a href="#bangla-series" class="nav-link" data-target="bangla-series">Bangla Series</a></li>
+                <li><a href="#korean-series" class="nav-link" data-target="korean-series" data-banner="Korean, Chinese, Japanese... Series">Korean Series</a></li>
+            </ul>
+        </li>
+        <li class="has-dropdown">
+            <a href="#" class="dropdown-toggle">OTT SHOWS ▾</a>
+            <ul class="dropdown-menu">
+                <li><a href="#netflix" class="nav-link" data-target="netflix">Netflix</a></li>
+                <li><a href="#prime-video" class="nav-link" data-target="prime-video" data-banner="Amazon Prime Video">Amazon Prime</a></li>
+                <li><a href="#hbo-max" class="nav-link" data-target="hbo-max">HBO MAX</a></li>
+                <li><a href="#disney-plus" class="nav-link" data-target="disney" data-banner="Disney+ Hotstar, Marvel, DC...">Disney+ Hotstar</a></li>
+                <li><a href="#crunchyroll" class="nav-link" data-target="crunchyroll">Crunchyroll</a></li>
+                <li><a href="#hoichoi" class="nav-link" data-target="hoichoi">Hoichoi</a></li>
+                <li><a href="#chorki" class="nav-link" data-target="chorki">Chorki</a></li>
+            </ul>
+        </li>
+        <li><a href="https://obiramtvlive.pages.dev/" id="sportsMenuLink">SPORTS</a></li>
+    </ul>
+</nav>
+
+<div class="notice-banner" id="noticeBanner">
+    <span id="noticeBannerText">We have Changed our Official Domain to BOTTMOVIES.Bookmarks Now</span>
+    <span class="close-banner" onclick="closeNotice()">✖</span>
+</div>
+</header>
+
+<main class="content-container">
+<div class="movie-grid" id="movieGrid"></div>
+<div class="pagination" id="paginationContainer"></div>
+</main>
+
+<div class="modal-overlay" id="movieModalOverlay">
+<div class="modal-box" id="modalDynamicBox"></div>
+</div>
+
+<!-- ==================== ADMIN PANEL (Hidden Access) ==================== -->
+<div class="admin-overlay" id="adminOverlay">
+<div class="admin-panel">
+    <div class="admin-panel-header">
+        <div class="admin-tabs">
+            <button type="button" class="admin-tab-btn active" id="adminTabBtnAdd" onclick="switchAdminTab('add')">➕ Add / Edit Content</button>
+            <button type="button" class="admin-tab-btn" id="adminTabBtnManage" onclick="switchAdminTab('manage')">🗂 Database</button>
+            <button type="button" class="admin-tab-btn" id="adminTabBtnComments" onclick="switchAdminTab('comments')">💬 Comments</button>
+            <button type="button" class="admin-tab-btn" id="adminTabBtnTrash" onclick="switchAdminTab('trash')">🗑 Recycle Bin<span class="admin-trash-count" id="adminTrashCount" style="display:none;"></span></button>
+        </div>
+        <span class="admin-close-btn" onclick="closeAdminPanel()">✖</span>
+    </div>
+
+    <div class="admin-panel-body">
+
+        <!-- ADD / EDIT TAB -->
+        <div class="admin-tab-content" id="adminTabAdd">
+            <input type="hidden" id="adminEditingId" value="">
+
+            <div class="admin-field">
+                <label>Title *</label>
+                <input type="text" id="adminTitle" placeholder="e.g. Inception (2010)">
+            </div>
+
+            <div class="admin-field">
+                <label>Search Name (auto-generated from Title, year removed)</label>
+                <input type="text" id="adminSearchName" placeholder="Auto-filled from title">
+            </div>
+
+            <div class="admin-field">
+                <label>Category <span class="admin-hint">(select one or more — "All" is applied automatically)</span></label>
+                <div class="admin-category-box" id="adminCategoryBox"></div>
+                <div class="admin-add-category-row">
+                    <input type="text" id="adminNewCategoryInput" placeholder="Type a new category name...">
+                    <button type="button" class="admin-mini-btn" onclick="addNewAdminCategory()">+ Add Category</button>
+                </div>
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>IMDb ID / Link <span class="admin-hint">(optional)</span></label>
+                    <input type="text" id="adminImdbId" placeholder="tt1375666 or full IMDb link">
+                </div>
+                <div class="admin-field">
+                    <label>TMDB ID / Link <span class="admin-hint">(optional)</span></label>
+                    <input type="text" id="adminTmdbId" placeholder="27205 or full TMDB link">
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>TMDB Type *</label>
+                <div class="admin-toggle-group" id="adminTmdbTypeGroup">
+                    <button type="button" class="admin-toggle-btn active" data-value="movie" onclick="selectTmdbType('movie')">🎬 Movie</button>
+                    <button type="button" class="admin-toggle-btn" data-value="tv" onclick="selectTmdbType('tv')">📺 TV / Series</button>
+                </div>
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Audio</label>
+                    <input type="text" id="adminAudio" placeholder="e.g. Hindi, English, Bangla">
+                </div>
+                <div class="admin-field">
+                    <label>Subtitles</label>
+                    <input type="text" id="adminSubtitles" placeholder="e.g. English, Bangla">
+                </div>
+            </div>
+
+            <div class="admin-field" id="adminMediaScanField">
+                <label>Scan Video for Audio &amp; Subtitles <span class="admin-hint">(optional — auto-fills the fields above)</span></label>
+                <input type="file" id="adminMediaScanFile" accept=".mkv,.mp4,video/x-matroska,video/mp4">
+                <div class="admin-media-scan-status" id="adminMediaScanStatus"></div>
+                <div class="admin-media-scan-result" id="adminMediaScanResult" style="display:none;"></div>
+            </div>
+
+            <div class="admin-field">
+                <label>Poster <span class="admin-hint">(optional — link or upload)</span></label>
+                <div class="admin-toggle-group" id="adminPosterModeGroup">
+                    <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setPosterMode('link')">🔗 Link</button>
+                    <button type="button" class="admin-toggle-btn" data-value="file" onclick="setPosterMode('file')">📁 Upload File</button>
+                </div>
+                <input type="text" id="adminPosterLink" placeholder="https://... poster image link" style="margin-top:8px;">
+                <input type="file" id="adminPosterFile" accept="image/*" style="display:none; margin-top:8px;">
+                <div id="adminPosterPreviewWrap" style="display:none;"><img id="adminPosterPreview" class="admin-poster-preview"></div>
+            </div>
+
+            <div class="admin-field" id="adminMovieLinksField">
+                <label>Download Links</label>
+                <div id="adminMovieLinksList"></div>
+                <button type="button" class="admin-add-row-btn" onclick="addMovieLinkRow()">+ Add Download Link</button>
+            </div>
+
+            <div class="admin-field" id="adminSeasonsField" style="display:none;">
+                <label>Seasons</label>
+                <div id="adminSeasonsList"></div>
+                <button type="button" class="admin-add-row-btn" onclick="addSeasonBlock()">+ Add Season</button>
+            </div>
+
+            <div id="adminFormMsg" class="admin-form-msg"></div>
+
+            <button type="button" class="admin-submit-btn" id="adminSubmitBtn" onclick="submitAdminContent()">Add Content</button>
+            <button type="button" class="admin-cancel-edit-btn" id="adminCancelEditBtn" onclick="resetAdminForm()" style="display:none;">Cancel Edit / New Content</button>
+        </div>
+
+        <!-- MANAGE / DATABASE TAB -->
+        <div class="admin-tab-content" id="adminTabManage" style="display:none;">
+            <div class="admin-manage-search">
+                <input type="text" id="adminSearchInput" placeholder="🔍 Search all content in database...">
+            </div>
+            <div class="admin-database-list" id="adminDatabaseList"></div>
+        </div>
+
+        <!-- COMMENTS TAB -->
+        <div class="admin-tab-content" id="adminTabComments" style="display:none;">
+            <div class="admin-manage-search">
+                <input type="text" id="adminCommentSearchInput" placeholder="🔍 Search comments by text, name, or movie...">
+            </div>
+            <div class="admin-database-list" id="adminCommentsList"></div>
+        </div>
+
+        <!-- RECYCLE BIN TAB -->
+        <div class="admin-tab-content" id="adminTabTrash" style="display:none;">
+            <div class="admin-trash-note">Deleted items stay here for 30 days, then are permanently removed. Restore anytime before that.</div>
+            <div class="admin-database-list" id="adminTrashList"></div>
+        </div>
+
+    </div>
+</div>
+</div>
+
+<footer class="main-footer" style="padding-top: 15px; padding-bottom: 15px;">
+    <div style="text-align: center;">
+        <a href="How-to-Download.html" target="_blank" style="color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#94a3b8'">How to Download</a>
+        <span style="color:#3a3f4a; margin: 0 10px;">|</span>
+        <a href="report-broken-links.html" target="_blank" style="color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#94a3b8'">Report Broken Links</a>
+    </div>
+    <div class="footer-links"></div>
+</footer>
+
+<!-- Light/Dark Theme Toggle Button (left side, mirrors the chat widget button) -->
+<div class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleThemeMode()" title="Switch light/dark mode">
+    <span id="themeToggleIcon"></span>
+</div>
+
+<!-- Floating Request Chat Widget (Crisp Style / Dark Theme) -->
+<div class="chat-widget-btn" id="chatWidgetBtn" onclick="toggleChatWidget()">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 6.5C3 5.67157 3.67157 5 4.5 5H19.5C20.3284 5 21 5.67157 21 6.5V17.5C21 18.3284 20.3284 19 19.5 19H4.5C3.67157 19 3 18.3284 3 17.5V6.5Z" stroke="white" stroke-width="1.6"/>
+        <path d="M4 6.5L12 13L20 6.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+</div>
+
+<div class="chat-widget-box" id="chatWidgetBox">
+    <div class="chat-widget-header">
+        <div class="chat-header-pill">
+            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            Messages
+        </div>
+        <div class="chat-avatars">
+            <div class="chat-avatar chat-avatar-gray">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <div class="chat-avatar chat-avatar-blue">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            </div>
+        </div>
+        <div class="chat-support-title">Request Here</div>
+        <div class="chat-support-status"></div>
+        <span class="chat-widget-close" onclick="closeChatWidget()">✕</span>
+    </div>
+    
+    <div class="chat-widget-body" id="chatWidgetBody"></div>
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>

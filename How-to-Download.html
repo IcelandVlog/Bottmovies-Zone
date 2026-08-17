@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How to Download - BOTTMOVIES</title>
+<link rel="shortcut icon" href="https://raw.githubusercontent.com/IcelandVlog/B.OTP/refs/heads/main/logo1.png" type="image/x-icon"/>
+<script>
+  // থিম আগে থেকে সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
+  (function(){
+      try {
+          if (localStorage.getItem('bottmovies_theme') === 'light') {
+              document.documentElement.classList.add('light-mode');
+          }
+      } catch(e) {}
+  })();
+</script>
+<style>
+    /* Base Dark Theme Styles */
+    :root {
+        --bg-color: #0b0b0c;
+        --text-main: #e0e0e0;
+        --text-strong: #ffffff;
+        --text-muted: #888;
+        --accent-color: #007bff;
+        --accent-hover: #0056b3;
+        --danger-color: #ff0000;
+        --border-color: #222;
+        --card-bg: #111112;
+        --card-border: #222;
+        --card-border-hover: #333;
+        --lang-btn-bg: #1a1a1a;
+        --lang-btn-border: #333;
+        --lang-btn-hover-bg: #2a2a2a;
+    }
+
+    html.light-mode {
+        --bg-color: #f2f4f7;
+        --text-main: #333a45;
+        --text-strong: #14161c;
+        --text-muted: #6b7280;
+        --accent-color: #007bff;
+        --accent-hover: #0056b3;
+        --danger-color: #d32f2f;
+        --border-color: #dde1e8;
+        --card-bg: #ffffff;
+        --card-border: #e5e8ee;
+        --card-border-hover: #c7ccd6;
+        --lang-btn-bg: #f1f3f7;
+        --lang-btn-border: #dde1e8;
+        --lang-btn-hover-bg: #e5e8ee;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Content Area Styles */
+    .content-container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .breadcrumb { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+    .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--text-strong); }
+    .breadcrumb .breadcrumb-current { color: #22c55e; font-weight: 600; }
+    
+    .page-title { font-size: 32px; font-weight: normal; margin-bottom: 30px; color: var(--text-strong); }
+    
+    .section-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-subtitle { font-size: 24px; color: var(--danger-color); font-weight: normal; margin: 0; }
+
+    /* BN/EN Toggle - segmented control, active side is highlighted */
+    .lang-toggle-group {
+        display: flex;
+        background-color: var(--lang-btn-bg);
+        border: 1px solid var(--lang-btn-border);
+        border-radius: 20px;
+        padding: 3px;
+        gap: 2px;
+    }
+    .lang-toggle-option {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 7px 16px;
+        border-radius: 16px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 13px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .lang-toggle-option:hover { color: var(--text-strong); }
+    .lang-toggle-option.active { background-color: var(--accent-color); color: #ffffff; }
+
+    /* Step Card Styles */
+    .step-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        transition: transform 0.2s, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .step-card:hover { border-color: var(--card-border-hover); }
+    
+    .step-text {
+        font-size: 17px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        color: var(--text-main);
+    }
+    .step-text strong {
+        color: var(--text-strong);
+    }
+
+    .step-image-container {
+        text-align: center;
+        margin-top: 15px;
+    }
+    .step-image-container img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 6px;
+        border: 1px solid var(--card-border-hover);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    .note-text {
+        color: var(--accent-color);
+        font-weight: bold;
+        font-size: 18px;
+        margin-top: 40px;
+        margin-bottom: 40px;
+    }
+
+    /* =========================================
+       CHAT WIDGET STYLES
+       ========================================= */
+       
+    /* Floating Message Button */
+    #chat-widget-btn {
+        position: fixed;
+        bottom: 25px;
+        right: 25px;
+        width: 60px;
+        height: 60px;
+        background-color: #2b6cb0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        z-index: 999999;
+        transition: transform 0.2s ease;
+    }
+    #chat-widget-btn:hover {
+        transform: scale(1.08);
+    }
+
+    /* Light/Dark Theme Toggle Button (mirrors the chat button, on the left side) */
+    #theme-toggle-btn {
+        position: fixed;
+        bottom: 25px;
+        left: 25px;
+        width: 60px;
+        height: 60px;
+        background-color: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        z-index: 999999;
+        transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    #theme-toggle-btn:hover {
+        transform: scale(1.08);
+    }
+    #theme-toggle-btn svg { width: 28px; height: 28px; display: block; }
+    #theme-toggle-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Chat Box Container */
+    #chat-widget-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 350px;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 40px);
+        background-color: #0d1321; /* Blue-Black background */
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 35px rgba(0,0,0,0.8);
+        display: none; /* Initially hidden */
+        flex-direction: column;
+        z-index: 999999;
+        border: 1px solid #1e293b;
+    }
+
+    /* Header (Black-Black) */
+    .chat-header {
+        background-color: #000000; 
+        padding: 15px;
+        color: white;
+        text-align: center;
+        position: relative;
+        flex-shrink: 0;
+    }
+    
+    /* Close (✖) Button at top right */
+    .chat-close-btn {
+        position: absolute;
+        top: 12px;
+        right: 15px;
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    .chat-close-btn:hover {
+        color: #ff4d4d;
+    }
+
+    .chat-header-title {
+        background-color: #1a1a1a;
+        border-radius: 20px;
+        padding: 5px 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        margin-bottom: 12px;
+        font-weight: bold;
+    }
+
+    .chat-avatars {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 8px;
+    }
+    .chat-avatar {
+        width: 42px;
+        height: 42px;
+        background-color: #555;
+        border-radius: 50%;
+        border: 3px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .chat-avatar.support {
+        background-color: #2b6cb0;
+        margin-left: -12px;
+    }
+
+    .chat-header-profile { font-size: 15px; font-weight: bold; }
+    .chat-header-status { font-size: 11px; color: #888; margin-top: 4px; }
+
+    /* Message Body (Blue-Black) */
+    .chat-body {
+        padding: 15px;
+        flex-grow: 1;
+        min-height: 180px;
+        max-height: 320px; 
+        overflow-y: auto;
+        background-color: #0d1321; 
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    /* Message Wrapper Container */
+    .chat-message-container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        max-width: 82%;
+    }
+    .chat-message-container.sent { align-self: flex-end; align-items: flex-end; }
+    .chat-message-container.received { align-self: flex-start; align-items: flex-start; }
+
+    .chat-message {
+        position: relative;
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 14px;
+        font-size: 13.5px;
+        line-height: 1.4;
+        word-wrap: break-word;
+        box-sizing: border-box;
+    }
+    .chat-message.received {
+        background-color: #1e293b;
+        color: #e2e8f0;
+        border-bottom-left-radius: 2px;
+    }
+    .chat-message.sent {
+        background-color: #2b6cb0;
+        color: white;
+        border-bottom-right-radius: 2px;
+    }
+    .chat-message img {
+        max-width: 100%;
+        border-radius: 8px;
+        margin-top: 6px;
+    }
+
+    /* Message Hover Reaction Button */
+    .msg-react-btn {
+        display: none;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        cursor: pointer;
+        color: #94a3b8;
+        z-index: 5;
+    }
+    .chat-message-container.sent .msg-react-btn { left: -30px; }
+    .chat-message-container.received .msg-react-btn { right: -30px; }
+    .chat-message-container:hover .msg-react-btn { display: flex; }
+
+    /* Quick Reaction Selector Bar */
+    .quick-react-bar {
+        display: none;
+        position: absolute;
+        top: -32px;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 20px;
+        padding: 3px 8px;
+        gap: 6px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        z-index: 10;
+    }
+    .quick-react-bar span {
+        cursor: pointer;
+        font-size: 14px;
+        transition: transform 0.15s;
+    }
+    .quick-react-bar span:hover {
+        transform: scale(1.3);
+    }
+
+    /* Reaction Badge on Message */
+    .reaction-badge {
+        display: none;
+        font-size: 12px;
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 2px 6px;
+        margin-top: -8px;
+        z-index: 2;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+    .reaction-badge.active {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    /* Footer & Input Area */
+    .chat-footer {
+        background-color: #0d1321; 
+        padding: 10px 15px 15px 15px;
+        border-top: 1px solid #1e293b;
+        flex-shrink: 0;
+        position: relative;
+    }
+    .chat-input-wrapper {
+        display: flex;
+        align-items: center;
+        background-color: #1e293b;
+        border-radius: 20px;
+        padding: 4px 10px;
+        border: 1px solid #334155;
+    }
+    #chat-input-text {
+        flex-grow: 1;
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 8px;
+        outline: none;
+        font-size: 13.5px;
+    }
+    #chat-input-text::placeholder { color: #94a3b8; }
+    
+    .chat-icon-btn {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s;
+    }
+    .chat-icon-btn:hover { color: #fff; }
+    .send-btn { color: #60a5fa; margin-left: 4px; }
+    .send-btn:hover { color: #93c5fd; }
+    
+    .chat-brand {
+        text-align: center;
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 8px;
+    }
+    .chat-brand strong { color: #94a3b8; }
+
+    /* Emoji Picker Box */
+    #emoji-picker {
+        display: none;
+        position: absolute;
+        bottom: 60px;
+        right: 15px;
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 8px;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        z-index: 100;
+    }
+    #emoji-picker span {
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px;
+        text-align: center;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+    #emoji-picker span:hover {
+        background-color: #334155;
+    }
+
+    /* File Preview area */
+    #file-preview {
+        display: none;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: #60a5fa;
+        background: #1e293b;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+    }
+</style>
+</head>
+<body>
+
+<main class="content-container">
+    <div class="breadcrumb" id="breadcrumbText">
+        <a href="index.html">Home</a> » <span class="breadcrumb-current">How to Download</span> » <a href="report-broken-links.html">Report Broken Links</a>
+    </div>
+
+    <h1 class="page-title" id="pageTitle">How to Download.</h1>
+
+    <!-- Section Header with Subtitle and BN/EN Button -->
+    <div class="section-header-flex">
+        <h2 class="page-subtitle" id="pageSubtitle">Steps to Download:</h2>
+        <div class="lang-toggle-group" id="langToggleGroup">
+            <button type="button" class="lang-toggle-option active" data-lang="en" onclick="setLanguage('en')">EN</button>
+            <button type="button" class="lang-toggle-option" data-lang="bn" onclick="setLanguage('bn')">বাং</button>
+        </div>
+    </div>
+
+    <!-- Steps Container -->
+    <div id="steps-container">
+        <div class="step-card" data-step="1">
+            <div class="step-text" data-en="▪ <strong>Step 1:</strong> First, from the specific content page on the bottmovies site, click on the download link button to click on <strong>Download File / Zip</strong> or copy the link." data-bn="▪ <strong>ধাপ ১:</strong> প্রথমে bottmovies সাইটের নির্দিষ্ট কন্টেন্ট পেজ থেকে download link বাটনে ক্লিক করে <strong>Download File / Zip</strong> অথবা Copy Link অপশনে ক্লিক করতে হবে।">
+                ▪ <strong>Step 1:</strong> First, from the specific content page on the bottmovies site, click on the download link button to click on <strong>Download File / Zip</strong> or copy the link.
+            </div>
+            <div class="step-image-container">
+                <img src="https://i.postimg.cc/k5NKJ4jS/Screenshot-2026-08-13-010006.png" alt="Download Step 1">
+            </div>
+        </div>
+
+        <div class="step-card" data-step="2">
+            <div class="step-text" data-en="▪ <strong>Step 2:</strong> If you clicked the download file/zip button, you need to copy the terabox link from your browser." data-bn="▪ <strong>ধাপ ২:</strong> যদি download file/zip বাটনে ক্লিক করেন তাহলে ব্রাউজার থেকে terabox লিংক কপি করতে হবে।">
+                ▪ <strong>Step 2:</strong> If you clicked the download file/zip button, you need to copy the terabox link from your browser.
+            </div>
+            <div class="step-image-container">
+                <img src="https://i.postimg.cc/qvyCwqdV/Screenshot-2026-08-13-010035.png" alt="Download Step 2">
+            </div>
+        </div>
+
+        <div class="step-card" data-step="3">
+            <div class="step-text" data-en="▪ <strong>Step 3:</strong> Go back to the bottmovies website, navigate to that content again, click the <strong>server-1</strong> or <strong>server-2</strong> button, and then click the <strong>downloader web</strong> button." data-bn="▪ <strong>ধাপ ৩:</strong> আবার bottmovies ওয়েবসাইটে গিয়ে ওই কন্টেন্ট থেকে <strong>server-1</strong> অথবা <strong>server-2</strong> বাটনে ক্লিক করে <strong>downloader web</strong> বাটনে ক্লিক করতে হবে।">
+                ▪ <strong>Step 3:</strong> Go back to the bottmovies website, navigate to that content again, click the <strong>server-1</strong> or <strong>server-2</strong> button, and then click the <strong>downloader web</strong> button.
+            </div>
+            <div class="step-image-container">
+                <img src="https://i.postimg.cc/2jtbfhzK/Screenshot-2026-08-13-010056.png" alt="Download Step 3">
+            </div>
+        </div>
+
+        <div class="step-card" data-step="4">
+            <div class="step-text" data-en="▪ <strong>Step 4:</strong> Now, paste the copied url/link and click the <strong>download</strong> button." data-bn="▪ <strong>ধাপ ৪:</strong> কপি করা url/link টা এখন পেস্ট করে <strong>download</strong> বাটনে ক্লিক করতে হবে।">
+                ▪ <strong>Step 4:</strong> Now, paste the copied url/link and click the <strong>download</strong> button.
+            </div>
+            <div class="step-image-container">
+                <img src="https://i.postimg.cc/Nj65Tn1s/Screenshot-2026-08-13-010129.png" alt="Download Step 4">
+            </div>
+        </div>
+
+        <div class="step-card" data-step="5">
+            <div class="step-text" data-en="▪ <strong>Step 5:</strong> After clicking the download button, the link will be processed. Click on <strong>download file</strong> below to start your download." data-bn="▪ <strong>ধাপ ৫:</strong> download বাটনে ক্লিক করার পরে লিংক প্রসেস হয়ে নিচে <strong>download file</strong> এ ক্লিক করলে ডাউনলোড শুরু হয়ে যাবে।">
+                ▪ <strong>Step 5:</strong> After clicking the download button, the link will be processed. Click on <strong>Download</strong> below to start your download.
+            </div>
+            <div class="step-image-container">
+                <img src="https://i.postimg.cc/Kj3YYpZf/Screenshot-2026-08-13-010204.png" alt="Download Step 5">
+            </div>
+        </div>
+    </div>
+
+    <div class="note-text" id="noteText" data-en="Note, if you face any Problem please comment down." data-bn="নোটঃ কোনো সমস্যা হলে নিচে কমেন্ট করুন।">
+        Note, if you face any Problem please comment down.
+    </div>
+</main>
+
+
+<!-- =========================================
+     FLOATING CHAT WIDGET
+     ========================================= -->
+
+<!-- =========================================
+     LIGHT / DARK THEME TOGGLE BUTTON
+     ========================================= -->
+<div id="theme-toggle-btn" onclick="toggleThemeMode()" title="Switch light/dark mode">
+    <span id="theme-toggle-icon"></span>
+</div>
+
+<!-- Message Button (Blue Circle Icon) -->
+<div id="chat-widget-btn" onclick="openChat()" title="Open Messages">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+        <polyline points="22,6 12,13 2,6"></polyline>
+    </svg>
+</div>
+
+<!-- Chat Window -->
+<div id="chat-widget-container">
+    <!-- Header (Black-Black) -->
+    <div class="chat-header">
+        <button type="button" class="chat-close-btn" onclick="closeChat()" title="Close">✖</button>
+        <div class="chat-header-title">
+            💬 Messages
+        </div>
+        <div class="chat-avatars">
+            <div class="chat-avatar">
+                <svg viewBox="0 0 24 24" fill="#aaa" width="22" height="22"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <div class="chat-avatar support">
+                <svg viewBox="0 0 24 24" fill="white" width="18" height="18"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            </div>
+        </div>
+        <div class="chat-header-profile">Chat with support</div>
+        <div class="chat-header-status">🕒 Last active an hour ago.</div>
+    </div>
+
+    <!-- Body (Blue-Black) -->
+    <div class="chat-body" id="chatBody">
+        <!-- Default Welcome Message -->
+    </div>
+
+    <!-- Footer / Input -->
+    <div class="chat-footer">
+        <!-- Emoji Picker Popup -->
+        <div id="emoji-picker">
+            <span onclick="insertEmoji('❤️')">❤️</span>
+            <span onclick="insertEmoji('👍')">👍</span>
+            <span onclick="insertEmoji('😂')">😂</span>
+            <span onclick="insertEmoji('🔥')">🔥</span>
+            <span onclick="insertEmoji('😊')">😊</span>
+            <span onclick="insertEmoji('😮')">😮</span>
+            <span onclick="insertEmoji('😢')">😢</span>
+            <span onclick="insertEmoji('🙏')">🙏</span>
+            <span onclick="insertEmoji('👏')">👏</span>
+            <span onclick="insertEmoji('🎉')">🎉</span>
+        </div>
+
+        <div id="file-preview"></div>
+        <div class="chat-input-wrapper">
+            <!-- File Attach -->
+            <label for="chat-file-input" class="chat-icon-btn" title="Attach Image">
+                📎
+            </label>
+            <input type="file" id="chat-file-input" accept="image/*" style="display:none;" onchange="handleFileSelect(event)">
+            
+            <!-- Text Input -->
+            <input type="text" id="chat-input-text" placeholder="Compose your message..." onkeypress="handleEnter(event)">
+            
+            <!-- Emoji Button -->
+            <button type="button" class="chat-icon-btn" onclick="toggleEmojiPicker()" title="Add Emoji">🙂</button>
+
+            <!-- Send Button -->
+            <button class="chat-icon-btn send-btn" onclick="sendMessage()" title="Send">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+        <div class="chat-brand">We run on <strong>BottMovies</strong></div>
+    </div>
+</div>
+
+<script>
+    /* =========================================
+       LANGUAGE TOGGLE LOGIC
+       ========================================= */
+    let currentLang = 'en';
+
+    function setLanguage(lang) {
+        if (lang !== 'bn' && lang !== 'en') return;
+        currentLang = lang;
+
+        document.querySelectorAll('.lang-toggle-option').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-lang') === currentLang);
+        });
+
+        const pageTitle = document.getElementById('pageTitle');
+        const pageSubtitle = document.getElementById('pageSubtitle');
+        const breadcrumbText = document.getElementById('breadcrumbText');
+        const noteText = document.getElementById('noteText');
+
+        if (currentLang === 'bn') {
+            pageTitle.innerText = "কীভাবে ডাউনলোড করবেন।";
+            pageSubtitle.innerText = "ডাউনলোড করার নিয়ম:";
+            breadcrumbText.innerHTML = '<a href="index.html">হোম</a> » <span class="breadcrumb-current">কীভাবে ডাউনলোড করবেন</span> » <a href="report-broken-links.html">রিপোর্ট ব্রোকেন লিংকস</a>';
+            noteText.innerHTML = noteText.getAttribute('data-bn');
+        } else {
+            pageTitle.innerText = "How to Download.";
+            pageSubtitle.innerText = "Steps to Download:";
+            breadcrumbText.innerHTML = '<a href="index.html">Home</a> » <span class="breadcrumb-current">How to Download</span> » <a href="report-broken-links.html">Report Broken Links</a>';
+            noteText.innerHTML = noteText.getAttribute('data-en');
+        }
+
+        const stepTexts = document.querySelectorAll('.step-text');
+        stepTexts.forEach(el => {
+            if (currentLang === 'bn') {
+                el.innerHTML = el.getAttribute('data-bn');
+            } else {
+                el.innerHTML = el.getAttribute('data-en');
+            }
+        });
+    }
+
+    /* =========================================
+       LIGHT / DARK THEME TOGGLE
+       ========================================= */
+    const THEME_STORAGE_KEY = 'bottmovies_theme';
+
+    // বাটনে সবসময় ক্লিক করলে যেই মোডে যাবে সেই মোডের আইকন দেখানো হয়
+    const THEME_ICON_SUN = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="5" fill="#fbbf24"/>
+        <g stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round">
+            <line x1="12" y1="1" x2="12" y2="3.3"/>
+            <line x1="12" y1="20.7" x2="12" y2="23"/>
+            <line x1="1" y1="12" x2="3.3" y2="12"/>
+            <line x1="20.7" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="4.22" x2="5.87" y2="5.87"/>
+            <line x1="18.13" y1="18.13" x2="19.78" y2="19.78"/>
+            <line x1="4.22" y1="19.78" x2="5.87" y2="18.13"/>
+            <line x1="18.13" y1="5.87" x2="19.78" y2="4.22"/>
+        </g>
+    </svg>`;
+
+    const THEME_ICON_MOON = `
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20.5 13.6A8.5 8.5 0 1 1 10.4 3.5a6.8 6.8 0 0 0 10.1 10.1z" fill="#14161c"/>
+    </svg>`;
+
+    function getCurrentThemeMode() {
+        return document.documentElement.classList.contains('light-mode') ? 'light' : 'dark';
+    }
+
+    function applyThemeToggleIcon() {
+        const iconWrap = document.getElementById('theme-toggle-icon');
+        if (!iconWrap) return;
+        iconWrap.innerHTML = getCurrentThemeMode() === 'light' ? THEME_ICON_MOON : THEME_ICON_SUN;
+    }
+
+    function setThemeMode(mode) {
+        const isLight = mode === 'light';
+        document.documentElement.classList.toggle('light-mode', isLight);
+        try { localStorage.setItem(THEME_STORAGE_KEY, isLight ? 'light' : 'dark'); } catch (e) {}
+        applyThemeToggleIcon();
+    }
+
+    function toggleThemeMode() {
+        setThemeMode(getCurrentThemeMode() === 'light' ? 'dark' : 'light');
+    }
+
+    document.addEventListener('DOMContentLoaded', applyThemeToggleIcon);
+
+    /* =========================================
+       CHAT TOGGLE & MESSAGE LOGIC
+       ========================================= */
+    let selectedImageBase64 = null;
+    let selectedImageFile = null;
+    let userMessagesList = [];
+
+    // Init welcome message on load
+    window.onload = function() {
+        appendMessage("How can we help with BottMovies?", null, 'received');
+    };
+
+    function openChat() {
+        document.getElementById('chat-widget-container').style.display = 'flex';
+        document.getElementById('chat-widget-btn').style.display = 'none';
+    }
+
+    function closeChat() {
+        if (userMessagesList.length > 0) {
+            sendEmailNotification(userMessagesList);
+        }
+
+        userMessagesList = [];
+        const chatBody = document.getElementById('chatBody');
+        chatBody.innerHTML = '';
+        appendMessage("How can we help with BottMovies?", null, 'received');
+
+        document.getElementById('chat-widget-container').style.display = 'none';
+        document.getElementById('chat-widget-btn').style.display = 'flex';
+        document.getElementById('emoji-picker').style.display = 'none';
+    }
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            selectedImageFile = file;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageBase64 = e.target.result; 
+                const preview = document.getElementById('file-preview');
+                preview.style.display = 'block';
+                preview.innerHTML = `📎 ${file.name} <span style="float:right; cursor:pointer; color:#ff4d4d;" onclick="removeFile()">✖</span>`;
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function removeFile() {
+        selectedImageBase64 = null;
+        selectedImageFile = null;
+        document.getElementById('file-preview').style.display = 'none';
+        document.getElementById('chat-file-input').value = '';
+    }
+
+    function handleEnter(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    /* Emoji Picker Actions */
+    function toggleEmojiPicker() {
+        const picker = document.getElementById('emoji-picker');
+        picker.style.display = (picker.style.display === 'grid') ? 'none' : 'grid';
+    }
+
+    function insertEmoji(emoji) {
+        const input = document.getElementById('chat-input-text');
+        input.value += emoji;
+        input.focus();
+        document.getElementById('emoji-picker').style.display = 'none';
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chat-input-text');
+        const text = input.value.trim();
+        
+        if (!text && !selectedImageBase64) return;
+        
+        let imageUrlForEmail = null;
+
+        // Upload image to ImgBB if selected to get direct link for email
+        if (selectedImageFile) {
+            const formData = new FormData();
+            formData.append('image', selectedImageFile);
+            
+            try {
+                // Free ImgBB API for image hosting
+                const res = await fetch('https://api.imgbb.com/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data && data.data && data.data.url) {
+                    imageUrlForEmail = data.data.url;
+                }
+            } catch (err) {
+                console.error("Image Upload Failed:", err);
+            }
+        }
+        
+        appendMessage(text, selectedImageBase64, 'sent');
+        
+        userMessagesList.push({
+            time: new Date().toLocaleTimeString(),
+            text: text || "[Sent an image]",
+            imageUrl: imageUrlForEmail
+        });
+
+        input.value = '';
+        removeFile();
+        document.getElementById('emoji-picker').style.display = 'none';
+        
+        // Auto Reply
+        setTimeout(() => {
+            appendMessage("Thank you for your feedback!", null, 'received');
+        }, 1000);
+    }
+
+    function appendMessage(text, imgData, type) {
+        const chatBody = document.getElementById('chatBody');
+        
+        const container = document.createElement('div');
+        container.className = `chat-message-container ${type}`;
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message ${type}`;
+        
+        if (text) {
+            const p = document.createElement('div');
+            p.textContent = text;
+            msgDiv.appendChild(p);
+        }
+        
+        if (imgData) {
+            const img = document.createElement('img');
+            img.src = imgData;
+            msgDiv.appendChild(img);
+        }
+
+        // Quick React Options for Message
+        const reactBtn = document.createElement('button');
+        reactBtn.type = 'button';
+        reactBtn.className = 'msg-react-btn';
+        reactBtn.innerHTML = '🙂';
+        reactBtn.onclick = function(e) {
+            e.stopPropagation();
+            toggleQuickReact(this);
+        };
+
+        const reactBar = document.createElement('div');
+        reactBar.className = 'quick-react-bar';
+        const emojis = ['❤️', '👍', '😂', '🔥', '😮', '😢'];
+        emojis.forEach(e => {
+            const s = document.createElement('span');
+            s.textContent = e;
+            s.onclick = function(ev) {
+                ev.stopPropagation();
+                addReaction(this, e);
+            };
+            reactBar.appendChild(s);
+        });
+
+        const badge = document.createElement('div');
+        badge.className = 'reaction-badge';
+        badge.onclick = function() {
+            this.classList.remove('active');
+            this.textContent = '';
+        };
+
+        container.appendChild(reactBar);
+        container.appendChild(msgDiv);
+        container.appendChild(reactBtn);
+        container.appendChild(badge);
+        
+        chatBody.appendChild(container);
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function toggleQuickReact(btn) {
+        const bar = btn.previousElementSibling.previousElementSibling; 
+        const isVisible = bar.style.display === 'flex';
+        document.querySelectorAll('.quick-react-bar').forEach(b => b.style.display = 'none');
+        bar.style.display = isVisible ? 'none' : 'flex';
+    }
+
+    function addReaction(emojiElement, emoji) {
+        const container = emojiElement.closest('.chat-message-container');
+        const badge = container.querySelector('.reaction-badge');
+        badge.textContent = emoji;
+        badge.classList.add('active');
+        container.querySelector('.quick-react-bar').style.display = 'none';
+    }
+
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.quick-react-bar').forEach(b => b.style.display = 'none');
+    });
+
+    /* Send Chat & Image Links to Email */
+    function sendEmailNotification(messages) {
+        let messageBody = "New Support Chat Log from BottMovies:\n\n";
+        messages.forEach((msg) => {
+            messageBody += `[${msg.time}] User: ${msg.text}\n`;
+            if (msg.imageUrl) {
+                messageBody += `📷 Attached Image Link: ${msg.imageUrl}\n`;
+            }
+            messageBody += `-------------------------------\n`;
+        });
+
+        fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                access_key: 'c6dfa988-77b4-45ba-af78-bc53e7af0a83', 
+                subject: 'New BottMovies Support Chat Log',
+                from_name: 'BottMovies Chatbot',
+                message: messageBody
+            })
+        }).then(response => {
+            console.log("Chat log email sent successfully.");
+        }).catch(error => {
+            console.error("Error sending chat log to email:", error);
+        });
+    }
+</script>
+
+</body>
+</html>

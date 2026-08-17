@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DMCA Policy — MyVideoSite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0D10;
+    --surface:#151A20;
+    --surface2:#1D242C;
+    --text:#ECEAE5;
+    --muted:#8F959D;
+    --accent:#E8B86D;
+    --accent-red:#C1443A;
+    --accent-dim:#7A5F32;
+    --border:rgba(232,184,109,0.14);
+    --radius:4px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+
+  .sprocket{
+    display:flex;
+    justify-content:space-between;
+    padding:0 6px;
+    height:14px;
+  }
+  .sprocket span{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--bg);
+    border:1.5px solid var(--accent-dim);
+    align-self:center;
+  }
+  .sprocket.top span, .sprocket.bottom span{
+    background:var(--surface2);
+  }
+
+  header{
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:10;
+    background:rgba(11,13,16,0.92);
+    backdrop-filter:blur(6px);
+  }
+  nav{
+    max-width:960px;
+    margin:0 auto;
+    padding:18px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .brand{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:26px;
+    letter-spacing:1.5px;
+    color:var(--accent);
+  }
+  .navlinks{
+    display:flex;
+    gap:22px;
+    font-size:14px;
+    color:var(--muted);
+    flex-wrap:wrap;
+  }
+  .navlinks a{ text-decoration:none; transition:color .2s; }
+  .navlinks a:hover, .navlinks a.active{ color:var(--accent); }
+
+  /* Google Translate widget — themed to match dark UI */
+  .goog-te-banner-frame{ display:none !important; }
+  body{ top:0 !important; position:static !important; }
+  .goog-te-gadget{ font-family:'Inter',sans-serif !important; font-size:0 !important; color:transparent !important; }
+  #google_translate_element{
+    display:flex;
+    align-items:center;
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:2px 4px;
+    background:var(--surface);
+  }
+  #google_translate_element .goog-te-combo{
+    appearance:none;
+    -webkit-appearance:none;
+    background:transparent;
+    color:var(--accent) !important;
+    border:none;
+    font-family:'JetBrains Mono',monospace !important;
+    font-size:12.5px !important;
+    padding:5px 22px 5px 8px;
+    cursor:pointer;
+    outline:none;
+  }
+  #google_translate_element .goog-te-combo option{
+    background:var(--surface);
+    color:var(--text);
+  }
+  .goog-te-gadget-icon{ display:none !important; }
+  body > .skiptranslate{ display:none !important; }
+
+  main{ max-width:760px; margin:0 auto; padding:48px 20px 80px; }
+
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--accent-red);
+    margin-bottom:10px;
+  }
+  h1{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:44px;
+    letter-spacing:1px;
+    line-height:1.1;
+    margin-bottom:14px;
+  }
+  .lede{
+    color:var(--muted);
+    font-size:16px;
+    max-width:580px;
+    margin-bottom:44px;
+  }
+
+  .step{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+    margin-bottom:22px;
+  }
+  .step-body{
+    display:flex;
+    gap:18px;
+    padding:22px;
+    align-items:flex-start;
+  }
+  .step-num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--accent-red);
+    border:1px solid var(--accent-red);
+    border-radius:3px;
+    padding:2px 8px;
+    flex-shrink:0;
+    margin-top:3px;
+  }
+  .step h3{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:17px;
+    margin-bottom:6px;
+    color:var(--text);
+  }
+  .step p{
+    color:var(--muted);
+    font-size:14.5px;
+  }
+  .step img{
+    width:100%;
+    display:block;
+    filter:grayscale(45%) brightness(0.7) contrast(1.05);
+    border-top:1px solid var(--border);
+  }
+
+  .warning-box{
+    margin-top:36px;
+    padding:20px 22px;
+    background:rgba(193,68,58,0.08);
+    border:1px solid rgba(193,68,58,0.35);
+    border-left:3px solid var(--accent-red);
+    border-radius:3px;
+    font-size:14px;
+    color:var(--muted);
+  }
+  .warning-box strong{ color:var(--text); }
+
+  .contact-box{
+    margin-top:22px;
+    padding:24px;
+    background:var(--surface2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+  }
+  .contact-box h3{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:22px;
+    letter-spacing:0.5px;
+    color:var(--accent);
+    margin-bottom:10px;
+  }
+  .contact-box p{ color:var(--muted); font-size:14.5px; margin-bottom:14px;}
+  .contact-box code{
+    display:inline-block;
+    font-family:'JetBrains Mono',monospace;
+    background:var(--bg);
+    border:1px solid var(--border);
+    padding:6px 12px;
+    border-radius:3px;
+    color:var(--accent);
+    font-size:14px;
+  }
+
+  footer{
+    border-top:1px solid var(--border);
+    padding:30px 20px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+  }
+  footer a{ color:var(--accent); text-decoration:none; margin:0 8px; }
+
+  @media (max-width:560px){
+    h1{ font-size:34px; }
+    .step-body{ flex-direction:column; gap:10px; }
+    .navlinks{ gap:14px; font-size:13px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="sprocket top">
+    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <nav>
+    <div class="brand">MyVideoSite</div>
+    <div class="navlinks">
+      <a href="how-to-download.html">How to Download</a>
+      <a href="report-broken-links.html">Report Broken Links</a>
+      <a href="#" class="active">DMCA</a>
+    </div>
+    <div id="google_translate_element"></div>
+  </nav>
+</header>
+
+<main>
+  <div class="eyebrow">Copyright Policy</div>
+  <h1>DMCA Notice</h1>
+  <p class="lede">MyVideoSite-এর সব ভিডিও/মুভি সম্পূর্ণভাবে নিজস্ব তৈরি ও কপিরাইট সংরক্ষিত কন্টেন্ট। অনুমতি ছাড়া পুনঃবিতরণ, পুনঃআপলোড বা পরিবর্তন কঠোরভাবে নিষিদ্ধ।</p>
+
+  <div class="step">
+    <div class="step-body">
+      <div class="step-num">01</div>
+      <div>
+        <h3>স্বত্বাধিকার</h3>
+        <p>এই সাইটে প্রকাশিত সমস্ত ভিডিও, চিত্রনাট্য, সম্পাদনা এবং সংশ্লিষ্ট কন্টেন্টের সর্বস্বত্ব MyVideoSite-এর মালিকের।</p>
+      </div>
+    </div>
+    <img src="https://picsum.photos/seed/dmcastep1/760/300" alt="Copyright ownership">
+  </div>
+
+  <div class="step">
+    <div class="step-body">
+      <div class="step-num">02</div>
+      <div>
+        <h3>অননুমোদিত ব্যবহার</h3>
+        <p>অন্য কোনো প্ল্যাটফর্মে আমাদের ভিডিও পুনঃআপলোড, রি-এডিট বা বাণিজ্যিকভাবে ব্যবহার করা হলে তা কপিরাইট লঙ্ঘন হিসেবে গণ্য হবে।</p>
+      </div>
+    </div>
+    <img src="https://picsum.photos/seed/dmcastep2/760/300" alt="Unauthorized use">
+  </div>
+
+  <div class="step">
+    <div class="step-body">
+      <div class="step-num">03</div>
+      <div>
+        <h3>লঙ্ঘন খুঁজে পেলে</h3>
+        <p>আমাদের কোনো ভিডিও অন্য কোথাও অনুমতি ছাড়া পেলে, সেই পেজের লিংকসহ আমাদের জানান।</p>
+      </div>
+    </div>
+    <img src="https://picsum.photos/seed/dmcastep3/760/300" alt="Report infringement">
+  </div>
+
+  <div class="step">
+    <div class="step-body">
+      <div class="step-num">04</div>
+      <div>
+        <h3>টেকডাউন প্রক্রিয়া</h3>
+        <p>যাচাইয়ের পর সংশ্লিষ্ট প্ল্যাটফর্মে আনুষ্ঠানিক DMCA টেকডাউন রিকোয়েস্ট পাঠানো হবে।</p>
+      </div>
+    </div>
+    <img src="https://picsum.photos/seed/dmcastep4/760/300" alt="Takedown process">
+  </div>
+
+  <div class="warning-box">
+    <strong>সতর্কতা:</strong> মিথ্যা বা ভিত্তিহীন কপিরাইট দাবি জমা দেওয়া থেকে বিরত থাকুন। শুধুমাত্র প্রকৃত মালিক বা তার অনুমোদিত প্রতিনিধি অভিযোগ দাখিল করতে পারবেন।
+  </div>
+
+  <div class="contact-box">
+    <h3>কপিরাইট দাবি জানাতে</h3>
+    <p>প্রমাণসহ (ভিডিওর লিংক, মালিকানার তথ্য) নিচের ইমেইলে যোগাযোগ করুন:</p>
+    <code>dmca@myvideosite.example</code>
+  </div>
+</main>
+
+<footer>
+  <div class="sprocket bottom">
+    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <p>&copy; 2026 MyVideoSite — All videos are original content.</p>
+  <p><a href="how-to-download.html">How to Download</a> | <a href="report-broken-links.html">Report Broken Links</a> | <a href="#">DMCA</a></p>
+</footer>
+
+
+<script type="text/javascript">
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement(
+      {
+        pageLanguage: 'bn',
+        includedLanguages: 'en,bn,hi,ur,ar,es,fr,pt,zh-CN,ja,ru,id',
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+        autoDisplay: false
+      },
+      'google_translate_element'
+    );
+  }
+</script>
+<script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+</body>
+</html>
