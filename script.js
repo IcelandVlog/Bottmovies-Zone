@@ -1932,18 +1932,58 @@ function mediaScanParseStreamLogs(lines) {
     const audio = new Set();
     const subtitle = new Set();
     const streamRe = /Stream #\d+:\d+(?:\[[^\]]*\])?(?:\(([^)]+)\))?:\s*(Audio|Subtitle)/i;
+    // ffmpeg -i প্রতিটা স্ট্রিমের নিচে আলাদা "Metadata:" ব্লকে language ট্যাগ প্রিন্ট করে।
+    // Stream লাইনের ভেতরের parenthetical code (স্ট্রিম #0:1(xxx)) সবসময় generic
+    // ISO 639-2 code (spa/por/zho...) - regional/locale variant (es-LA vs es-ES,
+    // pt-BR vs pt-PT, zh-CN vs zh-TW) শুধু এই "language-ietf" মেটাডেটা লাইনে থাকে।
+    const metaLangRe = /^\s*language(-ietf)?\s*:\s*(\S+)/i;
+
+    const audioTracks = [];
+    const subtitleTracks = [];
+    let current = null; // { kind, code (generic), ietf (locale-specific, if found) }
+
+    function flush() {
+        if (!current) return;
+        // Locale-specific tag থাকলে সেটাকেই প্রায়োরিটি দাও, কারণ regional
+        // variant আলাদা করার একমাত্র জায়গা এটাই - generic code দিয়ে সব
+        // regional track একই নামে collapse হয়ে যেত।
+        const code = current.ietf || current.code;
+        if (current.kind === 'audio') audioTracks.push(code); else subtitleTracks.push(code);
+        current = null;
+    }
+
     lines.forEach(line => {
         const m = line.match(streamRe);
-        if (!m) return;
-        const codeRaw = (m[1] || '').toLowerCase().trim();
-        const kind = m[2].toLowerCase();
-        if (!codeRaw || codeRaw === 'und') return;
-        // Use the shared resolver so region/locale codes (es-es, pt-br, zh-tw, fr-ca...)
-        // and the cmn -> Mandarin special case are handled the same way everywhere.
-        const name = mediaScanGuessLanguageFromToken(codeRaw);
-        if (!name) return;
-        if (kind === 'audio') audio.add(name); else subtitle.add(name);
+        if (m) {
+            flush(); // আগের স্ট্রিম চূড়ান্ত করে নতুনটা শুরু করো
+            const codeRaw = (m[1] || '').toLowerCase().trim();
+            current = {
+                kind: m[2].toLowerCase(),
+                code: (codeRaw && codeRaw !== 'und') ? codeRaw : null,
+                ietf: null
+            };
+            return;
+        }
+        if (!current) return;
+        const lm = line.match(metaLangRe);
+        if (!lm) return;
+        const isIetf = !!lm[1];
+        const val = (lm[2] || '').toLowerCase().trim();
+        if (!val || val === 'und') return;
+        if (isIetf) current.ietf = val;
+        else if (!current.code) current.code = val;
     });
+    flush(); // লগের শেষ স্ট্রিমটা আরেকটা Stream লাইনে পড়বে না, তাই ম্যানুয়ালি ফ্লাশ
+
+    audioTracks.forEach(code => {
+        const name = mediaScanGuessLanguageFromToken(code);
+        if (name) audio.add(name);
+    });
+    subtitleTracks.forEach(code => {
+        const name = mediaScanGuessLanguageFromToken(code);
+        if (name) subtitle.add(name);
+    });
+
     return { audio: Array.from(audio), subtitle: Array.from(subtitle) };
 }
 
