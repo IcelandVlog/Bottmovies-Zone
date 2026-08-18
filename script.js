@@ -1874,6 +1874,37 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     la: 'Latin American'
 };
 
+// অনেক MKV uploader/muxer regional info একদম hyphenated code (es-LA) হিসেবে
+// track title-এ রাখে না - বরং সাধারণ বর্ণনামূলক শব্দ রাখে, যেমন title="Latin American",
+// "Spain", "Brazil", "Portugal", "Simplified", "Traditional"। এই লিস্টটা উপরের
+// MEDIA_SCAN_LANGUAGE_MAP-এর প্রতিটা "Base (Qualifier)" ভ্যালু থেকে qualifier অংশটা
+// আলাদা করে রাখে, যাতে base language code (spa/por/chi...) + title-এর শব্দ মিলিয়ে
+// সঠিক regional label বানানো যায়।
+const MEDIA_SCAN_REGIONAL_QUALIFIERS = (() => {
+    const list = [];
+    const seen = new Set();
+    for (const key in MEDIA_SCAN_LANGUAGE_MAP) {
+        const val = MEDIA_SCAN_LANGUAGE_MAP[key];
+        const m = val.match(/^(.*) \(([^)]+)\)$/);
+        if (m && !seen.has(val)) {
+            seen.add(val);
+            list.push({ base: m[1], qualifier: m[2].toLowerCase(), full: val });
+        }
+    }
+    return list;
+})();
+
+function mediaScanResolveRegionalFromTitle(baseName, title) {
+    if (!baseName || !title) return null;
+    const t = title.toLowerCase().trim();
+    if (!t) return null;
+    for (const entry of MEDIA_SCAN_REGIONAL_QUALIFIERS) {
+        if (entry.base !== baseName) continue;
+        if (t === entry.qualifier || t.includes(entry.qualifier)) return entry.full;
+    }
+    return null;
+}
+
 let mediaScanFFmpegInstance = null;
 let mediaScanFFmpegLoadingPromise = null;
 
@@ -1980,9 +2011,13 @@ function mediaScanParseStreamLogs(lines) {
     // FFmpeg-এর demuxer আসলে Matroska-র নতুন LanguageIETF element পার্সই করে না
     // (এটা FFmpeg-এর নিজেরই একটা known limitation, ffmpeg.wasm-এর সীমাবদ্ধতা না) -
     // তাই es-LA/es-ES/pt-BR-এর মতো regional কোড কখনোই "language" মেটাডেটা লাইনে
-    // আসে না। বেশিরভাগ uploader/muxer তাই সেই কোডটা track-এর "title" ফিল্ডে বসায়
-    // (যেমন title="es-LA") - সেটাই এখানে খোঁজা হচ্ছে, generic code-এর আগে।
+    // আসে না। বাস্তব ফাইলে দেখা গেছে regional তথ্যটা track "title"-এ থাকে, তবে
+    // hyphenated code হিসেবে না - সাধারণ বর্ণনামূলক শব্দ হিসেবে (title="Latin American",
+    // "Spain", "Brazil", "Simplified"...)। তাই দুই ধাপে চেষ্টা করা হচ্ছে:
+    // ১) title-এ সরাসরি hyphenated locale code (es-LA) থাকলে সেটা, ২) না থাকলে
+    // base language + title-এর qualifier শব্দ মিলিয়ে regional label বানানো।
     function resolveTrack(t) {
+        const baseName = mediaScanGuessLanguageFromToken(t.ietf || t.code);
         if (t.title) {
             const matches = t.title.match(localeTokenRe);
             if (matches) {
@@ -1991,8 +2026,10 @@ function mediaScanParseStreamLogs(lines) {
                     if (name) return name;
                 }
             }
+            const regional = mediaScanResolveRegionalFromTitle(baseName, t.title);
+            if (regional) return regional;
         }
-        return mediaScanGuessLanguageFromToken(t.ietf || t.code);
+        return baseName;
     }
 
     audioTracks.forEach(t => { const n = resolveTrack(t); if (n) audio.add(n); });
@@ -2021,15 +2058,7 @@ async function mediaScanProbeVideoFile(file, onProgress) {
     }
     try { ffmpeg.FS('unlink', safeName); } catch (e) {}
 
-    // TEMP DEBUG: es-LA/es-ES type regional tags detect na howar asol karon
-    // khunje ber korar jonno - Stream/Metadata/language/title shongkranto
-    // raw line gulo result-er shathe return kora hocche jate page-e dekhano jay.
-    // Kaj hoye gele ei debug lines return kora ta remove kore dile hobe.
-    const debugLines = logLines.filter(l => /Stream #|Metadata|language|title/i.test(l));
-
-    const parsed = mediaScanParseStreamLogs(logLines);
-    parsed._debugLines = debugLines;
-    return parsed;
+    return mediaScanParseStreamLogs(logLines);
 }
 
 function mediaScanFormatList(list) {
@@ -2084,19 +2113,6 @@ async function handleMediaScanFile(file) {
                 <div class="admin-media-scan-pill">${escapeAttr(audioStr || 'No audio tracks detected')}</div>
                 <div class="admin-media-scan-pill">${escapeAttr(subStr || 'No subtitles detected')}</div>
             `;
-            // TEMP DEBUG: raw ffmpeg stream/metadata lines page-e ekta copyable
-            // textarea-te dekhano hocche, jate DevTools na khule shorashori copy
-            // kore pathano jay. Debug howar por ei block soho upore-r debugLines
-            // shob remove kore dile hobe.
-            if (result._debugLines && result._debugLines.length) {
-                const debugBox = document.createElement('div');
-                debugBox.style.cssText = 'grid-column:1/-1;margin-top:10px;';
-                debugBox.innerHTML = `
-                    <div style="font-size:12px;color:#8F959D;margin-bottom:4px;">Debug: raw ffmpeg stream/metadata lines (copy full text below)</div>
-                    <textarea readonly style="width:100%;min-height:160px;background:#0B0D10;color:#ECEAE5;border:1px solid rgba(232,184,109,0.3);border-radius:4px;padding:8px;font-family:monospace;font-size:12px;" onclick="this.select()">${escapeAttr(result._debugLines.join('\n'))}</textarea>
-                `;
-                resultEl.appendChild(debugBox);
-            }
         }
         setStatus('Scan complete — Audio and Subtitles fields updated.', 'ok');
     } catch (err) {
