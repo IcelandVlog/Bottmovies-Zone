@@ -2021,6 +2021,14 @@ async function mediaScanProbeVideoFile(file, onProgress) {
     }
     try { ffmpeg.FS('unlink', safeName); } catch (e) {}
 
+    // TEMP DEBUG: es-LA/es-ES type regional tags detect na howar asol karon
+    // khunje ber korar jonno - shudhu Stream/Metadata/language/title shongkranto
+    // line gulo console-e print kore. Kaj hoye gele ei block ta remove kore dile hobe.
+    console.log('%c[MediaScan] Raw ffmpeg stream/metadata lines:', 'color:#E8B86D;font-weight:bold');
+    logLines
+        .filter(l => /Stream #|Metadata|language|title/i.test(l))
+        .forEach(l => console.log(l));
+
     return mediaScanParseStreamLogs(logLines);
 }
 
