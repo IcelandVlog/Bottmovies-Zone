@@ -1838,38 +1838,38 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
 
     // ---- Spanish (es) — generic code + regional/locale variants ----
     es: 'Spanish', spa: 'Spanish', spanish: 'Spanish',
-    'es-ES': 'Spanish (Spain)', 'es-419': 'Spanish (Latin American)',
-    'es-LA': 'Spanish (Latin American)', 'es-MX': 'Spanish (Mexico)',
-    'es-AR': 'Spanish (Argentina)', 'es-US': 'Spanish (US)',
+    'es-es': 'Spanish (Spain)', 'es-419': 'Spanish (Latin American)',
+    'es-la': 'Spanish (Latin American)', 'es-mx': 'Spanish (Mexico)',
+    'es-ar': 'Spanish (Argentina)', 'es-us': 'Spanish (US)',
 
     // ---- French (fr) — generic code + regional/locale variants ----
     fr: 'French', fre: 'French', fra: 'French', french: 'French',
-    'fr-FR': 'French (France)', 'fr-CA': 'French (Canada)',
-    'fr-BE': 'French (Belgium)', 'fr-CH': 'French (Switzerland)',
+    'fr-fr': 'French (France)', 'fr-ca': 'French (Canada)',
+    'fr-be': 'French (Belgium)', 'fr-ch': 'French (Switzerland)',
 
     // ---- Portuguese (pt) — generic code + regional/locale variants ----
     pt: 'Portuguese', por: 'Portuguese', portuguese: 'Portuguese',
-    'pt-BR': 'Portuguese (Brazil)', 'pt-PT': 'Portuguese (Portugal)',
+    'pt-br': 'Portuguese (Brazil)', 'pt-pt': 'Portuguese (Portugal)',
 
     // ---- Chinese (zh) — generic code + regional/script variants ----
     zh: 'Chinese', chi: 'Chinese', zho: 'Chinese', chinese: 'Chinese',
-    'zh-CN': 'Chinese (Simplified)', 'zh-SG': 'Chinese (Simplified)',
-    'zh-HANS': 'Chinese (Simplified)',
-    'zh-TW': 'Chinese (Traditional)', 'zh-HK': 'Chinese (Traditional)',
-    'zh-mo': 'Chinese (Traditional)', 'zh-HANT': 'Chinese (Traditional)',
+    'zh-cn': 'Chinese (Simplified)', 'zh-sg': 'Chinese (Simplified)',
+    'zh-hans': 'Chinese (Simplified)',
+    'zh-tw': 'Chinese (Traditional)', 'zh-hk': 'Chinese (Traditional)',
+    'zh-mo': 'Chinese (Traditional)', 'zh-hant': 'Chinese (Traditional)',
     // cmn (ISO 639-3) is specifically Mandarin — kept distinct from generic 'zh'/'Chinese'
     cmn: 'Mandarin', mandarin: 'Mandarin',
     yue: 'Cantonese', cantonese: 'Cantonese',
 
     // ---- English (en) — a few common locale variants ----
-    'en-US': 'English (US)', 'en-GB': 'English (UK)',
-    'en-AU': 'English (Australia)', 'en-IN': 'English (India)',
+    'en-us': 'English (US)', 'en-gb': 'English (UK)',
+    'en-au': 'English (Australia)', 'en-in': 'English (India)',
 
     // ---- German (de) / Italian (it) / Russian (ru) / Arabic (ar) locale variants ----
-    'de-DE': 'German (Germany)', 'de-AT': 'German (Austria)', 'de-CH': 'German (Switzerland)',
-    'it-IT': 'Italian (Italy)', 'it-CH': 'Italian (Switzerland)',
-    'ru-RU': 'Russian (Russia)',
-    'ar-SA': 'Arabic (Saudi Arabia)', 'ar-EG': 'Arabic (Egypt)',
+    'de-de': 'German (Germany)', 'de-at': 'German (Austria)', 'de-ch': 'German (Switzerland)',
+    'it-it': 'Italian (Italy)', 'it-ch': 'Italian (Switzerland)',
+    'ru-ru': 'Russian (Russia)',
+    'ar-sa': 'Arabic (Saudi Arabia)', 'ar-eg': 'Arabic (Egypt)',
 
     la: 'Latin American'
 };
@@ -1932,57 +1932,71 @@ function mediaScanParseStreamLogs(lines) {
     const audio = new Set();
     const subtitle = new Set();
     const streamRe = /Stream #\d+:\d+(?:\[[^\]]*\])?(?:\(([^)]+)\))?:\s*(Audio|Subtitle)/i;
-    // ffmpeg -i প্রতিটা স্ট্রিমের নিচে আলাদা "Metadata:" ব্লকে language ট্যাগ প্রিন্ট করে।
-    // Stream লাইনের ভেতরের parenthetical code (স্ট্রিম #0:1(xxx)) সবসময় generic
-    // ISO 639-2 code (spa/por/zho...) - regional/locale variant (es-LA vs es-ES,
-    // pt-BR vs pt-PT, zh-CN vs zh-TW) শুধু এই "language-ietf" মেটাডেটা লাইনে থাকে।
     const metaLangRe = /^\s*language(-ietf)?\s*:\s*(\S+)/i;
+    const metaTitleRe = /^\s*title\s*:\s*(.+?)\s*$/i;
+    // মিলবে "es-LA", "pt-BR", "zh-TW" ইত্যাদি — কিন্তু কোয়ালিটি/কোডেক টোকেন
+    // (যেমন "5.1", "AAC-LC") ভুলভাবে ধরা এড়াতে দ্বিতীয় অংশটাও letters-only রাখা হলো।
+    const localeTokenRe = /\b([a-z]{2,3}-[a-z]{2,4})\b/gi;
 
     const audioTracks = [];
     const subtitleTracks = [];
-    let current = null; // { kind, code (generic), ietf (locale-specific, if found) }
+    let current = null; // { kind, code (generic 639-2/639-1), ietf, title }
 
     function flush() {
         if (!current) return;
-        // Locale-specific tag থাকলে সেটাকেই প্রায়োরিটি দাও, কারণ regional
-        // variant আলাদা করার একমাত্র জায়গা এটাই - generic code দিয়ে সব
-        // regional track একই নামে collapse হয়ে যেত।
-        const code = current.ietf || current.code;
-        if (current.kind === 'audio') audioTracks.push(code); else subtitleTracks.push(code);
+        (current.kind === 'audio' ? audioTracks : subtitleTracks).push(current);
         current = null;
     }
 
     lines.forEach(line => {
         const m = line.match(streamRe);
         if (m) {
-            flush(); // আগের স্ট্রিম চূড়ান্ত করে নতুনটা শুরু করো
+            flush();
             const codeRaw = (m[1] || '').toLowerCase().trim();
             current = {
                 kind: m[2].toLowerCase(),
                 code: (codeRaw && codeRaw !== 'und') ? codeRaw : null,
-                ietf: null
+                ietf: null,
+                title: null
             };
             return;
         }
         if (!current) return;
         const lm = line.match(metaLangRe);
-        if (!lm) return;
-        const isIetf = !!lm[1];
-        const val = (lm[2] || '').toLowerCase().trim();
-        if (!val || val === 'und') return;
-        if (isIetf) current.ietf = val;
-        else if (!current.code) current.code = val;
+        if (lm) {
+            const isIetf = !!lm[1];
+            const val = (lm[2] || '').toLowerCase().trim();
+            if (val && val !== 'und') {
+                if (isIetf) current.ietf = val;
+                else if (!current.code) current.code = val;
+            }
+            return;
+        }
+        const tm = line.match(metaTitleRe);
+        if (tm) current.title = tm[1];
     });
-    flush(); // লগের শেষ স্ট্রিমটা আরেকটা Stream লাইনে পড়বে না, তাই ম্যানুয়ালি ফ্লাশ
+    flush();
 
-    audioTracks.forEach(code => {
-        const name = mediaScanGuessLanguageFromToken(code);
-        if (name) audio.add(name);
-    });
-    subtitleTracks.forEach(code => {
-        const name = mediaScanGuessLanguageFromToken(code);
-        if (name) subtitle.add(name);
-    });
+    // FFmpeg-এর demuxer আসলে Matroska-র নতুন LanguageIETF element পার্সই করে না
+    // (এটা FFmpeg-এর নিজেরই একটা known limitation, ffmpeg.wasm-এর সীমাবদ্ধতা না) -
+    // তাই es-LA/es-ES/pt-BR-এর মতো regional কোড কখনোই "language" মেটাডেটা লাইনে
+    // আসে না। বেশিরভাগ uploader/muxer তাই সেই কোডটা track-এর "title" ফিল্ডে বসায়
+    // (যেমন title="es-LA") - সেটাই এখানে খোঁজা হচ্ছে, generic code-এর আগে।
+    function resolveTrack(t) {
+        if (t.title) {
+            const matches = t.title.match(localeTokenRe);
+            if (matches) {
+                for (const tok of matches) {
+                    const name = mediaScanGuessLanguageFromToken(tok);
+                    if (name) return name;
+                }
+            }
+        }
+        return mediaScanGuessLanguageFromToken(t.ietf || t.code);
+    }
+
+    audioTracks.forEach(t => { const n = resolveTrack(t); if (n) audio.add(n); });
+    subtitleTracks.forEach(t => { const n = resolveTrack(t); if (n) subtitle.add(n); });
 
     return { audio: Array.from(audio), subtitle: Array.from(subtitle) };
 }
