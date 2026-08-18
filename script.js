@@ -2022,14 +2022,14 @@ async function mediaScanProbeVideoFile(file, onProgress) {
     try { ffmpeg.FS('unlink', safeName); } catch (e) {}
 
     // TEMP DEBUG: es-LA/es-ES type regional tags detect na howar asol karon
-    // khunje ber korar jonno - shudhu Stream/Metadata/language/title shongkranto
-    // line gulo console-e print kore. Kaj hoye gele ei block ta remove kore dile hobe.
-    console.log('%c[MediaScan] Raw ffmpeg stream/metadata lines:', 'color:#E8B86D;font-weight:bold');
-    logLines
-        .filter(l => /Stream #|Metadata|language|title/i.test(l))
-        .forEach(l => console.log(l));
+    // khunje ber korar jonno - Stream/Metadata/language/title shongkranto
+    // raw line gulo result-er shathe return kora hocche jate page-e dekhano jay.
+    // Kaj hoye gele ei debug lines return kora ta remove kore dile hobe.
+    const debugLines = logLines.filter(l => /Stream #|Metadata|language|title/i.test(l));
 
-    return mediaScanParseStreamLogs(logLines);
+    const parsed = mediaScanParseStreamLogs(logLines);
+    parsed._debugLines = debugLines;
+    return parsed;
 }
 
 function mediaScanFormatList(list) {
@@ -2084,6 +2084,19 @@ async function handleMediaScanFile(file) {
                 <div class="admin-media-scan-pill">${escapeAttr(audioStr || 'No audio tracks detected')}</div>
                 <div class="admin-media-scan-pill">${escapeAttr(subStr || 'No subtitles detected')}</div>
             `;
+            // TEMP DEBUG: raw ffmpeg stream/metadata lines page-e ekta copyable
+            // textarea-te dekhano hocche, jate DevTools na khule shorashori copy
+            // kore pathano jay. Debug howar por ei block soho upore-r debugLines
+            // shob remove kore dile hobe.
+            if (result._debugLines && result._debugLines.length) {
+                const debugBox = document.createElement('div');
+                debugBox.style.cssText = 'grid-column:1/-1;margin-top:10px;';
+                debugBox.innerHTML = `
+                    <div style="font-size:12px;color:#8F959D;margin-bottom:4px;">Debug: raw ffmpeg stream/metadata lines (copy full text below)</div>
+                    <textarea readonly style="width:100%;min-height:160px;background:#0B0D10;color:#ECEAE5;border:1px solid rgba(232,184,109,0.3);border-radius:4px;padding:8px;font-family:monospace;font-size:12px;" onclick="this.select()">${escapeAttr(result._debugLines.join('\n'))}</textarea>
+                `;
+                resultEl.appendChild(debugBox);
+            }
         }
         setStatus('Scan complete — Audio and Subtitles fields updated.', 'ok');
     } catch (err) {
