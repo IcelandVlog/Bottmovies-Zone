@@ -3560,7 +3560,7 @@ function insertEmoji(inputId, emoji) {
         autoGrowTextarea(input);
     }
     const picker = document.getElementById('quickEmojiPicker');
-    if (picker) picker.remove();
+    if (picker) picker.remove(); 
 }
 
 // Close open emoji/reaction pickers when clicking elsewhere
