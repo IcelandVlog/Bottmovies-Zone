@@ -2140,13 +2140,18 @@ function mediaScanResetHistory() {
     mediaScanHistory = [];
 }
 
+// কতগুলো ফাইল স্ক্যান করা হবে তার কোনো লিমিট নেই (২টা সিজন না, ২০+ সিজন প্যাকও
+// হতে পারে) - তাই এখানে "S01,02" স্টাইলে ফিক্সড ফরম্যাটের বদলে "/" দিয়ে জোড়া লাগানো
+// প্লেইন নাম্বার ব্যবহার করা হয় (যেমন: 12/20/21/27)। স্ক্যান সংখ্যা বেশি হয়ে গেলে
+// ট্যাগ যেন বিশাল লম্বা না হয়ে যায়, তাই MEDIA_SCAN_TAG_MAX_SHOWN-এর বেশি হলে বাকিগুলো
+// ".." দিয়ে সংক্ষেপ করে দেখানো হয়।
+const MEDIA_SCAN_TAG_MAX_SHOWN = 4;
+
 function mediaScanFormatScanTag(scanNums) {
     const sorted = Array.from(scanNums).sort((a, b) => a - b);
-    const parts = sorted.map((n, i) => {
-        const padded = String(n).padStart(2, '0');
-        return i === 0 ? `S${padded}` : padded;
-    });
-    return `(${parts.join(',')} Only)`;
+    const shown = sorted.slice(0, MEDIA_SCAN_TAG_MAX_SHOWN).map(n => String(n).padStart(2, '0'));
+    const truncated = sorted.length > MEDIA_SCAN_TAG_MAX_SHOWN ? '..' : '';
+    return `(${shown.join('/')}${truncated} Only)`;
 }
 
 // একাধিক স্ক্যানের ফলাফল মিলিয়ে একটাই ইউনিক লিস্ট বানায়। প্রতিটা আইটেম কোন কোন
