@@ -2127,6 +2127,63 @@ function mediaScanFormatList(list) {
     return `(${clean.length})- ${clean.join(', ')}`;
 }
 
+// অ্যাডমিন যদি পেজ রিফ্রেশ না করে একের পর এক একাধিক ফাইল (যেমন: আলাদা আলাদা সিজন)
+// স্ক্যান করে, তাহলে প্রতিটা স্ক্যানের audio/subtitle রেজাল্ট এখানে জমা থাকে। নতুন
+// স্ক্যান হলে আগের ফলাফল মুছে না গিয়ে সব স্ক্যানের ইউনিক ভাষাগুলো একসাথে মার্জ হয়ে
+// Audio/Subtitles ফিল্ডে বসে - যে ভাষাগুলো সবগুলো ফাইলে নেই (কোনো একটাতে/কয়েকটাতে
+// আছে), সেগুলোর পাশে কোন স্ক্যান নাম্বারে পাওয়া গেছে সেটা "(S01,02 Only)" স্টাইলে
+// ট্যাগ হয়ে বাকি ভাষাগুলোর সাথেই বসে যায়। resetAdminForm() / নতুন এডিট ওপেন করলে
+// এই হিস্ট্রি খালি হয়ে যায়, যাতে ভিন্ন ভিন্ন কনটেন্টের স্ক্যান একসাথে মিশে না যায়।
+let mediaScanHistory = [];
+
+function mediaScanResetHistory() {
+    mediaScanHistory = [];
+}
+
+function mediaScanFormatScanTag(scanNums) {
+    const sorted = Array.from(scanNums).sort((a, b) => a - b);
+    const parts = sorted.map((n, i) => {
+        const padded = String(n).padStart(2, '0');
+        return i === 0 ? `S${padded}` : padded;
+    });
+    return `(${parts.join(',')} Only)`;
+}
+
+// একাধিক স্ক্যানের ফলাফল মিলিয়ে একটাই ইউনিক লিস্ট বানায়। প্রতিটা আইটেম কোন কোন
+// স্ক্যানে (1-indexed) পাওয়া গেছে সেটা ট্র্যাক করে - সব স্ক্যানে থাকলে ট্যাগ ছাড়া,
+// নাহলে "Only" ট্যাগসহ বসে। প্রথমবার যে ক্রমে ভাষাগুলো পাওয়া গেছে সেই ক্রমই বজায় থাকে।
+function mediaScanMergeHistory(historyKey) {
+    const totalScans = mediaScanHistory.length;
+    if (totalScans === 0) return { labels: [], count: 0, commonCount: 0 };
+
+    const presence = new Map(); // item -> Set(scanNum)
+    mediaScanHistory.forEach((scan, idx) => {
+        const scanNum = idx + 1;
+        (scan[historyKey] || []).forEach(item => {
+            if (!presence.has(item)) presence.set(item, new Set());
+            presence.get(item).add(scanNum);
+        });
+    });
+
+    let commonCount = 0;
+    const labels = Array.from(presence.entries()).map(([item, scanSet]) => {
+        const isCommon = scanSet.size === totalScans;
+        if (isCommon) { commonCount++; return item; }
+        return `${item} ${mediaScanFormatScanTag(scanSet)}`;
+    });
+
+    return { labels, count: labels.length, commonCount };
+}
+
+function mediaScanFormatMergedList(historyKey) {
+    const { labels, count, commonCount } = mediaScanMergeHistory(historyKey);
+    if (labels.length === 0) return '';
+    // মাত্র একটা ফাইল স্ক্যান হলে আগের মতোই সাধারণ "(count)-" ফরম্যাট দেখাবে -
+    // "Only" ট্যাগ বা "total/common" রেশিও শুধু একাধিক ফাইল স্ক্যান হলেই লাগবে।
+    if (mediaScanHistory.length <= 1) return `(${count})- ${labels.join(', ')}`;
+    return `(${count}/${commonCount})- ${labels.join(', ')}`;
+}
+
 async function handleMediaScanFile(file) {
     const statusEl = document.getElementById('adminMediaScanStatus');
     const resultEl = document.getElementById('adminMediaScanResult');
@@ -2154,13 +2211,17 @@ async function handleMediaScanFile(file) {
     try {
         const result = await mediaScanProbeVideoFile(file, setStatus);
 
-        const audioStr = mediaScanFormatList(result.audio);
-        const subStr = mediaScanFormatList(result.subtitle);
-
-        if (!audioStr && !subStr) {
+        if (result.audio.length === 0 && result.subtitle.length === 0) {
             setStatus('No audio or subtitle language tags were detected in this file.', 'error');
             return;
         }
+
+        // এই ফাইলের রেজাল্ট আগের স্ক্যানগুলোর সাথে যোগ হলো (ওভাররাইট না করে) -
+        // পেজ রিফ্রেশ না করা পর্যন্ত এই হিস্ট্রি জমা থাকতে থাকবে।
+        mediaScanHistory.push({ audio: result.audio, subtitle: result.subtitle });
+
+        const audioStr = mediaScanFormatMergedList('audio');
+        const subStr = mediaScanFormatMergedList('subtitle');
 
         const audioInput = document.getElementById('adminAudio');
         const subInput = document.getElementById('adminSubtitles');
@@ -2174,7 +2235,9 @@ async function handleMediaScanFile(file) {
                 <div class="admin-media-scan-pill">${escapeAttr(subStr || 'No subtitles detected')}</div>
             `;
         }
-        setStatus('Scan complete — Audio and Subtitles fields updated.', 'ok');
+
+        const mergeNote = mediaScanHistory.length > 1 ? ` (merged from ${mediaScanHistory.length} files scanned)` : '';
+        setStatus(`Scan complete — Audio and Subtitles fields updated${mergeNote}.`, 'ok');
     } catch (err) {
         console.error('Media scan failed:', err);
         setStatus('Scan failed: ' + (err && err.message ? err.message : 'unknown error'), 'error');
@@ -2482,6 +2545,7 @@ function resetAdminForm() {
     if (mediaScanStatus) { mediaScanStatus.textContent = ''; mediaScanStatus.className = 'admin-media-scan-status'; }
     const mediaScanResult = document.getElementById('adminMediaScanResult');
     if (mediaScanResult) { mediaScanResult.style.display = 'none'; mediaScanResult.innerHTML = ''; }
+    mediaScanResetHistory();
 
     adminSelectedCategories = new Set();
     renderAdminCategoryBox();
@@ -2501,6 +2565,7 @@ function resetAdminForm() {
 
 function loadMovieIntoAdminForm(movie) {
     switchAdminTab('add');
+    mediaScanResetHistory();
 
     document.getElementById('adminEditingId').value = movie.id;
     document.getElementById('adminTitle').value = movie.title || '';
