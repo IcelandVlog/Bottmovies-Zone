@@ -3656,6 +3656,20 @@ document.addEventListener('click', (e) => {
         badge.classList.add('show');
     }
 
+    function tryFetchCountry(providers, index) {
+        if (index >= providers.length) return;
+        const provider = providers[index];
+        fetch(provider.url)
+            .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+            .then(function (data) {
+                const code = provider.extract(data);
+                if (!code) { tryFetchCountry(providers, index + 1); return; }
+                try { sessionStorage.setItem('bottmovies_visitor_country', code); } catch (e) {}
+                showBadge(code);
+            })
+            .catch(function () { tryFetchCountry(providers, index + 1); });
+    }
+
     function init() {
         try {
             const cached = sessionStorage.getItem('bottmovies_visitor_country');
@@ -3665,15 +3679,14 @@ document.addEventListener('click', (e) => {
             }
         } catch (e) {}
 
-        fetch('https://ipapi.co/json/')
-            .then(function (res) { return res.ok ? res.json() : null; })
-            .then(function (data) {
-                const code = data && data.country_code;
-                if (!code) return;
-                try { sessionStorage.setItem('bottmovies_visitor_country', code); } catch (e) {}
-                showBadge(code);
-            })
-            .catch(function () { /* badge simply stays hidden on failure */ });
+        // একাধিক free GeoIP provider - কিছু adblocker/extension প্রথমটা (ipapi.co) ব্লক করে দেয়,
+        // তাই একটা fail করলে পরেরটা try করা হয়।
+        const providers = [
+            { url: 'https://get.geojs.io/v1/ip/country.json', extract: function (d) { return d && d.country; } },
+            { url: 'https://ipwho.is/', extract: function (d) { return d && d.country_code; } },
+            { url: 'https://ipapi.co/json/', extract: function (d) { return d && d.country_code; } }
+        ];
+        tryFetchCountry(providers, 0);
     }
 
     if (document.readyState === 'loading') {

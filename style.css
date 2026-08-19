@@ -56,7 +56,7 @@ body {
     cursor: pointer;
 }
 
-.logo span { color: #8bc34a; }
+.logo .logo-accent { color: #8bc34a; }
 
 .logo-country-badge {
     display: none;
