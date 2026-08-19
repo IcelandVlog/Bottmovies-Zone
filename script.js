@@ -573,7 +573,7 @@ function getMoviesPerPage() {
         const vw = window.innerWidth || document.documentElement.clientWidth || 1;
         const vh = window.innerHeight || document.documentElement.clientHeight || 1;
         const aspect = vh / vw; // সাধারণ ডেস্কটপে এটা মোটামুটি ০.৫-০.৭, ফোনে ভুয়া ডেস্কটপ মোডে অনেক বেশি (লম্বা)
-        const rows = Math.max(2, Math.round(2 * aspect));
+        const rows = Math.max(2, Math.round(2 * aspect)) + 1; // +১ এক্সট্রা লাইন, যাতে নিচে সামান্য ফাঁকা থাকলেও পুরোপুরি ভরাট মনে হয়
         return cols * rows;
     }
 
