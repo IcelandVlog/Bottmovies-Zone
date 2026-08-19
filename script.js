@@ -3654,23 +3654,15 @@ document.addEventListener('click', (e) => {
             .then(function (data) {
                 const code = provider.extract(data);
                 if (!code) { tryFetchCountry(providers, index + 1); return; }
-                try { sessionStorage.setItem('bottmovies_visitor_country', code); } catch (e) {}
                 showBadge(code);
             })
             .catch(function () { tryFetchCountry(providers, index + 1); });
     }
 
     function init() {
-        try {
-            const cached = sessionStorage.getItem('bottmovies_visitor_country');
-            if (cached) {
-                showBadge(cached);
-                return;
-            }
-        } catch (e) {}
-
-        // একাধিক free GeoIP provider - কিছু adblocker/extension প্রথমটা (ipapi.co) ব্লক করে দেয়,
-        // তাই একটা fail করলে পরেরটা try করা হয়।
+        // প্রতিবার page load/refresh-এ fresh IP detect করা হয় (VPN দিয়ে test করার সময় যেন
+        // পুরনো cached দেশ আটকে না থাকে)। কিছু free GeoIP provider - একটা fail/block হলে
+        // পরেরটা try করা হয়।
         const providers = [
             { url: 'https://get.geojs.io/v1/ip/country.json', extract: function (d) { return d && d.country; } },
             { url: 'https://ipwho.is/', extract: function (d) { return d && d.country_code; } },
