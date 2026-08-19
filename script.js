@@ -62,6 +62,25 @@ function makePosterPlaceholder(label) {
 const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
 const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
 
+// A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
+// warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
+// host) even though the URL is perfectly valid - a plain reload fixes it
+// because the connection is warm the second time. Retrying once in-place
+// covers that case automatically instead of making the user reload.
+function handlePosterImgError(imgEl) {
+    if (!imgEl) return;
+    if (imgEl.dataset.posterRetried === '1') {
+        imgEl.onerror = null;
+        imgEl.src = POSTER_PLACEHOLDER_MISSING;
+        return;
+    }
+    imgEl.dataset.posterRetried = '1';
+    const originalSrc = imgEl.src;
+    setTimeout(() => {
+        if (imgEl.isConnected) imgEl.src = originalSrc;
+    }, 800);
+}
+
 async function fetchMoviesFromSupabase() {
     try {
         const { data: movies, error } = await supabaseClient
@@ -351,7 +370,7 @@ async function getFullTMDBDetails(movie) {
         const cleanImdbId = extractImdbId(movie.imdbId);
 
         if (!matchId && cleanImdbId) {
-            const findRes = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${cleanImdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`, {}, 2000);
+            const findRes = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${cleanImdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`, {}, 6000);
             if (findRes.ok) {
                 const findData = await findRes.json();
                 if (findData.movie_results && findData.movie_results.length > 0) {
@@ -366,7 +385,7 @@ async function getFullTMDBDetails(movie) {
 
         if (!matchId && (movie.title || movie.searchName)) {
             const cleanQuery = (movie.searchName || movie.title).replace(/\s*\([\d\-]+\)/g, '').trim();
-            const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 2000);
+            const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 6000);
             if (searchRes.ok) {
                 const searchData = await searchRes.json();
                 if (searchData && searchData.results && searchData.results.length > 0) {
@@ -379,7 +398,7 @@ async function getFullTMDBDetails(movie) {
 
         if (!matchId) return null;
 
-        const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids,release_dates,content_ratings`, {}, 2000);
+        const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids,release_dates,content_ratings`, {}, 6000);
         if (!detailRes.ok) return null;
         const detailData = await detailRes.json();
 
@@ -471,7 +490,7 @@ async function getOMDbDetails(movie) {
         const cleanImdb = extractImdbId(movie.imdbId);
         const cleanName = (movie.searchName || movie.title).replace(/\s*\([\d\-]+\)/g, '').trim();
         const omdbQuery = cleanImdb ? `i=${encodeURIComponent(cleanImdb)}` : `t=${encodeURIComponent(cleanName)}`;
-        const res = await fetchWithTimeout(`https://www.omdbapi.com/?${omdbQuery}&apikey=${OMDB_API_KEY}`, {}, 2000);
+        const res = await fetchWithTimeout(`https://www.omdbapi.com/?${omdbQuery}&apikey=${OMDB_API_KEY}`, {}, 6000);
         const data = await res.json();
         if (data && data.Response === "True") {
             return {
@@ -637,7 +656,7 @@ function renderMoviesByPage(movies, page) {
             <div class="poster-rating-badge" id="card-rating-${index}">
                 <span>★</span> N/A
             </div>
-            <img src="${POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${POSTER_PLACEHOLDER_MISSING}';">
+            <img src="${POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;
@@ -853,7 +872,7 @@ fastServersList.forEach((fs, fIdx) => {
                     <span class="star-icon">★</span>
                     <span id="modalRatingVal">${finalRating}</span>/10
                 </div>
-                <img src="${poster}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${POSTER_PLACEHOLDER_MISSING}';">
+                <img src="${poster}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
             </div>
             <div class="card-header-info">
                 <h1 class="card-movie-title">${title}</h1>
@@ -2100,9 +2119,9 @@ async function handleMediaScanFile(file) {
     }
 
     const bigFileWarnBytes = 800 * 1024 * 1024;
-    const bigFileHardCapBytes = 2 * 1024 * 1024 * 1024; // ~2GB: ffmpeg.wasm (32-bit) keeps a copy of the file in its own heap on top of the browser's copy, so anything near/over 2GB reliably fails ("File could not be read").
+    const bigFileHardCapBytes = 4 * 1024 * 1024 * 1024; // ~4GB cap: wasm32 linear memory tops out at 4GB total, and ffmpeg.wasm needs room for both the file copy and its own working memory, so very large files can still fail even under this cap depending on the device.
     if (file.size > bigFileHardCapBytes) {
-        setStatus(`File is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB — too large for in-browser scanning (in-browser limit is ~2GB). Please fill Audio/Subtitles manually for this one.`, 'error');
+        setStatus(`File is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB — too large for in-browser scanning (in-browser limit is ~4GB). Please fill Audio/Subtitles manually for this one.`, 'error');
         return;
     } else if (file.size > bigFileWarnBytes) {
         setStatus(`Large file (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB) — in-browser scanning may be slow or fail depending on device memory. Scanning...`);
