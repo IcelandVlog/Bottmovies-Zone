@@ -542,12 +542,41 @@ function getGridColumnsCount() {
     return cols || 5;
 }
 
+// ফোনে ব্রাউজারের "Request Desktop Site" চালু থাকলে ভিউপোর্ট width বড় দেখানো হয়
+// (তাই ৫-কলাম গ্রিড বসে যায়, নিচের max-width মিডিয়া কোয়েরিগুলো আর ধরে না) কিন্তু
+// ফোনের আসল স্ক্রিন তো তখনও লম্বা (portrait) - zoom-out করে পুরো পেজ দেখানোর কারণে
+// effective viewport height অনেক বেশি হয়ে যায়। normal desktop monitor-এর জন্য ঠিক
+// করা "৫ কলাম = ২ row = ১০টা" নিয়মে তখন পেজের নিচের অনেকটা অংশ ফাঁকা থেকে যায় -
+// screen.width/height ব্রাউজার viewport স্পুফ করলেও বদলায় না (আসল ডিভাইসের
+// রেজোলিউশনই দেখায়), তাই touch + ছোট আসল স্ক্রিন + ৫-কলাম গ্রিড এই কম্বিনেশন
+// দেখলে বোঝা যায় এটা আসলে ফোনেই জোর করে "desktop site" চালু করা হয়েছে।
+function isForcedDesktopOnPhone(cols) {
+    if (cols !== 5) return false;
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (!isTouch) return false;
+    const realScreenNarrow = Math.min(window.screen.width || 0, window.screen.height || 0) < 500;
+    return realScreenNarrow;
+}
+
 // নিয়ম: যেকোনো ডিভাইসে ১ লাইনে সর্বোচ্চ ৫টা কন্টেন্ট।
 // ১ লাইনে ৩ বা ৪টা কন্টেন্ট থাকলে প্রতি পেজে ১২টা কন্টেন্ট,
 // বাকি সব ক্ষেত্রে (২ বা ৫টা) প্রতি পেজে ১০টা কন্টেন্ট।
+// ব্যতিক্রম: ফোনে জোর করে "desktop site" চালু থাকলে (isForcedDesktopOnPhone) সেই
+// ফাঁকা জায়গার সমস্যা এড়াতে row সংখ্যা visible viewport-এর height/width অনুপাত
+// মেপে বাড়ানো হয়, যাতে zoom-out করা লম্বা ভার্চুয়াল পেজটা যথেষ্ট কন্টেন্ট দিয়ে ভরে
+// যায় - স্বাভাবিক ডেস্কটপ/মোবাইলে (এই কন্ডিশন false থাকলে) আচরণ আগের মতোই থাকে।
 function getMoviesPerPage() {
     let cols = getGridColumnsCount();
     if (cols > 5) cols = 5;
+
+    if (isForcedDesktopOnPhone(cols)) {
+        const vw = window.innerWidth || document.documentElement.clientWidth || 1;
+        const vh = window.innerHeight || document.documentElement.clientHeight || 1;
+        const aspect = vh / vw; // সাধারণ ডেস্কটপে এটা মোটামুটি ০.৫-০.৭, ফোনে ভুয়া ডেস্কটপ মোডে অনেক বেশি (লম্বা)
+        const rows = Math.max(2, Math.round(2 * aspect));
+        return cols * rows;
+    }
+
     if (cols === 3 || cols === 4) return 12;
     return 10;
 }
