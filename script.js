@@ -2085,10 +2085,21 @@ async function mediaScanReadFileAsUint8Array(blob) {
 // bigger chunk before giving up.
 const MEDIA_SCAN_CHUNK_BYTES = [64 * 1024 * 1024, 300 * 1024 * 1024]; // 64MB, then 300MB
 
+// "-i file" (output ছাড়া) দিলে ffmpeg ইনপুটের সব স্ট্রিম ইনফো প্রিন্ট করা শেষ করেই এই
+// লাইনটা দিয়ে error করে - মানে এই লাইনটা এলে বোঝা যায় হেডার সম্পূর্ণ পার্স হয়েছে,
+// মাঝপথে কাটা পড়েনি।
+const MEDIA_SCAN_HEADER_COMPLETE_RE = /at least one output file must be specified/i;
+
+function mediaScanHeaderFullyParsed(logLines) {
+    return logLines.some(l => MEDIA_SCAN_HEADER_COMPLETE_RE.test(l));
+}
+
 async function mediaScanProbeVideoFile(file, onProgress) {
     const ffmpeg = await mediaScanEnsureFFmpeg(onProgress);
     const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
     const safeName = 'probe_input' + (extMatch ? extMatch[0] : '.mkv');
+
+    let bestResult = { audio: [], subtitle: [] };
 
     for (let i = 0; i < MEDIA_SCAN_CHUNK_BYTES.length; i++) {
         const chunkBytes = MEDIA_SCAN_CHUNK_BYTES[i];
@@ -2112,13 +2123,21 @@ async function mediaScanProbeVideoFile(file, onProgress) {
 
         const result = mediaScanParseStreamLogs(logLines);
         const foundSomething = result.audio.length > 0 || result.subtitle.length > 0;
+        if (foundSomething) bestResult = result; // partial হলেও এখন পর্যন্ত পাওয়া সেরা ফলাফল রাখা হচ্ছে
 
-        // Probed the whole file already, or found tracks - either way, stop here.
-        if (foundSomething || probeBlob === file || i === MEDIA_SCAN_CHUNK_BYTES.length - 1) {
-            return result;
+        // শুধু "কিছু একটা পাওয়া গেছে" দেখেই থেমে যাওয়া যাবে না - বড় ফাইলে ছোট chunk-এ
+        // audio ট্র্যাকগুলো পাওয়ার পরপরই chunk শেষ হয়ে যেতে পারে, তখন পরের subtitle
+        // ট্র্যাকগুলো এখনও না-পড়া অবস্থায় থেকে যায় (ffmpeg header সম্পূর্ণ পড়ার আগেই
+        // চাঙ্ক ফুরিয়ে যায় বলে ভিন্ন error দেয়) - ফলে সেই ফাইলের কিছু ভাষা মিস হয়ে
+        // যেত, যদিও merge history-তে সেটাকে "সম্পূর্ণ স্ক্যান" ধরে নেওয়া হতো। তাই এখন
+        // হেডার পুরোপুরি পার্স হয়েছে এটা নিশ্চিত না হলে (headerComplete) থামা হয় না -
+        // পুরো ফাইল পড়া হয়ে গেলে বা এটাই শেষ/বড় chunk হলে যা পাওয়া গেছে তাই ফাইনাল।
+        const headerComplete = mediaScanHeaderFullyParsed(logLines);
+        if ((foundSomething && headerComplete) || probeBlob === file || i === MEDIA_SCAN_CHUNK_BYTES.length - 1) {
+            return foundSomething ? result : bestResult;
         }
     }
-    return { audio: [], subtitle: [] };
+    return bestResult;
 }
 
 function mediaScanFormatList(list) {
