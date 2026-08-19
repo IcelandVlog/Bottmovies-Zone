@@ -3649,7 +3649,8 @@ document.addEventListener('click', (e) => {
     function tryFetchCountry(providers, index) {
         if (index >= providers.length) return;
         const provider = providers[index];
-        fetch(provider.url)
+        const bustParam = (provider.url.indexOf('?') === -1 ? '?' : '&') + '_t=' + Date.now();
+        fetch(provider.url + bustParam, { cache: 'no-store' })
             .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
             .then(function (data) {
                 const code = provider.extract(data);
