@@ -3639,20 +3639,10 @@ document.addEventListener('click', (e) => {
 // automatically desh detect kore. Fail hole ba API slow hole badge simply hidden
 // thake - eta kono blocking call na, tai page/logo load-e kono delay hoy na.
 (function () {
-    function countryCodeToFlagEmoji(code) {
-        if (!code || code.length !== 2) return '';
-        const A = 0x1F1E6;
-        const chars = code.toUpperCase().split('').map(function (c) {
-            return String.fromCodePoint(A + (c.charCodeAt(0) - 65));
-        });
-        return chars.join('');
-    }
-
     function showBadge(countryCode) {
         const badge = document.getElementById('logoCountryBadge');
         if (!badge || !countryCode) return;
-        const flag = countryCodeToFlagEmoji(countryCode);
-        badge.textContent = (flag ? flag + ' ' : '') + countryCode.toUpperCase();
+        badge.textContent = countryCode.toUpperCase();
         badge.classList.add('show');
     }
 

@@ -44,10 +44,8 @@ body {
 }
 
 .logo {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    line-height: 1.1;
+    position: relative;
+    display: inline-block;
     font-size: 24px;
     font-weight: bold;
     color: #ffffff;
@@ -60,25 +58,18 @@ body {
 
 .logo-country-badge {
     display: none;
-    align-items: center;
-    gap: 4px;
-    font-size: 9px;
+    position: relative;
+    top: -0.9em;
+    margin-left: 2px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    color: #b7c0cf;
-    background: rgba(139, 195, 74, 0.12);
-    border: 1px solid rgba(139, 195, 74, 0.35);
-    border-radius: 3px;
-    padding: 1px 6px;
-    margin-bottom: 2px;
+    color: #8bc34a;
+    vertical-align: top;
 }
 
 .logo-country-badge.show {
-    display: inline-flex;
-}
-
-.logo-text-line {
-    display: inline-block;
+    display: inline;
 }
 
 .search-container {
