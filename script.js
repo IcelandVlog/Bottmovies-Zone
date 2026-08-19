@@ -2038,16 +2038,31 @@ function mediaScanParseStreamLogs(lines) {
     return { audio: Array.from(audio), subtitle: Array.from(subtitle) };
 }
 
+// ffmpeg.wasm's own fetchFile() reads the whole file through the old
+// FileReader API. On big movie files (or low-memory/mobile browsers) that
+// read can silently fail with "File could not be read! Code=0" - FileReader
+// throws a generic error with no real error code when it can't allocate the
+// buffer. Reading the Blob natively via file.arrayBuffer() uses the
+// browser's streaming Blob pipeline instead and is far less likely to fail,
+// and when it does fail it throws a real, more descriptive error.
+async function mediaScanReadFileAsUint8Array(file) {
+    try {
+        const buf = await file.arrayBuffer();
+        return new Uint8Array(buf);
+    } catch (e) {
+        throw new Error('Could not load the file into memory. It may be too large for in-browser scanning, or your browser/device ran out of memory. Try a smaller file, close other tabs, or scan from a desktop browser.');
+    }
+}
+
 async function mediaScanProbeVideoFile(file, onProgress) {
     const ffmpeg = await mediaScanEnsureFFmpeg(onProgress);
     const logLines = [];
     ffmpeg.setLogger(({ message }) => { if (message) logLines.push(message); });
 
     if (onProgress) onProgress('Reading file into scanner...');
-    const { fetchFile } = window.FFmpeg;
     const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
     const safeName = 'probe_input' + (extMatch ? extMatch[0] : '.mkv');
-    ffmpeg.FS('writeFile', safeName, await fetchFile(file));
+    ffmpeg.FS('writeFile', safeName, await mediaScanReadFileAsUint8Array(file));
 
     if (onProgress) onProgress('Detecting audio & subtitle tracks...');
     try {
@@ -2085,7 +2100,11 @@ async function handleMediaScanFile(file) {
     }
 
     const bigFileWarnBytes = 800 * 1024 * 1024;
-    if (file.size > bigFileWarnBytes) {
+    const bigFileHardCapBytes = 2 * 1024 * 1024 * 1024; // ~2GB: ffmpeg.wasm (32-bit) keeps a copy of the file in its own heap on top of the browser's copy, so anything near/over 2GB reliably fails ("File could not be read").
+    if (file.size > bigFileHardCapBytes) {
+        setStatus(`File is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB — too large for in-browser scanning (in-browser limit is ~2GB). Please fill Audio/Subtitles manually for this one.`, 'error');
+        return;
+    } else if (file.size > bigFileWarnBytes) {
         setStatus(`Large file (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB) — in-browser scanning may be slow or fail depending on device memory. Scanning...`);
     } else {
         setStatus('Starting scan...');
