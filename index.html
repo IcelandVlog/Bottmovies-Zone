@@ -32,6 +32,16 @@
 <link rel="shortcut icon" href="favicon.png" type="image/x-icon"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- coi-serviceworker সরিয়ে দেওয়ায় page cross-origin-isolated না, তাই আসল SharedArrayBuffer পাওয়া যায় না।
+     @ffmpeg/core@0.11.0 single-threaded হয়েও ভেতরে SharedArrayBuffer-কে রেফার করে (শুধু টাইপ-চেক করে না),
+     তাই সেটা না থাকলে "SharedArrayBuffer is not defined" ছুঁড়ে দেয়। যেহেতু single-thread mode-এ আসলে
+     থ্রেডের মধ্যে মেমরি শেয়ার করারই দরকার নেই, তাই এখানে একটা নিরাপদ polyfill/শিম দেওয়া হলো -
+     আসল SharedArrayBuffer না থাকলে সাধারণ ArrayBuffer দিয়েই কাজ চালানো হবে। -->
+<script>
+  if (typeof window.SharedArrayBuffer === 'undefined') {
+      window.SharedArrayBuffer = ArrayBuffer;
+  }
+</script>
 <!-- এডমিন প্যানেলের ভিডিও/ZIP স্ক্যান ফিচারের জন্য (audio/subtitle auto-detect), ব্রাউজারেই লোকালি চলে -->
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script type="text/javascript">
