@@ -95,6 +95,7 @@ if (typeof window === 'undefined') {
                     ? false
                     : coi.coepCredentialless(),
             });
+
             if (reloadToDegrade) {
                 !coi.quiet && console.log("Reloading page to degrade COEP.");
                 window.sessionStorage.setItem("coiReloadedBySelf", "coepdegrade");

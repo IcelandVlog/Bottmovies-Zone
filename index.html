@@ -4,19 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bottmovies Zone</title>
-<!-- coi-serviceworker.js সরিয়ে দেওয়া হয়েছে: এটা প্রতি fresh visit-এ নিজে থেকে
-     window.location.reload() চালাত (SharedArrayBuffer/cross-origin-isolation চালু করতে),
-     যেটা poster load হওয়ার আগেই page reload করে দিয়ে "No Poster" bug তৈরি করছিল।
-     media-scan এ ব্যবহৃত @ffmpeg/core@0.11.0 single-threaded, তাই এটার আসলে দরকারই নেই।
-     আগে যাদের browser-এ এই service worker ইতিমধ্যে install হয়ে গেছে, তাদের জন্য নিচের
-     লাইনটা সেটা unregister করে দেবে যাতে তারাও আর এই bug না দেখেন। -->
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function (regs) {
-      regs.forEach(function (reg) { reg.unregister(); });
-    });
-  }
-</script>
+<!-- GitHub Pages custom HTTP header set করতে দেয় না, তাই SharedArrayBuffer/cross-origin-isolation
+     চালু করার একমাত্র উপায় এই service worker (coi-serviceworker v0.1.7)। আগের version-এ
+     credentialless mode না থাকায় বাইরের poster link ব্লক হয়ে "No Poster" bug হচ্ছিল -
+     এই updated version default-ই credentialless mode ব্যবহার করে (বাইরের poster/CDN ব্লক করে না)
+     এবং শুধু প্রথমবার (registration না হওয়া পর্যন্ত) reload করে, বারবার reload করে না। -->
+<script src="coi-serviceworker.js"></script>
 <script>
   // থিম সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
   (function(){
