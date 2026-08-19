@@ -2178,9 +2178,10 @@ function mediaScanMergeHistory(historyKey) {
 function mediaScanFormatMergedList(historyKey) {
     const { labels, count, commonCount } = mediaScanMergeHistory(historyKey);
     if (labels.length === 0) return '';
-    // মাত্র একটা ফাইল স্ক্যান হলে আগের মতোই সাধারণ "(count)-" ফরম্যাট দেখাবে -
-    // "Only" ট্যাগ বা "total/common" রেশিও শুধু একাধিক ফাইল স্ক্যান হলেই লাগবে।
-    if (mediaScanHistory.length <= 1) return `(${count})- ${labels.join(', ')}`;
+    // সব স্ক্যানে যদি কোনো অমিল না থাকে (সবগুলো ভাষাই সব ফাইলে কমন), তাহলে আগের
+    // মতোই সাধারণ "(count)-" ফরম্যাট দেখাবে। "total/common" রেশিও শুধু তখনই দেখাবে
+    // যখন সত্যিই কোনো ভাষা এক বা কয়েকটা ফাইলে "Only" ট্যাগ নিয়ে আলাদা পড়ে আছে।
+    if (count === commonCount) return `(${count})- ${labels.join(', ')}`;
     return `(${count}/${commonCount})- ${labels.join(', ')}`;
 }
 
