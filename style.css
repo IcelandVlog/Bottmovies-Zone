@@ -44,6 +44,10 @@ body {
 }
 
 .logo {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.1;
     font-size: 24px;
     font-weight: bold;
     color: #ffffff;
@@ -53,6 +57,29 @@ body {
 }
 
 .logo span { color: #8bc34a; }
+
+.logo-country-badge {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #b7c0cf;
+    background: rgba(139, 195, 74, 0.12);
+    border: 1px solid rgba(139, 195, 74, 0.35);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-bottom: 2px;
+}
+
+.logo-country-badge.show {
+    display: inline-flex;
+}
+
+.logo-text-line {
+    display: inline-block;
+}
 
 .search-container {
     display: flex;

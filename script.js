@@ -3633,3 +3633,52 @@ document.addEventListener('click', (e) => {
         document.querySelectorAll('.comment-reaction-picker').forEach(p => p.style.display = 'none');
     }
 });
+
+// ==================== VISITOR COUNTRY BADGE (auto, above logo) ====================
+// Logo-r upore YouTube-style chhoto country badge dekhায়, visitor-er IP theke
+// automatically desh detect kore. Fail hole ba API slow hole badge simply hidden
+// thake - eta kono blocking call na, tai page/logo load-e kono delay hoy na.
+(function () {
+    function countryCodeToFlagEmoji(code) {
+        if (!code || code.length !== 2) return '';
+        const A = 0x1F1E6;
+        const chars = code.toUpperCase().split('').map(function (c) {
+            return String.fromCodePoint(A + (c.charCodeAt(0) - 65));
+        });
+        return chars.join('');
+    }
+
+    function showBadge(countryCode) {
+        const badge = document.getElementById('logoCountryBadge');
+        if (!badge || !countryCode) return;
+        const flag = countryCodeToFlagEmoji(countryCode);
+        badge.textContent = (flag ? flag + ' ' : '') + countryCode.toUpperCase();
+        badge.classList.add('show');
+    }
+
+    function init() {
+        try {
+            const cached = sessionStorage.getItem('bottmovies_visitor_country');
+            if (cached) {
+                showBadge(cached);
+                return;
+            }
+        } catch (e) {}
+
+        fetch('https://ipapi.co/json/')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                const code = data && data.country_code;
+                if (!code) return;
+                try { sessionStorage.setItem('bottmovies_visitor_country', code); } catch (e) {}
+                showBadge(code);
+            })
+            .catch(function () { /* badge simply stays hidden on failure */ });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
