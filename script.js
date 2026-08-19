@@ -2061,38 +2061,64 @@ function mediaScanParseStreamLogs(lines) {
 // FileReader API. On big movie files (or low-memory/mobile browsers) that
 // read can silently fail with "File could not be read! Code=0" - FileReader
 // throws a generic error with no real error code when it can't allocate the
-// buffer. Reading the Blob natively via file.arrayBuffer() uses the
-// browser's streaming Blob pipeline instead and is far less likely to fail,
-// and when it does fail it throws a real, more descriptive error.
-async function mediaScanReadFileAsUint8Array(file) {
+// buffer. Reading the Blob natively via .arrayBuffer() uses the browser's
+// streaming Blob pipeline instead and is far less likely to fail, and when
+// it does fail it throws a real, more descriptive error.
+async function mediaScanReadFileAsUint8Array(blob) {
     try {
-        const buf = await file.arrayBuffer();
+        const buf = await blob.arrayBuffer();
         return new Uint8Array(buf);
     } catch (e) {
         throw new Error('Could not load the file into memory. It may be too large for in-browser scanning, or your browser/device ran out of memory. Try a smaller file, close other tabs, or scan from a desktop browser.');
     }
 }
 
+// Audio/subtitle track info lives in the container's header (EBML/Tracks
+// element for MKV, moov atom for MP4) which sits at or near the start of the
+// file - ffmpeg never needs to touch the actual video payload to list
+// streams. So instead of loading the whole (possibly multi-GB) file into
+// memory, we only read a leading chunk. This uses a tiny, fixed amount of
+// memory no matter how large the source file is, which is what was actually
+// causing "Could not load the file into memory" on big files. If nothing
+// turns up in the first chunk (rare - e.g. unusually large embedded
+// attachments/chapters before the Tracks element) we retry once with a
+// bigger chunk before giving up.
+const MEDIA_SCAN_CHUNK_BYTES = [64 * 1024 * 1024, 300 * 1024 * 1024]; // 64MB, then 300MB
+
 async function mediaScanProbeVideoFile(file, onProgress) {
     const ffmpeg = await mediaScanEnsureFFmpeg(onProgress);
-    const logLines = [];
-    ffmpeg.setLogger(({ message }) => { if (message) logLines.push(message); });
-
-    if (onProgress) onProgress('Reading file into scanner...');
     const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
     const safeName = 'probe_input' + (extMatch ? extMatch[0] : '.mkv');
-    ffmpeg.FS('writeFile', safeName, await mediaScanReadFileAsUint8Array(file));
 
-    if (onProgress) onProgress('Detecting audio & subtitle tracks...');
-    try {
-        await ffmpeg.run('-hide_banner', '-i', safeName);
-    } catch (e) {
-        // এখানে কোনো output file দেওয়া হয়নি বলে ffmpeg error দেবে -
-        // এটাই expected, কারণ error দেওয়ার আগেই স্ট্রিম ইনফো লগ হয়ে যায়।
+    for (let i = 0; i < MEDIA_SCAN_CHUNK_BYTES.length; i++) {
+        const chunkBytes = MEDIA_SCAN_CHUNK_BYTES[i];
+        const probeBlob = file.size > chunkBytes ? file.slice(0, chunkBytes) : file;
+
+        if (onProgress) onProgress(i === 0 ? 'Reading file header into scanner...' : 'Header not found yet — reading a larger chunk...');
+
+        const logLines = [];
+        ffmpeg.setLogger(({ message }) => { if (message) logLines.push(message); });
+
+        ffmpeg.FS('writeFile', safeName, await mediaScanReadFileAsUint8Array(probeBlob));
+
+        if (onProgress) onProgress('Detecting audio & subtitle tracks...');
+        try {
+            await ffmpeg.run('-hide_banner', '-i', safeName);
+        } catch (e) {
+            // এখানে কোনো output file দেওয়া হয়নি বলে (এবং chunk-এ ফাইল কাটা থাকায়) ffmpeg error দেবে -
+            // এটাই expected, কারণ error দেওয়ার আগেই স্ট্রিম ইনফো লগ হয়ে যায়।
+        }
+        try { ffmpeg.FS('unlink', safeName); } catch (e) {}
+
+        const result = mediaScanParseStreamLogs(logLines);
+        const foundSomething = result.audio.length > 0 || result.subtitle.length > 0;
+
+        // Probed the whole file already, or found tracks - either way, stop here.
+        if (foundSomething || probeBlob === file || i === MEDIA_SCAN_CHUNK_BYTES.length - 1) {
+            return result;
+        }
     }
-    try { ffmpeg.FS('unlink', safeName); } catch (e) {}
-
-    return mediaScanParseStreamLogs(logLines);
+    return { audio: [], subtitle: [] };
 }
 
 function mediaScanFormatList(list) {
@@ -2118,13 +2144,9 @@ async function handleMediaScanFile(file) {
         return;
     }
 
-    const bigFileWarnBytes = 800 * 1024 * 1024;
-    const bigFileHardCapBytes = 4 * 1024 * 1024 * 1024; // ~4GB cap: wasm32 linear memory tops out at 4GB total, and ffmpeg.wasm needs room for both the file copy and its own working memory, so very large files can still fail even under this cap depending on the device.
-    if (file.size > bigFileHardCapBytes) {
-        setStatus(`File is ${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB — too large for in-browser scanning (in-browser limit is ~4GB). Please fill Audio/Subtitles manually for this one.`, 'error');
-        return;
-    } else if (file.size > bigFileWarnBytes) {
-        setStatus(`Large file (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB) — in-browser scanning may be slow or fail depending on device memory. Scanning...`);
+    const bigFileWarnBytes = 2 * 1024 * 1024 * 1024;
+    if (file.size > bigFileWarnBytes) {
+        setStatus(`Large file (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB) — scanning just the file header, this should still be quick...`);
     } else {
         setStatus('Starting scan...');
     }
