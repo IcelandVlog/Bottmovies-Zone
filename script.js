@@ -53,14 +53,22 @@ const ADMIN_POSTER_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent
 
 // via.placeholder.com is dead/unreliable in 2026 (SSL/DNS issues) - use a local SVG instead
 // so poster boxes never end up blank when there's no real poster to show.
+// Colors are picked based on the current theme so the placeholder matches
+// light/dark mode instead of always being dark.
 function makePosterPlaceholder(label) {
     const safeLabel = escapeHtml(label || 'No Poster');
+    const isLight = document.documentElement.classList.contains('light-mode');
+    const bg = isLight ? '#ffffff' : '#1a1c23';
+    const icon = isLight ? '#94a3b8' : '#475569';
+    const text = isLight ? '#64748b' : '#64748b';
     return "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#1a1c23"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="#475569" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="#475569"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${safeLabel}</text></svg>`
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="${bg}"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="${icon}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="${icon}"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="${text}" text-anchor="middle">${safeLabel}</text></svg>`
     );
 }
-const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
-const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
+// Use getters (not fixed constants) so the placeholder always reflects the
+// theme active at the moment it's actually used, not just at script load.
+function getPosterPlaceholderLoading() { return makePosterPlaceholder('Loading...'); }
+function getPosterPlaceholderMissing() { return makePosterPlaceholder('No Poster'); }
 
 // A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
 // warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
@@ -71,7 +79,7 @@ function handlePosterImgError(imgEl) {
     if (!imgEl) return;
     if (imgEl.dataset.posterRetried === '1') {
         imgEl.onerror = null;
-        imgEl.src = POSTER_PLACEHOLDER_MISSING;
+        imgEl.src = getPosterPlaceholderMissing();
         return;
     }
     imgEl.dataset.posterRetried = '1';
@@ -685,7 +693,7 @@ function renderMoviesByPage(movies, page) {
             <div class="poster-rating-badge" id="card-rating-${index}">
                 <span>★</span> N/A
             </div>
-            <img src="${POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
+            <img src="${getPosterPlaceholderLoading()}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;
@@ -750,7 +758,7 @@ async function openMovieModal(movie) {
     `;
 
     let title = movie.title || "N/A";
-    let poster = movie.poster || POSTER_PLACEHOLDER_MISSING;
+    let poster = movie.poster || getPosterPlaceholderMissing();
     let year = movie.year || "N/A";
     let genre = movie.genre || "Drama";
     let plot = movie.plot || "No plot description available.";
@@ -3796,4 +3804,34 @@ document.addEventListener('click', (e) => {
     } else {
         init();
     }
+})();
+
+/* ==================== Cursor-follow background glow (all pages) ==================== */
+(function () {
+    var ticking = false;
+    var lastX = window.innerWidth / 2;
+    var lastY = window.innerHeight * 0.4;
+
+    function applyGlow(x, y) {
+        var px = (x / window.innerWidth) * 100;
+        var py = (y / window.innerHeight) * 100;
+        document.documentElement.style.setProperty('--mx', px + '%');
+        document.documentElement.style.setProperty('--my', py + '%');
+    }
+
+    function onMove(e) {
+        var point = e.touches && e.touches[0] ? e.touches[0] : e;
+        lastX = point.clientX;
+        lastY = point.clientY;
+        if (!ticking) {
+            window.requestAnimationFrame(function () {
+                applyGlow(lastX, lastY);
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }
+
+    window.addEventListener('mousemove', onMove, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: true });
 })();

@@ -1,0 +1,213 @@
+/* =========================================================================
+   LIQUID GLASS THEME — frosted / translucent overlay for BOTTMOVIES
+   Load this AFTER style.css. It re-skins every solid panel into a
+   translucent, blurred "glass" surface and adds a soft colour-blob
+   backdrop so the blur has something pretty to show through.
+   ========================================================================= */
+
+/* ---------- Animated colour backdrop (sits behind everything) ---------- */
+html { min-height: 100%; --mx: 50%; --my: 40%; }
+
+body {
+    background-color: #06070a;
+    background-image:
+        radial-gradient(circle 420px at var(--mx) var(--my), rgba(0, 188, 212, 0.30) 0%, rgba(0, 188, 212, 0) 70%),
+        radial-gradient(circle at 12% 8%,  rgba(139, 195, 74, 0.35) 0%, rgba(139, 195, 74, 0) 45%),
+        radial-gradient(circle at 88% 15%, rgba(0, 188, 212, 0.32) 0%, rgba(0, 188, 212, 0) 45%),
+        radial-gradient(circle at 25% 85%, rgba(124, 77, 255, 0.28) 0%, rgba(124, 77, 255, 0) 50%),
+        radial-gradient(circle at 80% 90%, rgba(0, 105, 92, 0.30) 0%, rgba(0, 105, 92, 0) 50%),
+        linear-gradient(160deg, #0a0c12 0%, #06070a 60%, #08090d 100%);
+    background-attachment: fixed;
+    background-size: cover;
+    position: relative;
+}
+
+html.light-mode body {
+    background-color: #eef1f6;
+    background-image:
+        radial-gradient(circle 420px at var(--mx) var(--my), rgba(124, 77, 255, 0.22) 0%, rgba(124, 77, 255, 0) 70%),
+        radial-gradient(circle at 12% 8%,  rgba(139, 195, 74, 0.30) 0%, rgba(139, 195, 74, 0) 45%),
+        radial-gradient(circle at 88% 15%, rgba(0, 188, 212, 0.28) 0%, rgba(0, 188, 212, 0) 45%),
+        radial-gradient(circle at 25% 85%, rgba(124, 77, 255, 0.22) 0%, rgba(124, 77, 255, 0) 50%),
+        radial-gradient(circle at 80% 90%, rgba(255, 193, 7, 0.20) 0%, rgba(255, 193, 7, 0) 50%),
+        linear-gradient(160deg, #f4f6fa 0%, #eef1f6 60%, #f1f3f8 100%);
+    background-attachment: fixed;
+    background-size: cover;
+}
+
+/* ---------- Shared glass recipe ---------- */
+.main-header, .menu-toggle-btn, .search-container input, .search-container button,
+.search-suggestions, .main-nav, .dropdown-menu, .notice-banner, .poster-wrapper,
+.modal-box, .movie-summary-card, .card-pill,
+.download-info-section, .season-box-item, .season-download-body,
+.admin-link-row, .page-num, .main-footer, .chat-widget-box, .chat-widget-header,
+.chat-header-pill, .chat-widget-body, .chat-msg-bubble, .chat-card-container,
+.chat-input-wrapper input, .chat-input-wrapper select, .admin-panel,
+.admin-panel-header, .admin-tab-btn, .admin-field input[type="text"],
+.admin-field input[type="number"], .admin-category-pill, .admin-season-block,
+.admin-link-row input, .theme-toggle-btn, .chat-widget-btn, .poster-rating-badge,
+.card-rating-badge-overlay, .comments-section, .comment-input-box,
+.comment-emoji-picker, .comment-reaction-picker, .comment-reaction-pill,
+.comment-auth-box, .custom-confirm-box, .comments-sort-tabs,
+.admin-db-card, .admin-db-thumb, .admin-alert-source-tag, .step-card {
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* ---------- Header / nav / search ---------- */
+.main-header {
+    background-color: rgba(12, 13, 16, 0.55) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.menu-toggle-btn { background-color: rgba(23, 26, 33, 0.55) !important; border-color: rgba(255,255,255,0.14) !important; }
+.search-container input { background-color: rgba(26, 28, 35, 0.45) !important; border-color: rgba(255,255,255,0.12) !important; }
+.search-container button { background-color: rgba(45, 49, 63, 0.55) !important; border-color: rgba(255,255,255,0.12) !important; }
+.search-suggestions { background-color: rgba(26, 28, 35, 0.72) !important; border-color: rgba(255,255,255,0.12) !important; }
+.main-nav { background-color: rgba(23, 26, 33, 0.45) !important; border-top-color: rgba(255,255,255,0.08) !important; border-bottom-color: rgba(255,255,255,0.08) !important; }
+.dropdown-menu { background-color: rgba(26, 28, 35, 0.80) !important; border-color: rgba(255,255,255,0.12) !important; }
+/* .notice-banner { background-color: rgba(0, 105, 92, 0.45) !important; border: 1px solid rgba(255,255,255,0.12); } */
+
+/* ---------- Movie grid / posters ---------- */
+.poster-wrapper { background-color: rgba(17, 17, 17, 0.35) !important; border-color: rgba(255,255,255,0.10) !important; }
+.poster-rating-badge { background-color: rgba(20, 24, 33, 0.55) !important; }
+
+/* ---------- Modal / movie detail page ---------- */
+.modal-overlay {
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    background-color: rgba(6, 7, 10, 0.38) !important;
+}
+.modal-box {
+    background-color: rgba(17, 19, 25, 0.38) !important;
+    border-color: rgba(255,255,255,0.12) !important;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+}
+/* soft light sheen across the top of the glass panel */
+.modal-box::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 22%, rgba(255,255,255,0) 45%);
+    z-index: 0;
+}
+.modal-box > * { position: relative; z-index: 1; }
+
+.movie-summary-card { background: rgba(21, 24, 33, 0.32) !important; border-color: rgba(255,255,255,0.12) !important; backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); }
+.card-rating-badge-overlay { background-color: rgba(30, 33, 44, 0.45) !important; backdrop-filter: blur(10px) saturate(150%); -webkit-backdrop-filter: blur(10px) saturate(150%); }
+.card-pill { background-color: rgba(255,255,255,0.10) !important; }
+.badge-quality { background-color: rgba(0, 176, 255, 0.55) !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.btn-tmdb-action { background-color: rgba(13, 37, 63, 0.45) !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.btn-google-action { background-color: rgba(32, 36, 50, 0.45) !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+/* ---------- Download section ---------- */
+.download-info-section { background: rgba(21, 24, 33, 0.30) !important; border-color: rgba(255,255,255,0.12) !important; }
+.season-box-item {
+    background: rgba(91, 79, 138, 0.40) !important;
+    border: 1px solid rgba(163, 148, 219, 0.45) !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.10);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    /* margin-bottom: 10px; */
+}
+.season-box-item.fast-server-box {
+    background: rgba(0, 91, 102, 0.42) !important;
+    border: 1px solid rgba(77, 208, 225, 0.45) !important;
+}
+.season-box-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.14);
+}
+.season-box-item .season-box-header { text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+.season-download-body { background: rgba(17, 19, 25, 0.35) !important; border-color: rgba(255,255,255,0.10) !important; }
+.admin-link-row { background-color: rgba(17, 22, 34, 0.45) !important; border-color: rgba(255,255,255,0.10) !important; }
+
+/* ---------- Pagination / footer ---------- */
+.page-num { background-color: rgba(23, 26, 33, 0.45) !important; }
+.page-num.active, .page-num:hover:not(.disabled) { background-color: rgba(43, 48, 60, 0.65) !important; }
+.page-num.disabled { background-color: rgba(12, 13, 16, 0.35) !important; }
+.page-num.prev-next { background-color: rgba(38, 50, 56, 0.55) !important; }
+.main-footer { background-color: rgba(0, 0, 0, 0.35) !important; border-top-color: rgba(255,255,255,0.08) !important; }
+
+/* ---------- Floating buttons / chat widget ---------- */
+.theme-toggle-btn { background: rgba(23, 26, 33, 0.55) !important; border-color: rgba(255,255,255,0.14) !important; }
+.chat-widget-btn { background: rgba(37, 99, 235, 0.55) !important; }
+.chat-widget-box, .chat-widget-header, .chat-widget-body { background-color: rgba(11, 14, 20, 0.55) !important; }
+.chat-header-pill { background-color: rgba(26, 32, 44, 0.55) !important; }
+.chat-msg-bubble { background-color: rgba(23, 30, 46, 0.55) !important; border-color: rgba(255,255,255,0.10) !important; }
+.chat-card-container { background-color: rgba(17, 22, 34, 0.50) !important; border-color: rgba(255,255,255,0.10) !important; }
+.chat-input-wrapper input, .chat-input-wrapper select { background-color: rgba(11, 14, 20, 0.55) !important; border-color: rgba(255,255,255,0.14) !important; }
+
+/* ---------- Comments ---------- */
+.comments-section { background-color: rgba(17, 19, 25, 0.42) !important; border-color: rgba(255,255,255,0.10) !important; }
+.comment-input-box { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.10) !important; }
+.comment-reaction-pill { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.12) !important; }
+.comments-sort-tabs { background: rgba(255,255,255,0.06) !important; }
+.comment-auth-box, .custom-confirm-box, .comment-emoji-picker, .comment-reaction-picker {
+    background: rgba(17, 19, 25, 0.70) !important; border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* ---------- Admin panel ---------- */
+.admin-panel { background-color: rgba(11, 14, 20, 0.65) !important; border-color: rgba(255,255,255,0.12) !important; }
+.admin-panel-header { background-color: rgba(255,255,255,0.04) !important; }
+.admin-tab-btn { background-color: rgba(255,255,255,0.06) !important; border-color: rgba(255,255,255,0.12) !important; }
+.admin-field input[type="text"], .admin-field input[type="number"], .admin-link-row input {
+    background-color: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.12) !important;
+}
+.admin-category-pill, .admin-season-block, .admin-db-card, .admin-alert-source-tag {
+    background-color: rgba(255,255,255,0.06) !important; border-color: rgba(255,255,255,0.12) !important;
+}
+.admin-db-thumb { background-color: rgba(255,255,255,0.06) !important; }
+
+/* Subtle glass highlight edge + soft shadow lift for the main glass panels */
+.main-header, .modal-box, .movie-summary-card, .download-info-section,
+.chat-widget-box, .admin-panel, .comments-section, .comment-auth-box,
+.custom-confirm-box, .season-download-body {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 10px 30px rgba(0,0,0,0.35);
+}
+
+/* =========================================================================
+   LIGHT MODE — same glass recipe, tuned for a bright frosted look
+   ========================================================================= */
+html.light-mode .main-header { background-color: rgba(255,255,255,0.55) !important; border-bottom-color: rgba(20,22,28,0.08) !important; box-shadow: none; }
+html.light-mode .menu-toggle-btn { background-color: rgba(241,243,247,0.6) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .search-container input { background-color: rgba(241,243,247,0.55) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .search-container button { background-color: rgba(229,232,238,0.65) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .search-suggestions { background-color: rgba(255,255,255,0.78) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .main-nav { background-color: rgba(255,255,255,0.5) !important; border-top-color: rgba(20,22,28,0.08) !important; border-bottom-color: rgba(20,22,28,0.08) !important; }
+html.light-mode .dropdown-menu { background-color: rgba(255,255,255,0.8) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .poster-wrapper { background-color: rgba(233,236,241,0.45) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .modal-box { background-color: rgba(255,255,255,0.32) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .movie-summary-card { background: rgba(247,248,250,0.28) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .download-info-section { background: rgba(247,248,250,0.28) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .season-download-body { background: rgba(255,255,255,0.28) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .page-num { background-color: rgba(236,239,243,0.55) !important; }
+html.light-mode .page-num.active, html.light-mode .page-num:hover:not(.disabled) { background-color: rgba(221,225,232,0.7) !important; }
+html.light-mode .page-num.disabled { background-color: rgba(241,243,247,0.5) !important; }
+html.light-mode .page-num.prev-next { background-color: rgba(229,232,238,0.65) !important; }
+html.light-mode .main-footer { background-color: rgba(255,255,255,0.5) !important; border-top-color: rgba(20,22,28,0.08) !important; }
+html.light-mode .theme-toggle-btn { background: rgba(255,255,255,0.65) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .comments-section { background-color: rgba(255,255,255,0.6) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .comment-input-box { background: rgba(247,248,250,0.6) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .comments-sort-tabs { background: rgba(241,243,247,0.6) !important; }
+html.light-mode .comment-auth-box, html.light-mode .custom-confirm-box { background-color: rgba(255,255,255,0.8) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .admin-panel { background-color: rgba(255,255,255,0.40) !important; border-color: rgba(20,22,28,0.1) !important; }
+html.light-mode .admin-panel-header { background-color: rgba(247,248,250,0.30) !important; }
+html.light-mode .admin-tab-btn { background-color: rgba(241,243,247,0.35) !important; border-color: rgba(20,22,28,0.12) !important; }
+html.light-mode .admin-field input[type="text"], html.light-mode .admin-field input[type="number"], html.light-mode .admin-link-row input {
+    background-color: rgba(247,248,250,0.6) !important; border-color: rgba(20,22,28,0.12) !important;
+}
+
+/* Download/season boxes were too washed-out (pale) in light mode — deepen them */
+html.light-mode .season-box-item { background: rgba(91, 79, 138, 0.62) !important; border: 1px solid rgba(70, 58, 112, 0.55) !important; box-shadow: 0 4px 14px rgba(20,22,28,0.18), inset 0 1px 0 rgba(255,255,255,0.15); }
+html.light-mode .season-box-item.fast-server-box { background: rgba(0, 91, 102, 0.65) !important; border: 1px solid rgba(0, 63, 71, 0.55) !important; }
+html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.24), inset 0 1px 0 rgba(255,255,255,0.2); }
+
+/* Mobile: keep the fullscreen mobile nav readable with a touch less blur */
+@media (max-width: 600px) {
+    .main-nav { backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); background-color: rgba(18, 20, 26, 0.75) !important; }
+    .dropdown-menu { background-color: rgba(26, 28, 35, 0.80) !important }
+    html.light-mode .main-nav { background-color: rgba(255,255,255,0.85) !important; }
+    html.light-mode .dropdown-menu { background-color: rgba(255,255,255,0.85) !important; }
+}
