@@ -1593,7 +1593,7 @@ html.light-mode .card-pill { background-color: rgba(20,22,28,0.05); border-color
 html.light-mode .card-plot-text { color: #1e2d46; }
 html.light-mode .card-meta-list { color: #4d5566; }
 html.light-mode .card-meta-list strong { color: #14161c; }
-html.light-mode .btn-google-action { background-color: #f1f3f7; border-color: #dde1e8; color: #14161c; }
+html.light-zz { background-color: #f1f3f7; border-color: #dde1e8; color: #14161c; }
 html.light-mode .hide-modal-link { color: #7b8494; }
 html.light-mode .hide-modal-link:hover { color: #14161c; }
 html.light-mode .series-info-list li { color: #14161c; }
@@ -1679,6 +1679,7 @@ html.light-mode .admin-hint { color: #9aa1ac; }
 html.light-mode .admin-field input[type="text"], html.light-mode .admin-field input[type="number"] { background-color: #f7f8fa; border-color: #dde1e8; color: #14161c; }
 html.light-mode .admin-field input::placeholder { color: #9aa1ac; }
 html.light-mode .admin-category-pill { background-color: #f1f3f7; border-color: #dde1e8; color: #6b7280; }
+html.light-mode .admin-category-pill.selected { background-color: #2563eb; border-color: #2563eb; color: #ffffff; }
 html.light-mode .admin-mini-btn, html.light-mode .admin-add-row-btn { background-color: #eef4ff; border-color: #2563eb; color: #1d4ed8; }
 html.light-mode .admin-mini-btn:hover, html.light-mode .admin-add-row-btn:hover { background-color: #dbe8ff; }
 html.light-mode .admin-toggle-btn { background-color: #f1f3f7; border-color: #dde1e8; color: #6b7280; }
