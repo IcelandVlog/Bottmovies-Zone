@@ -2246,6 +2246,21 @@ function mediaScanFormatMergedList(historyKey) {
     return `(${count}/${commonCount})- ${labels.join(', ')}`;
 }
 
+// এডিট মোডে ফর্ম লোড হওয়ার সময় আগে থেকে সেভ করা Audio/Subtitles টেক্সট
+// ("(2)- Hindi, English (01 Only)" এই স্টাইলের) থেকে প্লেইন ভাষার লিস্ট বের করে -
+// যাতে সেটাকে mediaScanHistory-এর প্রথম "scan" হিসেবে বসিয়ে দেওয়া যায় এবং এডিটের
+// সময় নতুন ফাইল স্ক্যান করলে আগের ডেটা মুছে না গিয়ে তার সাথে যোগ (merge) হয়,
+// ঠিক যেভাবে Season 1 / Season 2 / Season 3 -এর মতো একের পর এক জমা হয়।
+function mediaScanParseExistingField(str) {
+    if (!str) return [];
+    let s = String(str).trim();
+    s = s.replace(/^\(\d+(?:\/\d+)?\)-\s*/, ''); // leading "(n)-" / "(n/m)-" count prefix বাদ
+    if (!s) return [];
+    return s.split(',')
+        .map(item => item.replace(/\s*\([\d/.]+\s*Only\)\s*$/i, '').trim())
+        .filter(Boolean);
+}
+
 async function handleMediaScanFile(file) {
     const statusEl = document.getElementById('adminMediaScanStatus');
     const resultEl = document.getElementById('adminMediaScanResult');
@@ -2636,6 +2651,15 @@ function loadMovieIntoAdminForm(movie) {
     document.getElementById('adminTmdbId').value = movie.tmdbId || '';
     document.getElementById('adminAudio').value = movie.languages || '';
     document.getElementById('adminSubtitles').value = movie.Subtitles || movie.subtitles || '';
+
+    // আগে থেকে সেভ করা Audio/Subtitles-কে mediaScanHistory-এর "scan #1" হিসেবে
+    // বসিয়ে রাখা হলো, যাতে এডিট করার সময় নতুন কোনো ফাইল স্ক্যান করলে সেটা এই
+    // পুরনো ডেটা মুছে না দিয়ে তার সাথে যোগ হয় (season-by-season merge)।
+    const existingScanAudio = mediaScanParseExistingField(movie.languages);
+    const existingScanSubs = mediaScanParseExistingField(movie.Subtitles || movie.subtitles);
+    if (existingScanAudio.length > 0 || existingScanSubs.length > 0) {
+        mediaScanHistory.push({ audio: existingScanAudio, subtitle: existingScanSubs });
+    }
 
     adminSelectedCategories = new Set(
         Array.isArray(movie.category) ? movie.category : (movie.category ? String(movie.category).split('|').map(s => s.trim()).filter(Boolean) : [])
