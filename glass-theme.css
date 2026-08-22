@@ -22,6 +22,17 @@ body {
     position: relative;
 }
 
+/* Mobile: "fixed" backgrounds force a full repaint on every scroll
+   frame on many mobile browsers. Switching to "scroll" here is the
+   single biggest fix for scroll lag — visually almost nobody notices
+   the difference on a phone since you can't see much background
+   while actively scrolling anyway. */
+@media (max-width: 768px) {
+    body, html.light-mode body {
+        background-attachment: scroll;
+    }
+}
+
 html.light-mode body {
     background-color: #eef1f6;
     background-image:
@@ -188,4 +199,35 @@ html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.
     .dropdown-menu { background-color: rgba(26, 28, 35, 0.80) !important }
     html.light-mode .main-nav { background-color: rgba(255,255,255,0.85) !important; }
     html.light-mode .dropdown-menu { background-color: rgba(255,255,255,0.85) !important; }
+}
+
+/* =========================================================================
+   MOBILE PERFORMANCE FIX — desktop is untouched above.
+   On small/touch screens, the grid-repeating elements (poster cards,
+   badges, pills, season boxes) drop backdrop-filter entirely, since
+   20-40+ blurred layers on screen at once is what causes scroll jank
+   on mobile GPUs. Desktop keeps the full blur(18px) glass look.
+   ========================================================================= */
+@media (max-width: 768px) {
+    /* fixed background forces a full repaint every scroll frame on
+       many mobile browsers — switch to normal scrolling background */
+    body, html.light-mode body {
+        background-attachment: scroll;
+    }
+
+    .poster-wrapper, .poster-rating-badge, .card-rating-badge-overlay,
+    .card-pill, .season-box-item {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    .poster-wrapper { background-color: rgba(17, 17, 17, 0.72) !important; }
+    html.light-mode .poster-wrapper { background-color: rgba(233,236,241,0.85) !important; }
+
+    /* one-off / persistent panels: still glassy, just a lighter blur
+       radius so it composites faster on weaker mobile GPUs */
+    .main-header, .modal-box, .movie-summary-card, .download-info-section,
+    .chat-widget-box, .comments-section, .season-download-body {
+        backdrop-filter: blur(10px) saturate(150%) !important;
+        -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
+    }
 }
