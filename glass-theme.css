@@ -250,4 +250,13 @@ html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.
     html.light-mode .movie-summary-card { background: rgba(247,248,250,0.92) !important; }
     html.light-mode .comments-section { background-color: rgba(255,255,255,0.92) !important; }
     html.light-mode .main-header { background-color: rgba(255,255,255,0.92) !important; }
+
+    /* the "Request Here" / message widget box was left too see-through
+       once blur was dropped on mobile — it only had a 0.5-0.55 alpha
+       background meant to be paired with blur behind it. Bump it up so
+       it reads as a solid card again. */
+    .chat-widget-box { background-color: rgba(11, 14, 20, 0.94) !important; }
+    .chat-widget-header, .chat-widget-body { background-color: rgba(11, 14, 20, 0.94) !important; }
+    .chat-card-container { background-color: rgba(17, 22, 34, 0.92) !important; }
+    .chat-input-wrapper input, .chat-input-wrapper select { background-color: rgba(11, 14, 20, 0.92) !important; }
 }

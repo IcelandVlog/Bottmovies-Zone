@@ -864,6 +864,23 @@ body {
     border-color: #2563eb;
 }
 
+/* Field error state — red border on the input + a red warning line
+   below it, shown when a required request field (name/year) is empty */
+.chat-input-wrapper.has-error input,
+.chat-input-wrapper.has-error select {
+    border-color: #ff3366 !important;
+}
+.chat-field-error {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    color: #ff3366;
+    font-size: 12px;
+    margin-top: 6px;
+}
+.chat-field-error:not(:empty) { display: flex; }
+.chat-field-error svg { flex-shrink: 0; }
+
 .chat-submit-btn {
     width: 100%;
     background-color: #2563eb;

@@ -1480,16 +1480,18 @@ function chatWidgetFormHTML() {
             </div>
         </div>
         <div class="chat-card-container">
-            <div class="chat-input-wrapper">
-                <input type="text" id="chatMovieName" placeholder="Movie / Series Name (e.g. Inception)" autocomplete="off">
+            <div class="chat-input-wrapper" id="chatMovieNameWrap">
+                <input type="text" id="chatMovieName" placeholder="Movie / Series Name (e.g. Inception)" autocomplete="off" oninput="clearChatFieldError('chatMovieNameWrap','chatMovieNameError')">
+                <div class="chat-field-error" id="chatMovieNameError"></div>
             </div>
             <div class="chat-input-wrapper">
                 <input type="text" id="chatMovieLink" placeholder="TMDB / IMDb Link (Optional)" autocomplete="off">
             </div>
-            <div class="chat-input-wrapper select-wrapper">
-                <select id="chatMovieYear">
+            <div class="chat-input-wrapper select-wrapper" id="chatMovieYearWrap">
+                <select id="chatMovieYear" onchange="clearChatFieldError('chatMovieYearWrap','chatMovieYearError')">
                     ${generateYearOptions()}
                 </select>
+                <div class="chat-field-error" id="chatMovieYearError"></div>
             </div>
             <button class="chat-submit-btn" onclick="submitChatRequest()">Submit</button>
         </div>
@@ -1580,6 +1582,22 @@ function closeChatWidget() {
     switchChatTab('request');
 }
 
+function setChatFieldError(wrapId, errorId, message) {
+    const wrap = document.getElementById(wrapId);
+    const errorEl = document.getElementById(errorId);
+    if (wrap) wrap.classList.add('has-error');
+    if (errorEl) {
+        errorEl.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="12" cy="12" r="10"/><rect x="11" y="6" width="2" height="7" fill="#fff"/><rect x="11" y="15" width="2" height="2" fill="#fff"/></svg><span>${message}</span>`;
+    }
+}
+
+function clearChatFieldError(wrapId, errorId) {
+    const wrap = document.getElementById(wrapId);
+    const errorEl = document.getElementById(errorId);
+    if (wrap) wrap.classList.remove('has-error');
+    if (errorEl) errorEl.innerHTML = '';
+}
+
 function submitChatRequest() {
     const nameInput = document.getElementById('chatMovieName');
     const linkInput = document.getElementById('chatMovieLink');
@@ -1589,10 +1607,20 @@ function submitChatRequest() {
     const link = linkInput ? linkInput.value.trim() : '';
     const year = yearSelect ? yearSelect.value : '';
 
+    let hasError = false;
     if (!name) {
-        if (nameInput) nameInput.style.borderColor = '#ff3366';
-        return;
+        setChatFieldError('chatMovieNameWrap', 'chatMovieNameError', 'Please enter a movie or series name');
+        hasError = true;
+    } else {
+        clearChatFieldError('chatMovieNameWrap', 'chatMovieNameError');
     }
+    if (!year) {
+        setChatFieldError('chatMovieYearWrap', 'chatMovieYearError', 'Please select a release year');
+        hasError = true;
+    } else {
+        clearChatFieldError('chatMovieYearWrap', 'chatMovieYearError');
+    }
+    if (hasError) return;
 
     let requestMsg = name;
     if (year) requestMsg += ` (${year})`;
