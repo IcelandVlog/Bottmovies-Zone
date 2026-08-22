@@ -202,11 +202,15 @@ html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.
 }
 
 /* =========================================================================
-   MOBILE PERFORMANCE FIX — desktop is untouched above.
-   On small/touch screens, the grid-repeating elements (poster cards,
-   badges, pills, season boxes) drop backdrop-filter entirely, since
-   20-40+ blurred layers on screen at once is what causes scroll jank
-   on mobile GPUs. Desktop keeps the full blur(18px) glass look.
+   MOBILE PERFORMANCE FIX — desktop is untouched above, full 18px glass.
+   On small/touch screens ALL backdrop-filter is dropped (except the
+   fullscreen nav overlay above) and replaced with solid translucent
+   backgrounds. The details/modal page was still slow because
+   .modal-overlay + .modal-box + .movie-summary-card are nested blurred
+   layers stacked on top of each other — nested backdrop-filter is the
+   most expensive case, since each layer has to re-sample the already-
+   blurred layer beneath it. Comment reaction pills (one blurred layer
+   per reaction, per comment) were the other repeat-heavy culprit.
    ========================================================================= */
 @media (max-width: 768px) {
     /* fixed background forces a full repaint every scroll frame on
@@ -215,19 +219,35 @@ html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.
         background-attachment: scroll;
     }
 
-    .poster-wrapper, .poster-rating-badge, .card-rating-badge-overlay,
-    .card-pill, .season-box-item {
+    .main-header, .menu-toggle-btn, .search-container input, .search-container button,
+    .search-suggestions, .dropdown-menu, .notice-banner, .poster-wrapper,
+    .modal-overlay, .modal-box, .movie-summary-card, .card-pill,
+    .download-info-section, .season-box-item, .season-download-body,
+    .page-num, .main-footer, .chat-widget-box, .chat-widget-header,
+    .chat-header-pill, .chat-widget-body, .chat-msg-bubble, .chat-card-container,
+    .chat-input-wrapper input, .chat-input-wrapper select,
+    .theme-toggle-btn, .chat-widget-btn, .poster-rating-badge,
+    .card-rating-badge-overlay, .comments-section, .comment-input-box,
+    .comment-emoji-picker, .comment-reaction-picker, .comment-reaction-pill,
+    .comment-auth-box, .custom-confirm-box, .comments-sort-tabs, .step-card,
+    .badge-quality, .btn-tmdb-action, .btn-google-action {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
-    .poster-wrapper { background-color: rgba(17, 17, 17, 0.72) !important; }
-    html.light-mode .poster-wrapper { background-color: rgba(233,236,241,0.85) !important; }
 
-    /* one-off / persistent panels: still glassy, just a lighter blur
-       radius so it composites faster on weaker mobile GPUs */
-    .main-header, .modal-box, .movie-summary-card, .download-info-section,
-    .chat-widget-box, .comments-section, .season-download-body {
-        backdrop-filter: blur(10px) saturate(150%) !important;
-        -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
-    }
+    /* bump opacity on the big/nested panels so they stay readable
+       without any blur behind them */
+    .poster-wrapper { background-color: rgba(17, 17, 17, 0.72) !important; }
+    .modal-overlay { background-color: rgba(6, 7, 10, 0.68) !important; }
+    .modal-box { background-color: rgba(17, 19, 25, 0.92) !important; }
+    .movie-summary-card { background: rgba(21, 24, 33, 0.88) !important; }
+    .comments-section { background-color: rgba(17, 19, 25, 0.88) !important; }
+    .main-header { background-color: rgba(12, 13, 16, 0.90) !important; }
+
+    html.light-mode .poster-wrapper { background-color: rgba(233,236,241,0.85) !important; }
+    html.light-mode .modal-overlay { background-color: rgba(240,242,246,0.78) !important; }
+    html.light-mode .modal-box { background-color: rgba(255,255,255,0.94) !important; }
+    html.light-mode .movie-summary-card { background: rgba(247,248,250,0.92) !important; }
+    html.light-mode .comments-section { background-color: rgba(255,255,255,0.92) !important; }
+    html.light-mode .main-header { background-color: rgba(255,255,255,0.92) !important; }
 }
