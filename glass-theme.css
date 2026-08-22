@@ -193,6 +193,41 @@ html.light-mode .season-box-item { background: rgba(91, 79, 138, 0.62) !importan
 html.light-mode .season-box-item.fast-server-box { background: rgba(0, 91, 102, 0.65) !important; border: 1px solid rgba(0, 63, 71, 0.55) !important; }
 html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.24), inset 0 1px 0 rgba(255,255,255,0.2); }
 
+/* The "Request Here" / message widget in style.css is hardcoded dark
+   (dark background + white text) with no light-mode variant at all —
+   that's why it still shows black even when the site is in light mode.
+   Re-theme the whole widget for light mode here. */
+html.light-mode .chat-widget-box,
+html.light-mode .chat-widget-header,
+html.light-mode .chat-widget-body {
+    background-color: rgba(255,255,255,0.65) !important;
+    color: #1a202c !important;
+}
+html.light-mode .chat-header-pill { background-color: rgba(20,22,28,0.08) !important; color: #1a202c !important; }
+html.light-mode .chat-header-pill svg { fill: #1a202c; }
+html.light-mode .chat-support-title { color: #1a202c !important; }
+html.light-mode .chat-support-status { color: #64748b; }
+html.light-mode .chat-widget-close { background: rgba(20,22,28,0.08); color: #64748b; }
+html.light-mode .chat-widget-close:hover { background: rgba(20,22,28,0.14); color: #1a202c; }
+html.light-mode .chat-msg-bubble {
+    background-color: rgba(241,243,247,0.9) !important;
+    color: #1a202c !important;
+    border-color: rgba(20,22,28,0.1) !important;
+}
+html.light-mode .chat-card-container {
+    background-color: rgba(247,248,250,0.7) !important;
+    border-color: rgba(20,22,28,0.12) !important;
+}
+html.light-mode .chat-input-wrapper input,
+html.light-mode .chat-input-wrapper select {
+    background-color: rgba(255,255,255,0.85) !important;
+    color: #1a202c !important;
+    border-color: rgba(20,22,28,0.14) !important;
+}
+html.light-mode .chat-input-wrapper input::placeholder { color: #94a3b8; }
+html.light-mode .chat-branding { color: #64748b; }
+html.light-mode .chat-branding strong { color: #1a202c; }
+
 /* Mobile: keep the fullscreen mobile nav readable with a touch less blur */
 @media (max-width: 600px) {
     .main-nav { backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%); background-color: rgba(18, 20, 26, 0.75) !important; }
@@ -259,4 +294,19 @@ html.light-mode .season-box-item:hover { box-shadow: 0 6px 18px rgba(20,22,28,0.
     .chat-widget-header, .chat-widget-body { background-color: rgba(11, 14, 20, 0.94) !important; }
     .chat-card-container { background-color: rgba(17, 22, 34, 0.92) !important; }
     .chat-input-wrapper input, .chat-input-wrapper select { background-color: rgba(11, 14, 20, 0.92) !important; }
+
+    /* same widget, but light mode — otherwise it stayed on the dark
+       rgba values above even with light mode on */
+    html.light-mode .chat-widget-box,
+    html.light-mode .chat-widget-header,
+    html.light-mode .chat-widget-body { background-color: rgba(255,255,255,0.96) !important; }
+    html.light-mode .chat-card-container { background-color: rgba(247,248,250,0.96) !important; }
+    html.light-mode .chat-input-wrapper input,
+    html.light-mode .chat-input-wrapper select { background-color: rgba(255,255,255,0.96) !important; }
+
+    /* Floating message icon + theme toggle icon were also left too
+       see-through on mobile (0.55/0.65 alpha, meant to sit on blur) */
+    .chat-widget-btn { background: rgba(37, 99, 235, 0.95) !important; }
+    .theme-toggle-btn { background: rgba(23, 26, 33, 0.95) !important; }
+    html.light-mode .theme-toggle-btn { background: rgba(255,255,255,0.95) !important; }
 }
