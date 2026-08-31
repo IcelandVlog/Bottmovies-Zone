@@ -22,7 +22,6 @@
   })();
 </script>
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="glass-theme.css">
 <link rel="shortcut icon" href="favicon.png" type="image/x-icon"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -57,6 +56,18 @@
     <div class="top-right-buttons">
         <a href="#bangla-dubbed" class="btn-top-bolly nav-link" data-target="bangla-dubbed">Bangla Dubbed</a>
         <a href="#anime-flix" class="btn-top-anime nav-link" data-target="anime">Anime/Flix</a>
+
+        <div class="auth-actions" id="authActionsLoggedOut">
+            <button type="button" class="btn-auth btn-auth-signin" onclick="openAuthModal('signin')">Login</button>
+        </div>
+        <div class="auth-actions" id="authActionsLoggedIn" style="display:none;">
+            <span class="auth-user-email" id="authUserEmail"></span>
+            <button type="button" class="btn-auth btn-auth-dashboard" id="btnAuthDashboard" onclick="openDashboard()">Dashboard</button>
+        </div>
+        <!-- ছোট device-এ উপরের text button গুলো hide হয়ে শুধু এই text button-টা দেখাবে (CSS media query) -->
+        <button type="button" class="btn-auth-icon-mobile" id="authIconMobile" onclick="handleMobileAuthIconClick()" title="Account" aria-label="Account">
+            <span id="authIconMobileLabel">Login</span>
+        </button>
     </div>
 </div>
 
@@ -112,130 +123,494 @@
 <div class="modal-box" id="modalDynamicBox"></div>
 </div>
 
-<!-- ==================== ADMIN PANEL (Hidden Access) ==================== -->
-<div class="admin-overlay" id="adminOverlay">
-<div class="admin-panel">
-    <div class="admin-panel-header">
-        <div class="admin-tabs">
-            <button type="button" class="admin-tab-btn active" id="adminTabBtnAdd" onclick="switchAdminTab('add')">➕ Add / Edit Content</button>
-            <button type="button" class="admin-tab-btn" id="adminTabBtnManage" onclick="switchAdminTab('manage')">🗂 Database</button>
-            <button type="button" class="admin-tab-btn" id="adminTabBtnComments" onclick="switchAdminTab('comments')">💬 Comments</button>
-            <button type="button" class="admin-tab-btn" id="adminTabBtnTrash" onclick="switchAdminTab('trash')">🗑 Recycle Bin<span class="admin-trash-count" id="adminTrashCount" style="display:none;"></span></button>
+<!-- ==================== AUTH FULL PAGE (Sign In / Sign Up) ====================
+     Card-style page with brand logo on top and a Login/Register tab switcher inside
+     the card, matching the reference design. Dark mode = pure black backdrop,
+     light mode = pure white backdrop (handled via html.light-mode overrides below). -->
+<div class="auth-page-overlay" id="authOverlay">
+    <button type="button" class="auth-page-close" onclick="closeAuthModal()" aria-label="Close">✖</button>
+
+    <div class="auth-page-wrap">
+        <a href="#home" class="auth-brand-logo" onclick="closeAuthModal()">BOTT<span class="logo-accent"> MOVIES</span><span class="logo-country-badge auth-logo-country-badge"></span></a>
+
+        <div class="auth-page-card-outer">
+          <div class="auth-page-card">
+
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab-btn active" id="authTabBtnSignin" onclick="switchAuthTab('signin')">Login</button>
+                <button type="button" class="auth-tab-btn" id="authTabBtnSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+            </div>
+
+            <!-- ---------- LOGIN PAGE ---------- -->
+            <div class="auth-page" id="authTabSignin">
+                <p class="auth-page-lead">Please login to your account:</p>
+
+                <div class="auth-input-group">
+                    <label class="auth-input-label" for="signinEmail">Username/Email:</label>
+                    <input type="text" id="signinEmail" autocomplete="username">
+                </div>
+                <div class="auth-input-group auth-input-password">
+                    <label class="auth-input-label" for="signinPassword">Password:</label>
+                    <div class="auth-password-field">
+                        <input type="password" id="signinPassword" autocomplete="current-password">
+                        <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('signinPassword', this)" aria-label="Show password">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="authSigninMsg" class="admin-form-msg"></div>
+                <button type="button" class="auth-submit-btn" id="signinSubmitBtn" onclick="handleSignIn()">Login</button>
+                <p class="auth-switch-row">Dont have an account? <a href="javascript:void(0)" onclick="switchAuthTab('signup')">Create account</a></p>
+            </div>
+
+            <!-- ---------- REGISTER PAGE ---------- -->
+            <div class="auth-page" id="authTabSignup" style="display:none;">
+                <p class="auth-page-lead">Create a new account:</p>
+
+                <div class="auth-input-group">
+                    <label class="auth-input-label" for="signupName">Full Name:</label>
+                    <input type="text" id="signupName" autocomplete="name" oninput="suggestUsernameFromNameIfEmpty()">
+                </div>
+                <div class="auth-input-group">
+                    <label class="auth-input-label" for="signupUsername">Username:</label>
+                    <div class="auth-username-row">
+                        <div class="auth-input-group" style="margin:0;">
+                            <input type="text" id="signupUsername" autocomplete="username" placeholder="no spaces, lowercase only" oninput="this.value = this.value.toLowerCase().replace(/\s+/g, ''); checkUsernameLive(this, 'signupUsernameMsg');">
+                        </div>
+                        <button type="button" class="auth-username-refresh-btn" onclick="regenerateSignupUsername(this)" title="Suggest a username from your Full Name" aria-label="Suggest username">⟳</button>
+                    </div>
+                    <div id="signupUsernameMsg" class="auth-field-msg"></div>
+                </div>
+                <div class="auth-input-group">
+                    <label class="auth-input-label" for="signupEmail">Email:</label>
+                    <input type="email" id="signupEmail" autocomplete="email" oninput="suggestUsernameFromNameIfEmpty()">
+                </div>
+                <div class="auth-input-group auth-input-password">
+                    <label class="auth-input-label" for="signupPassword">Password:</label>
+                    <div class="auth-password-field">
+                        <input type="password" id="signupPassword" autocomplete="new-password" oninput="updateAuthPasswordStrength(this.value)">
+                        <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('signupPassword', this)" aria-label="Show password">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                    <div class="auth-pw-strength">
+                        <div class="auth-pw-strength-track" id="authPwStrengthTrack">
+                            <div class="auth-pw-strength-seg"></div><div class="auth-pw-strength-seg"></div><div class="auth-pw-strength-seg"></div><div class="auth-pw-strength-seg"></div>
+                        </div>
+                        <div class="auth-pw-strength-label" id="authPwStrengthLabel">Enter a password to check strength</div>
+                    </div>
+                </div>
+                <div class="auth-input-group auth-input-password">
+                    <label class="auth-input-label" for="signupPasswordConfirm">Retype Password:</label>
+                    <div class="auth-password-field">
+                        <input type="password" id="signupPasswordConfirm" autocomplete="new-password">
+                        <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('signupPasswordConfirm', this)" aria-label="Show password">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Captcha: প্রতিবার নতুন র‍্যান্ডম সংখ্যা দেখায়, নিচের বক্সে সেই সংখ্যা হুবহু বসাতে হবে -->
+                <div class="auth-captcha-row">
+                    <div class="auth-captcha-code" id="authCaptchaCode" onclick="generateAuthCaptcha()" title="Click to change code"></div>
+                    <button type="button" class="auth-captcha-refresh" onclick="generateAuthCaptcha()" title="Change code" aria-label="Refresh code">⟳</button>
+                </div>
+                <div class="auth-input-group">
+                    <input type="text" id="signupCaptchaInput" placeholder="Enter the code above" autocomplete="off" inputmode="numeric" maxlength="6">
+                </div>
+
+                <div id="authSignupMsg" class="admin-form-msg"></div>
+                <button type="button" class="auth-submit-btn" id="signupSubmitBtn" onclick="handleSignUp()">Sign Up</button>
+                <p class="auth-switch-row">Already have an account? <a href="javascript:void(0)" onclick="switchAuthTab('signin')">Login</a></p>
+            </div>
+
+          </div>
         </div>
-        <span class="admin-close-btn" onclick="closeAdminPanel()">✖</span>
     </div>
+</div>
 
-    <div class="admin-panel-body">
+<!-- ==================== USER DASHBOARD (non-admin members) ====================
+     Admin Panel এর মতোই sidebar + tab লেআউট, কিন্তু সাধারণ member এর জন্য:
+     Profile (view/edit + profile picture), Favorites/Watchlist, My Requests, Security (Change Password) -->
+<div class="admin-overlay" id="userDashboardOverlay">
+<div class="admin-panel admin-panel-dash">
+    <div class="admin-dash-layout">
 
-        <!-- ADD / EDIT TAB -->
-        <div class="admin-tab-content" id="adminTabAdd">
-            <input type="hidden" id="adminEditingId" value="">
-
-            <div class="admin-field">
-                <label>Title *</label>
-                <input type="text" id="adminTitle" placeholder="e.g. Movies/Series name">
-            </div>
-
-            <div class="admin-field">
-                <label>Search Name</label>
-                <input type="text" id="adminSearchName" placeholder="Auto-filled from title">
-            </div>
-
-            <div class="admin-field">
-                <label>Category <span class="admin-hint">(select one or more)</span></label>
-                <div class="admin-category-box" id="adminCategoryBox"></div>
-                <div class="admin-add-category-row">
-                    <input type="text" id="adminNewCategoryInput" placeholder="Type a new category name...">
-                    <button type="button" class="admin-mini-btn" onclick="addNewAdminCategory()">+ Add Category</button>
-                </div>
-            </div>
-
-            <div class="admin-field-row">
-                <div class="admin-field">
-                    <label>IMDb ID / Link <span class="admin-hint">(optional)</span></label>
-                    <input type="text" id="adminImdbId" placeholder="IMDb Link/Id">
-                </div>
-                <div class="admin-field">
-                    <label>TMDB ID / Link <span class="admin-hint">(optional)</span></label>
-                    <input type="text" id="adminTmdbId" placeholder="TMDB Link/Id">
-                </div>
-            </div>
-
-            <div class="admin-field">
-                <label>TMDB Type *</label>
-                <div class="admin-toggle-group" id="adminTmdbTypeGroup">
-                    <button type="button" class="admin-toggle-btn active" data-value="movie" onclick="selectTmdbType('movie')">🎬 Movie</button>
-                    <button type="button" class="admin-toggle-btn" data-value="tv" onclick="selectTmdbType('tv')">📺 TV / Series</button>
-                </div>
-            </div>
-
-            <div class="admin-field-row">
-                <div class="admin-field">
-                    <label>Audio</label>
-                    <input type="text" id="adminAudio" placeholder="e.g. English, Hindi, Bangla">
-                </div>
-                <div class="admin-field">
-                    <label>Subtitles</label>
-                    <input type="text" id="adminSubtitles" placeholder="e.g. English, Hindi, Bangla">
-                </div>
-            </div>
-
-            <div class="admin-field" id="adminMediaScanField">
-                <label>Scan Video for Audio &amp; Subtitles <span class="admin-hint">(optional — auto-fills the fields above)</span></label>
-                <input type="file" id="adminMediaScanFile" accept=".mkv,.mp4,video/x-matroska,video/mp4">
-                <div class="admin-media-scan-status" id="adminMediaScanStatus"></div>
-                <div class="admin-media-scan-result" id="adminMediaScanResult" style="display:none;"></div>
-            </div>
-
-            <div class="admin-field">
-                <label>Poster <span class="admin-hint">(optional — link or upload)</span></label>
-                <div class="admin-toggle-group" id="adminPosterModeGroup">
-                    <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setPosterMode('link')">🔗 Link</button>
-                    <button type="button" class="admin-toggle-btn" data-value="file" onclick="setPosterMode('file')">📁 Upload File</button>
-                </div>
-                <input type="text" id="adminPosterLink" placeholder="https://... poster image link" style="margin-top:8px;">
-                <input type="file" id="adminPosterFile" accept="image/*" style="display:none; margin-top:8px;">
-                <div id="adminPosterPreviewWrap" style="display:none;"><img id="adminPosterPreview" class="admin-poster-preview"></div>
-            </div>
-
-            <div class="admin-field" id="adminMovieLinksField">
-                <label>Download Links</label>
-                <div id="adminMovieLinksList"></div>
-                <button type="button" class="admin-add-row-btn" onclick="addMovieLinkRow()">+ Add Download Link</button>
-            </div>
-
-            <div class="admin-field" id="adminSeasonsField" style="display:none;">
-                <label>Seasons</label>
-                <div id="adminSeasonsList"></div>
-                <button type="button" class="admin-add-row-btn" onclick="addSeasonBlock()">+ Add Season</button>
-            </div>
-
-            <div id="adminFormMsg" class="admin-form-msg"></div>
-
-            <button type="button" class="admin-submit-btn" id="adminSubmitBtn" onclick="submitAdminContent()">Add Content</button>
-            <button type="button" class="admin-cancel-edit-btn" id="adminCancelEditBtn" onclick="resetAdminForm()" style="display:none;">Cancel Edit / New Content</button>
+        <!-- ---------- SIDEBAR ---------- -->
+        <div class="admin-sidebar">
+            <div class="admin-sidebar-brand">BOTT<span class="logo-accent"> MOVIES</span></div>
+            <nav class="admin-nav">
+                <button type="button" class="admin-nav-btn active" id="userNavBtnProfile" onclick="switchUserTab('profile')">👤 <span>Profile</span></button>
+                <button type="button" class="admin-nav-btn" id="userNavBtnFavorites" onclick="switchUserTab('favorites')">❤️ <span>Favorites</span></button>
+                <button type="button" class="admin-nav-btn" id="userNavBtnRequests" onclick="switchUserTab('requests')">📥 <span>My Requests</span></button>
+                <button type="button" class="admin-nav-btn" id="userNavBtnDownloads" onclick="switchUserTab('downloads')">⬇️ <span>Download History</span></button>
+            </nav>
+            <button type="button" class="admin-sidebar-signout" onclick="signOutUser()">🚪 Logout</button>
         </div>
 
-        <!-- MANAGE / DATABASE TAB -->
-        <div class="admin-tab-content" id="adminTabManage" style="display:none;">
-            <div class="admin-manage-search">
-                <input type="text" id="adminSearchInput" placeholder="🔍 Search all content in database...">
+        <!-- ---------- MAIN ---------- -->
+        <div class="admin-main">
+            <div class="admin-topbar">
+                <div class="admin-topbar-title" id="userDashTopbarTitle">Profile</div>
+                <span class="admin-close-btn" onclick="closeUserDashboard()">✖</span>
             </div>
-            <div class="admin-database-list" id="adminDatabaseList"></div>
+
+            <div class="admin-panel-body">
+
+                <!-- PROFILE TAB -->
+                <div class="admin-tab-content" id="userTabProfile">
+                    <div class="user-avatar-block">
+                        <img id="userDashAvatarPreview" class="user-avatar-img" src="" alt="Profile Picture" onclick="document.getElementById('userAvatarFileInput').click()" title="Click to change photo">
+                        <div class="user-avatar-actions">
+                            <label for="userAvatarFileInput" class="admin-mini-btn user-avatar-upload-btn">📷 Change Photo</label>
+                            <input type="file" id="userAvatarFileInput" accept="image/*" style="display:none;">
+                            <div class="admin-form-msg" id="userAvatarMsg"></div>
+                        </div>
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Full Name</label>
+                        <input type="text" id="userDashFullNameInput" placeholder="Your full name">
+                    </div>
+                    <div class="admin-field">
+                        <label>Username</label>
+                        <div class="admin-username-row">
+                            <input type="text" id="userDashUsernameInput" placeholder="lowercase, no spaces" oninput="this.value = this.value.toLowerCase().replace(/\s+/g, ''); checkUsernameLive(this, 'userDashUsernameMsg', true);">
+                            <button type="button" class="admin-username-refresh-btn" onclick="regenerateDashboardUsername(this)" title="Suggest a username from your Full Name" aria-label="Suggest username">⟳</button>
+                        </div>
+                        <div id="userDashUsernameMsg" class="auth-field-msg"></div>
+                    </div>
+                    <div class="admin-field">
+                        <label>Email</label>
+                        <input type="text" id="userDashEmail" class="admin-readonly-field" readonly>
+                    </div>
+                    <div class="admin-field">
+                        <label>Joined Date</label>
+                        <div id="userDashJoined" class="admin-static-field-value muted"></div>
+                    </div>
+
+                    <div id="userProfileMsg" class="admin-form-msg"></div>
+                    <button type="button" class="admin-submit-btn" onclick="handleUpdateProfile()">💾 Update Profile</button>
+
+                    <div class="admin-panel-divider"></div>
+                    <div class="admin-section-heading">🔒 Change Password</div>
+
+                    <div class="auth-input-group auth-input-password" style="margin-bottom:16px;">
+                        <label class="auth-input-label" for="userOldPasswordInput">Old Password:</label>
+                        <div class="auth-password-field">
+                            <input type="password" id="userOldPasswordInput" placeholder="Enter your current password" autocomplete="current-password">
+                            <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('userOldPasswordInput', this)" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="auth-input-group auth-input-password" style="margin-bottom:16px;">
+                        <label class="auth-input-label" for="userNewPasswordInput">New Password:</label>
+                        <div class="auth-password-field">
+                            <input type="password" id="userNewPasswordInput" placeholder="At least 6 characters" autocomplete="new-password">
+                            <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('userNewPasswordInput', this)" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="auth-input-group auth-input-password" style="margin-bottom:16px;">
+                        <label class="auth-input-label" for="userConfirmPasswordInput">Repeat New Password:</label>
+                        <div class="auth-password-field">
+                            <input type="password" id="userConfirmPasswordInput" placeholder="Re-enter new password" autocomplete="new-password">
+                            <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('userConfirmPasswordInput', this)" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="userPasswordMsg" class="admin-form-msg"></div>
+                    <button type="button" class="admin-submit-btn" onclick="handleChangePassword()">🔒 Change Password</button>
+                </div>
+
+                <!-- FAVORITES / WATCHLIST TAB -->
+                <div class="admin-tab-content" id="userTabFavorites" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="userFavoriteSearchInput" placeholder="🔍 Search your favorites...">
+                    </div>
+                    <div class="admin-database-list" id="userFavoritesList"></div>
+                </div>
+
+                <!-- MY REQUESTS TAB -->
+                <div class="admin-tab-content" id="userTabRequests" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="userRequestSearchInput" placeholder="🔍 Search your requests...">
+                    </div>
+                    <div class="admin-database-list" id="userRequestsList"></div>
+                </div>
+
+                <!-- DOWNLOAD HISTORY TAB -->
+                <div class="admin-tab-content" id="userTabDownloads" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="userDownloadSearchInput" placeholder="🔍 Search your download history..." oninput="renderUserDownloadsList(this.value.trim())">
+                    </div>
+                    <div class="admin-database-list" id="userDownloadsList"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== AVATAR CROPPER (Facebook-style zoom/pan/crop) ====================
+     userAvatarFileInput এ ফাইল সিলেক্ট করলে সরাসরি আপলোড না হয়ে আগে এই মোডাল খোলে -
+     zoom slider দিয়ে বড়/ছোট আর ছবি drag করে position ঠিক করা যায়, তারপর Save চাপলে
+     গোল আকারে crop হয়ে আপলোড হয়। -->
+<div class="avatar-crop-overlay" id="avatarCropOverlay">
+    <div class="avatar-crop-card">
+        <div class="avatar-crop-header">
+            <div class="avatar-crop-title">Choose profile picture</div>
+            <button type="button" class="avatar-crop-close-btn" onclick="closeAvatarCropper()" aria-label="Close">✕</button>
+        </div>
+        <div class="avatar-crop-stage" id="avatarCropStage">
+            <img id="avatarCropImg" src="" alt="">
+            <div class="avatar-crop-mask"></div>
+        </div>
+        <div class="avatar-crop-zoom-row">
+            <button type="button" class="avatar-crop-zoom-btn" onclick="stepAvatarZoom(-20)" aria-label="Zoom out">−</button>
+            <input type="range" id="avatarCropZoomSlider" min="100" max="300" value="100">
+            <button type="button" class="avatar-crop-zoom-btn" onclick="stepAvatarZoom(20)" aria-label="Zoom in">+</button>
+        </div>
+        <div class="avatar-crop-public-note">🌐 Your profile picture is public.</div>
+        <div class="avatar-crop-actions">
+            <button type="button" class="avatar-crop-cancel-btn" onclick="closeAvatarCropper()">Cancel</button>
+            <button type="button" class="avatar-crop-save-btn" id="avatarCropSaveBtn" onclick="saveAvatarCrop()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== ADMIN PANEL (Hidden Access) ====================
+     StreamHG-style sidebar dashboard. সব ডাটা আসল/লাইভ (নিজেদের ডাটাবেজ থেকে) -
+     কোনো fake earning/premium সংখ্যা নেই, শুধু সাইটের real stats (Movies/Series,
+     Categories, Comments, Registered Users, Recycle Bin, Broken Link Reports)। -->
+<div class="admin-overlay" id="adminOverlay">
+<div class="admin-panel admin-panel-dash">
+    <div class="admin-dash-layout">
+
+        <!-- ---------- SIDEBAR ---------- -->
+        <div class="admin-sidebar">
+            <div class="admin-sidebar-brand">BOTT<span class="logo-accent"> MOVIES</span><span class="logo-country-badge admin-logo-country-badge" id="adminLogoCountryBadge"></span></div>
+            <nav class="admin-nav">
+                <button type="button" class="admin-nav-btn active" id="adminNavBtnDashboard" onclick="switchAdminTab('dashboard')">📊 <span>Dashboard</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnAdd" onclick="switchAdminTab('add')">➕ <span>Add / Edit Content</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnManage" onclick="switchAdminTab('manage')">🗂 <span>Database</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnRequests" onclick="switchAdminTab('requests')">📥 <span>Request Here</span><span class="admin-nav-badge" id="adminRequestsCount" style="display:none;"></span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnMessages" onclick="switchAdminTab('messages')">✉️ <span>Messages</span><span class="admin-nav-badge" id="adminMessagesCount" style="display:none;"></span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnAlerts" onclick="switchAdminTab('alerts')">🔔 <span>Broken Link Reports</span><span class="admin-nav-badge" id="adminAlertsCount" style="display:none;"></span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnTrash" onclick="switchAdminTab('trash')">🗑 <span>Recycle Bin</span><span class="admin-nav-badge" id="adminTrashCount" style="display:none;"></span></button>
+            </nav>
+            <button type="button" class="admin-sidebar-signout" id="adminSignOutBtn" onclick="signOutUser()">🚪 Logout</button>
         </div>
 
-        <!-- COMMENTS TAB -->
-        <div class="admin-tab-content" id="adminTabComments" style="display:none;">
-            <div class="admin-manage-search">
-                <input type="text" id="adminCommentSearchInput" placeholder="🔍 Search comments by text, name, or movie...">
+        <!-- ---------- MAIN ---------- -->
+        <div class="admin-main">
+            <div class="admin-topbar">
+                <div class="admin-topbar-title" id="adminTopbarTitle">Dashboard</div>
+                <span class="admin-close-btn" onclick="closeAdminPanel()">✖</span>
             </div>
-            <div class="admin-database-list" id="adminCommentsList"></div>
-        </div>
 
-        <!-- RECYCLE BIN TAB -->
-        <div class="admin-tab-content" id="adminTabTrash" style="display:none;">
-            <div class="admin-trash-note">Deleted items stay here for 30 days, then are permanently removed. Restore anytime before that.</div>
-            <div class="admin-database-list" id="adminTrashList"></div>
+            <div class="admin-panel-body">
+
+                <!-- DASHBOARD TAB -->
+                <div class="admin-tab-content" id="adminTabDashboard">
+                    <div class="admin-stats-grid" id="adminStatsGrid">
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">📦</div>
+                            <div><div class="admin-stat-value" id="adminStatTotalContent">—</div><div class="admin-stat-label">All Content</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🎬</div>
+                            <div><div class="admin-stat-value" id="adminStatMovies">—</div><div class="admin-stat-label">Movies</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">📺</div>
+                            <div><div class="admin-stat-value" id="adminStatSeries">—</div><div class="admin-stat-label">TV / Series</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">👁️</div>
+                            <div><div class="admin-stat-value" id="adminStatTotalViews">—</div><div class="admin-stat-label">Total Views</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🏷️</div>
+                            <div><div class="admin-stat-value" id="adminStatCategories">—</div><div class="admin-stat-label">Categories</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">💬</div>
+                            <div><div class="admin-stat-value" id="adminStatComments">—</div><div class="admin-stat-label">Total Comments</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">👤</div>
+                            <div><div class="admin-stat-value" id="adminStatUsers">—</div><div class="admin-stat-label">Registered Users</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🔔</div>
+                            <div><div class="admin-stat-value" id="adminStatAlerts">—</div><div class="admin-stat-label">Broken Link Reports</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">📥</div>
+                            <div><div class="admin-stat-value" id="adminStatRequests">—</div><div class="admin-stat-label">Request Here</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">✉️</div>
+                            <div><div class="admin-stat-value" id="adminStatMessages">—</div><div class="admin-stat-label">Messages</div></div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="admin-stat-icon">🗑</div>
+                            <div><div class="admin-stat-value" id="adminStatTrash">—</div><div class="admin-stat-label">Recycle Bin</div></div>
+                        </div>
+                    </div>
+
+                    <div class="admin-dash-panels">
+                        <div class="admin-dash-box">
+                            <h3>🆕 Recently Added</h3>
+                            <div id="adminDashRecent"></div>
+                        </div>
+                        <div class="admin-dash-box">
+                            <h3>👁️ Top Views</h3>
+                            <div id="adminDashTopViews"></div>
+                        </div>
+                        <div class="admin-dash-box">
+                            <h3>🏷️ Top Categories</h3>
+                            <div id="adminDashCategories"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADD / EDIT TAB -->
+                <div class="admin-tab-content" id="adminTabAdd" style="display:none;">
+                    <input type="hidden" id="adminEditingId" value="">
+
+                    <div class="admin-field">
+                        <label>Title *</label>
+                        <input type="text" id="adminTitle" placeholder="e.g. Inception (2010)">
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Search Name (auto-generated from Title, year removed)</label>
+                        <input type="text" id="adminSearchName" placeholder="Auto-filled from title">
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Category <span class="admin-hint">(select one or more — "All" is applied automatically)</span></label>
+                        <div class="admin-category-box" id="adminCategoryBox"></div>
+                        <div class="admin-add-category-row">
+                            <input type="text" id="adminNewCategoryInput" placeholder="Type a new category name...">
+                            <button type="button" class="admin-mini-btn" onclick="addNewAdminCategory()">+ Add Category</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-field-row">
+                        <div class="admin-field">
+                            <label>IMDb ID / Link <span class="admin-hint">(optional)</span></label>
+                            <input type="text" id="adminImdbId" placeholder="tt1375666 or full IMDb link">
+                        </div>
+                        <div class="admin-field">
+                            <label>TMDB ID / Link <span class="admin-hint">(optional)</span></label>
+                            <input type="text" id="adminTmdbId" placeholder="27205 or full TMDB link">
+                        </div>
+                    </div>
+
+                    <div class="admin-field">
+                        <label>TMDB Type *</label>
+                        <div class="admin-toggle-group" id="adminTmdbTypeGroup">
+                            <button type="button" class="admin-toggle-btn active" data-value="movie" onclick="selectTmdbType('movie')">🎬 Movie</button>
+                            <button type="button" class="admin-toggle-btn" data-value="tv" onclick="selectTmdbType('tv')">📺 TV / Series</button>
+                        </div>
+                    </div>
+
+                    <div class="admin-field-row">
+                        <div class="admin-field">
+                            <label>Audio</label>
+                            <input type="text" id="adminAudio" placeholder="e.g. Hindi, English, Bangla">
+                        </div>
+                        <div class="admin-field">
+                            <label>Subtitles</label>
+                            <input type="text" id="adminSubtitles" placeholder="e.g. English, Bangla">
+                        </div>
+                    </div>
+
+                    <div class="admin-field" id="adminMediaScanField">
+                        <label>Scan Video for Audio &amp; Subtitles <span class="admin-hint">(optional — auto-fills the fields above)</span></label>
+                        <input type="file" id="adminMediaScanFile" accept=".mkv,.mp4,video/x-matroska,video/mp4">
+                        <div class="admin-media-scan-status" id="adminMediaScanStatus"></div>
+                        <div class="admin-media-scan-result" id="adminMediaScanResult" style="display:none;"></div>
+                    </div>
+
+                    <div class="admin-field">
+                        <label>Poster <span class="admin-hint">(optional — link or upload)</span></label>
+                        <div class="admin-toggle-group" id="adminPosterModeGroup">
+                            <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setPosterMode('link')">🔗 Link</button>
+                            <button type="button" class="admin-toggle-btn" data-value="file" onclick="setPosterMode('file')">📁 Upload File</button>
+                        </div>
+                        <input type="text" id="adminPosterLink" placeholder="https://... poster image link" style="margin-top:8px;">
+                        <input type="file" id="adminPosterFile" accept="image/*" style="display:none; margin-top:8px;">
+                        <div id="adminPosterPreviewWrap" style="display:none;"><img id="adminPosterPreview" class="admin-poster-preview"></div>
+                    </div>
+
+                    <div class="admin-field" id="adminMovieLinksField">
+                        <label>Download Links</label>
+                        <div id="adminMovieLinksList"></div>
+                        <button type="button" class="admin-add-row-btn" onclick="addMovieLinkRow()">+ Add Download Link</button>
+                    </div>
+
+                    <div class="admin-field" id="adminSeasonsField" style="display:none;">
+                        <label>Seasons</label>
+                        <div id="adminSeasonsList"></div>
+                        <button type="button" class="admin-add-row-btn" onclick="addSeasonBlock()">+ Add Season</button>
+                    </div>
+
+                    <div id="adminFormMsg" class="admin-form-msg"></div>
+
+                    <button type="button" class="admin-submit-btn" id="adminSubmitBtn" onclick="submitAdminContent()">Add Content</button>
+                    <button type="button" class="admin-cancel-edit-btn" id="adminCancelEditBtn" onclick="resetAdminForm()" style="display:none;">Cancel Edit / New Content</button>
+                </div>
+
+                <!-- MANAGE / DATABASE TAB -->
+                <div class="admin-tab-content" id="adminTabManage" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminSearchInput" placeholder="🔍 Search all content in database...">
+                    </div>
+                    <div class="admin-database-list" id="adminDatabaseList"></div>
+                </div>
+
+                <!-- COMMENTS TAB -->
+                <div class="admin-tab-content" id="adminTabComments" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminCommentSearchInput" placeholder="🔍 Search comments by text, name, or movie...">
+                    </div>
+                    <div class="admin-database-list" id="adminCommentsList"></div>
+                </div>
+
+                <!-- REQUEST HERE TAB (movie/series requests submitted via the floating "Request Here" widget) -->
+                <div class="admin-tab-content" id="adminTabRequests" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminRequestSearchInput" placeholder="🔍 Search requests by movie/series name...">
+                    </div>
+                    <div class="admin-database-list" id="adminRequestsList"></div>
+                </div>
+
+                <!-- MESSAGES TAB (messages submitted via the floating widget's "Chat with support" tab) -->
+                <div class="admin-tab-content" id="adminTabMessages" style="display:none;">
+                    <div class="admin-database-list" id="adminMessagesList"></div>
+                </div>
+
+                <!-- BROKEN LINK REPORTS TAB -->
+                <div class="admin-tab-content" id="adminTabAlerts" style="display:none;">
+                    <div class="admin-database-list" id="adminAlertsList"></div>
+                </div>
+
+                <!-- RECYCLE BIN TAB -->
+                <div class="admin-tab-content" id="adminTabTrash" style="display:none;">
+                    <div class="admin-trash-note">Deleted items stay here for 30 days, then are permanently removed. Restore anytime before that.</div>
+                    <div class="admin-database-list" id="adminTrashList"></div>
+                </div>
+
+            </div>
         </div>
 
     </div>
@@ -244,9 +619,9 @@
 
 <footer class="main-footer" style="padding-top: 15px; padding-bottom: 15px;">
     <div style="text-align: center;">
-        <a href="How-to-Download.html" style="color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#94a3b8'">How to Download</a>
+        <a href="How-to-Download.html" target="_blank" style="color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#94a3b8'">How to Download</a>
         <span style="color:#3a3f4a; margin: 0 10px;">|</span>
-        <a href="report-broken-links.html" style="color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#94a3b8'">Report Broken Links</a>
+        <a href="report-broken-links.html" target="_blank" style="color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='#94a3b8'">Report Broken Links</a>
     </div>
     <div class="footer-links"></div>
 </footer>

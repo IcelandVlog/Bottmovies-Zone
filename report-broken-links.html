@@ -32,18 +32,6 @@
         --lang-btn-bg: #1a1a1a;
         --lang-btn-border: #333;
         --lang-btn-hover-bg: #2a2a2a;
-
-        /* Chat/Message widget theme */
-        --chat-bg: #0d1321;
-        --chat-header-bg: #000000;
-        --chat-pill-bg: #1a1a1a;
-        --chat-border: #1e293b;
-        --chat-border-strong: #334155;
-        --chat-bubble-received-bg: #1e293b;
-        --chat-bubble-received-text: #e2e8f0;
-        --chat-input-wrap-bg: #1e293b;
-        --chat-text: #ffffff;
-        --chat-muted: #94a3b8;
     }
 
     html.light-mode {
@@ -61,19 +49,19 @@
         --lang-btn-bg: #f1f3f7;
         --lang-btn-border: #dde1e8;
         --lang-btn-hover-bg: #e5e8ee;
-
-        /* Chat/Message widget theme (light) */
-        --chat-bg: #ffffff;
-        --chat-header-bg: #f1f3f7;
-        --chat-pill-bg: #e5e8ee;
-        --chat-border: #dde1e8;
-        --chat-border-strong: #c7ccd6;
-        --chat-bubble-received-bg: #eef1f6;
-        --chat-bubble-received-text: #1f2430;
-        --chat-input-wrap-bg: #f1f3f7;
-        --chat-text: #14161c;
-        --chat-muted: #6b7280;
     }
+
+    html {
+        scrollbar-width: thin;
+        scrollbar-color: #2d313f var(--bg-color);
+    }
+    html::-webkit-scrollbar { width: 10px; }
+    html::-webkit-scrollbar-track { background: var(--bg-color); }
+    html::-webkit-scrollbar-thumb { background-color: #2d313f; border-radius: 5px; }
+    html::-webkit-scrollbar-thumb:hover { background-color: #3a3f4a; }
+    html.light-mode { scrollbar-color: #d7dbe3 var(--bg-color); }
+    html.light-mode::-webkit-scrollbar-thumb { background-color: #d7dbe3; }
+    html.light-mode::-webkit-scrollbar-thumb:hover { background-color: #c2c8d1; }
 
     body {
         margin: 0;
@@ -117,9 +105,6 @@
         border-radius: 20px;
         padding: 3px;
         gap: 2px;
-        margin-left: auto; /* keeps it pinned to the right edge even when it
-                               wraps onto its own line on narrow screens —
-                               without this it snaps to the left after wrap */
     }
     .lang-toggle-option {
         background: transparent;
@@ -214,19 +199,16 @@
     .rc-reply-link:hover { text-decoration: underline; }
 
     .rc-reply-form-wrap:not(:empty) {
-        margin-top: 10px; padding: 12px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px;
+        margin-top: 10px; padding: 12px; background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 8px;
         display: flex; flex-direction: column; gap: 8px;
     }
     .rc-replies { margin-top: 16px; padding-left: 18px; border-left: 2px solid var(--card-border); display: flex; flex-direction: column; gap: 16px; }
     .rc-reply .rc-avatar { width: 30px; height: 30px; font-size: 12px; }
 
     .rc-input, .rc-textarea {
-        width: 100%; background: rgba(0,0,0,0.06); border: 1px solid var(--card-border); border-radius: 6px;
+        width: 100%; background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px;
         color: var(--text-main); font-family: inherit; font-size: 13.5px; padding: 10px 12px; outline: none;
         box-sizing: border-box;
-    }
-    html.light-mode .rc-input, html.light-mode .rc-textarea {
-        background: rgba(255,255,255,0.55);
     }
     .rc-textarea { resize: vertical; min-height: 44px; }
     .rc-input:focus, .rc-textarea:focus { border-color: var(--accent-color); }
@@ -325,25 +307,23 @@
         width: 350px;
         max-width: calc(100vw - 40px);
         max-height: calc(100vh - 40px);
-        background-color: var(--chat-bg);
+        background-color: #0d1321;
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 10px 35px rgba(0,0,0,0.8);
         display: none;
         flex-direction: column;
         z-index: 999999;
-        border: 1px solid var(--chat-border);
-        transition: background-color 0.2s ease, border-color 0.2s ease;
+        border: 1px solid #1e293b;
     }
 
     .chat-header {
-        background-color: var(--chat-header-bg);
+        background-color: #000000;
         padding: 15px;
-        color: var(--chat-text);
+        color: white;
         text-align: center;
         position: relative;
         flex-shrink: 0;
-        transition: background-color 0.2s ease, color 0.2s ease;
     }
 
     .chat-close-btn {
@@ -352,7 +332,7 @@
         right: 15px;
         background: none;
         border: none;
-        color: var(--chat-muted);
+        color: #888;
         font-size: 20px;
         font-weight: bold;
         cursor: pointer;
@@ -363,8 +343,7 @@
     }
 
     .chat-header-title {
-        background-color: var(--chat-pill-bg);
-        color: var(--chat-text);
+        background-color: #1a1a1a;
         border-radius: 20px;
         padding: 5px 14px;
         display: inline-flex;
@@ -373,7 +352,6 @@
         font-size: 13px;
         margin-bottom: 12px;
         font-weight: bold;
-        transition: background-color 0.2s ease, color 0.2s ease;
     }
 
     .chat-avatars {
@@ -386,19 +364,18 @@
         height: 42px;
         background-color: #555;
         border-radius: 50%;
-        border: 3px solid var(--chat-header-bg);
+        border: 3px solid #000;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: border-color 0.2s ease;
     }
     .chat-avatar.support {
         background-color: #2b6cb0;
         margin-left: -12px;
     }
 
-    .chat-header-profile { font-size: 15px; font-weight: bold; color: var(--chat-text); }
-    .chat-header-status { font-size: 11px; color: var(--chat-muted); margin-top: 4px; }
+    .chat-header-profile { font-size: 15px; font-weight: bold; }
+    .chat-header-status { font-size: 11px; color: #888; margin-top: 4px; }
 
     .chat-body {
         padding: 15px;
@@ -406,12 +383,17 @@
         min-height: 180px;
         max-height: 320px;
         overflow-y: auto;
-        background-color: var(--chat-bg);
+        background-color: #0d1321;
         display: flex;
         flex-direction: column;
         gap: 14px;
-        transition: background-color 0.2s ease;
+        scrollbar-width: thin;
+        scrollbar-color: #2d313f transparent;
     }
+    .chat-body::-webkit-scrollbar { width: 8px; }
+    .chat-body::-webkit-scrollbar-track { background: transparent; }
+    .chat-body::-webkit-scrollbar-thumb { background-color: #2d313f; border-radius: 4px; }
+    .chat-body::-webkit-scrollbar-thumb:hover { background-color: #3a3f4a; }
 
     .chat-message-container {
         position: relative;
@@ -433,10 +415,9 @@
         box-sizing: border-box;
     }
     .chat-message.received {
-        background-color: var(--chat-bubble-received-bg);
-        color: var(--chat-bubble-received-text);
+        background-color: #1e293b;
+        color: #e2e8f0;
         border-bottom-left-radius: 2px;
-        transition: background-color 0.2s ease, color 0.2s ease;
     }
     .chat-message.sent {
         background-color: #2b6cb0;
@@ -454,8 +435,8 @@
         position: absolute;
         top: 50%;
         transform: translateY(-50%);
-        background: var(--chat-bubble-received-bg);
-        border: 1px solid var(--chat-border-strong);
+        background: #1e293b;
+        border: 1px solid #334155;
         border-radius: 50%;
         width: 24px;
         height: 24px;
@@ -463,7 +444,7 @@
         justify-content: center;
         font-size: 12px;
         cursor: pointer;
-        color: var(--chat-muted);
+        color: #94a3b8;
         z-index: 5;
     }
     .chat-message-container.sent .msg-react-btn { left: -30px; }
@@ -474,8 +455,8 @@
         display: none;
         position: absolute;
         top: -32px;
-        background: var(--chat-bubble-received-bg);
-        border: 1px solid var(--chat-border-strong);
+        background: #1e293b;
+        border: 1px solid #334155;
         border-radius: 20px;
         padding: 3px 8px;
         gap: 6px;
@@ -494,8 +475,8 @@
     .reaction-badge {
         display: none;
         font-size: 12px;
-        background-color: var(--chat-bubble-received-bg);
-        border: 1px solid var(--chat-border-strong);
+        background-color: #1e293b;
+        border: 1px solid #334155;
         border-radius: 12px;
         padding: 2px 6px;
         margin-top: -8px;
@@ -509,40 +490,35 @@
     }
 
     .chat-footer {
-        background-color: var(--chat-bg);
+        background-color: #0d1321;
         padding: 10px 15px 15px 15px;
-        border-top: 1px solid var(--chat-border);
+        border-top: 1px solid #1e293b;
         flex-shrink: 0;
         position: relative;
-        transition: background-color 0.2s ease, border-color 0.2s ease;
     }
     .chat-input-wrapper {
         display: flex;
         align-items: center;
-        background-color: var(--chat-input-wrap-bg);
+        background-color: #1e293b;
         border-radius: 20px;
         padding: 4px 10px;
-        border: 1px solid var(--chat-border-strong);
-        transition: background-color 0.2s ease, border-color 0.2s ease;
+        border: 1px solid #334155;
     }
     #chat-input-text {
         flex-grow: 1;
-        min-width: 0; /* lets the input shrink inside the flex row on small
-                          screens instead of pushing the emoji/send icons
-                          out past the box's edge */
         background: transparent;
         border: none;
-        color: var(--chat-text);
+        color: white;
         padding: 8px;
         outline: none;
         font-size: 13.5px;
     }
-    #chat-input-text::placeholder { color: var(--chat-muted); }
+    #chat-input-text::placeholder { color: #94a3b8; }
 
     .chat-icon-btn {
         background: none;
         border: none;
-        color: var(--chat-muted);
+        color: #94a3b8;
         cursor: pointer;
         font-size: 18px;
         padding: 4px;
@@ -550,27 +526,26 @@
         align-items: center;
         justify-content: center;
         transition: color 0.2s;
-        flex-shrink: 0; /* keep icons full size — only the text input shrinks */
     }
-    .chat-icon-btn:hover { color: var(--chat-text); }
+    .chat-icon-btn:hover { color: #fff; }
     .send-btn { color: #60a5fa; margin-left: 4px; }
     .send-btn:hover { color: #93c5fd; }
 
     .chat-brand {
         text-align: center;
         font-size: 11px;
-        color: var(--chat-muted);
+        color: #64748b;
         margin-top: 8px;
     }
-    .chat-brand strong { color: var(--chat-text); }
+    .chat-brand strong { color: #94a3b8; }
 
     #emoji-picker {
         display: none;
         position: absolute;
         bottom: 60px;
         right: 15px;
-        background-color: var(--chat-input-wrap-bg);
-        border: 1px solid var(--chat-border-strong);
+        background-color: #1e293b;
+        border: 1px solid #334155;
         border-radius: 10px;
         padding: 8px;
         grid-template-columns: repeat(5, 1fr);
@@ -587,7 +562,7 @@
         transition: background 0.2s;
     }
     #emoji-picker span:hover {
-        background-color: var(--chat-border-strong);
+        background-color: #334155;
     }
 
     #file-preview {
@@ -595,50 +570,17 @@
         margin-bottom: 8px;
         font-size: 12px;
         color: #60a5fa;
-        background: var(--chat-input-wrap-bg);
+        background: #1e293b;
         padding: 6px 12px;
         border-radius: 8px;
-        border: 1px solid var(--chat-border-strong);
-    }
-
-    /* ===== LIQUID GLASS OVERRIDE ===== */
-    :root {
-        --card-bg: rgba(17, 17, 18, 0.45);
-        --lang-btn-bg: rgba(255, 255, 255, 0.06);
-    }
-    html.light-mode {
-        --card-bg: rgba(255, 255, 255, 0.55);
-        --lang-btn-bg: rgba(255, 255, 255, 0.5);
-    }
-    body {
-        background-color: #06070a;
-        background-image:
-            radial-gradient(circle at 12% 8%,  rgba(139, 195, 74, 0.35) 0%, rgba(139, 195, 74, 0) 45%),
-            radial-gradient(circle at 88% 15%, rgba(0, 188, 212, 0.32) 0%, rgba(0, 188, 212, 0) 45%),
-            radial-gradient(circle at 25% 85%, rgba(124, 77, 255, 0.28) 0%, rgba(124, 77, 255, 0) 50%),
-            linear-gradient(160deg, #0a0c12 0%, #06070a 60%, #08090d 100%);
-        background-attachment: fixed;
-        background-size: cover;
-    }
-    html.light-mode body {
-        background-color: #eef1f6;
-        background-image:
-            radial-gradient(circle at 12% 8%,  rgba(139, 195, 74, 0.30) 0%, rgba(139, 195, 74, 0) 45%),
-            radial-gradient(circle at 88% 15%, rgba(0, 188, 212, 0.28) 0%, rgba(0, 188, 212, 0) 45%),
-            radial-gradient(circle at 25% 85%, rgba(124, 77, 255, 0.22) 0%, rgba(124, 77, 255, 0) 50%),
-            linear-gradient(160deg, #f4f6fa 0%, #eef1f6 60%, #f1f3f8 100%);
-        background-attachment: fixed;
-        background-size: cover;
-    }
-    .step-card, .lang-toggle-group, .rc-composer, .rc-reply-form-wrap:not(:empty),
-    .rc-avatar, .rc-older-btn, #theme-toggle-btn {
-        backdrop-filter: blur(18px) saturate(160%);
-        -webkit-backdrop-filter: blur(18px) saturate(160%);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 30px rgba(0,0,0,0.3);
+        border: 1px solid #334155;
     }
 </style>
 </head>
 <body>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth-widget.js"></script>
 
 <main class="content-container">
     <div class="breadcrumb" id="breadcrumbText">
@@ -688,15 +630,40 @@
         </div>
 
         <div class="step-card" data-step="5">
-            <div class="step-text" data-en="▪ <strong>Step 5:</strong> Post it as a comment below - no email needed. We usually fix it within 24-48 hours." data-bn="▪ <strong>ধাপ ৫:</strong> নিচের কমেন্ট বক্সে পোস্ট করুন - কোনো ইমেইল লাগবে না। সাধারণত ২৪-৪৮ ঘণ্টার মধ্যে লিংক ঠিক করা হয়।">
-                ▪ <strong>Step 5:</strong> Post it as a comment below - no email needed. We usually fix it within 24-48 hours.
+            <div class="step-text" data-en="▪ <strong>Step 5:</strong> Fill out the report form below and submit - no email needed. We usually fix it within 24-48 hours." data-bn="▪ <strong>ধাপ ৫:</strong> নিচের রিপোর্ট ফর্মটি পূরণ করে সাবমিট করুন - কোনো ইমেইল লাগবে না। সাধারণত ২৪-৪৮ ঘণ্টার মধ্যে লিংক ঠিক করা হয়।">
+                ▪ <strong>Step 5:</strong> Fill out the report form below and submit - no email needed. We usually fix it within 24-48 hours.
             </div>
         </div>
     </div>
 
-    <div class="note-text" id="noteText" data-en="Note, if you face any Problem please comment down." data-bn="নোটঃ কোনো সমস্যা হলে নিচে কমেন্ট করুন।">
-        Note, if you face any Problem please comment down.
+    <div class="note-text" id="noteText" data-en="Note, if you face any Problem please use the report form below." data-bn="নোটঃ কোনো সমস্যা হলে নিচের রিপোর্ট ফর্মটি ব্যবহার করুন।">
+        Note, if you face any Problem please use the report form below.
     </div>
+
+    <!-- ==================== BROKEN LINK REPORT FORM ====================
+         Submits directly into the "link_alerts" table (same table the
+         admin panel's 🔔 Broken Link Reports tab reads from), tagged
+         source: 'visitor_report' so it shows up there as "👤 Visitor Report". -->
+    <section class="rc-composer" id="brFormSection">
+        <h3 id="brFormTitle">🔔 Report a Broken Link</h3>
+        <input type="text" id="brMovieInput" class="rc-input" list="brMovieList" placeholder="Movie / Series Name*" maxlength="150">
+        <datalist id="brMovieList"></datalist>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <select id="brQualitySelect" class="rc-input" style="flex:1; min-width:140px; cursor:pointer;">
+                <option value="">Print Type (optional)</option>
+                <option value="720p">720p</option>
+            </select>
+            <select id="brLinkTypeSelect" class="rc-input" style="flex:1; min-width:140px; cursor:pointer;">
+                <option value="">Link Type (optional)</option>
+                <option value="Terabox">Terabox</option>
+            </select>
+        </div>
+        <input type="url" id="brLinkUrlInput" class="rc-input" placeholder="Broken Link URL (optional)" maxlength="500">
+        <textarea id="brProblemText" class="rc-textarea" rows="3" placeholder="What's wrong? (e.g. won't play, black screen, link not found)*"></textarea>
+        <input type="text" id="brNameInput" class="rc-input" placeholder="Your Name (optional)" maxlength="40">
+        <button type="button" class="rc-btn-submit" id="brSubmitBtn" onclick="submitBrokenLinkReport()">SUBMIT REPORT</button>
+        <div class="rc-form-msg" id="brFormMsg"></div>
+    </section>
 
     <!-- ==================== LIVE "REPORT" COMMENT THREAD ==================== -->
     <section class="rc-section" id="rcSection">
@@ -814,6 +781,14 @@
         const rcComposerText = document.getElementById('rcComposerText');
         const rcComposerName = document.getElementById('rcComposerName');
         const rcComposerSubmitBtn = document.getElementById('rcComposerSubmitBtn');
+        const brFormTitle = document.getElementById('brFormTitle');
+        const brMovieInput = document.getElementById('brMovieInput');
+        const brQualitySelect = document.getElementById('brQualitySelect');
+        const brLinkTypeSelect = document.getElementById('brLinkTypeSelect');
+        const brLinkUrlInput = document.getElementById('brLinkUrlInput');
+        const brProblemText = document.getElementById('brProblemText');
+        const brNameInput = document.getElementById('brNameInput');
+        const brSubmitBtn = document.getElementById('brSubmitBtn');
 
         if (currentLang === 'bn') {
             pageTitle.innerText = "রিপোর্ট ব্রোকেন লিংকস।";
@@ -824,6 +799,14 @@
             if (rcComposerText) rcComposerText.placeholder = "কমেন্ট টেক্সট*";
             if (rcComposerName) rcComposerName.placeholder = "নাম*";
             if (rcComposerSubmitBtn) rcComposerSubmitBtn.innerText = "কমেন্ট সাবমিট করুন";
+            if (brFormTitle) brFormTitle.innerText = "🔔 ব্রোকেন লিংক রিপোর্ট করুন";
+            if (brMovieInput) brMovieInput.placeholder = "মুভি / সিরিজের নাম*";
+            if (brQualitySelect && brQualitySelect.options[0]) brQualitySelect.options[0].text = "প্রিন্ট টাইপ (ঐচ্ছিক)";
+            if (brLinkTypeSelect && brLinkTypeSelect.options[0]) brLinkTypeSelect.options[0].text = "লিংক টাইপ (ঐচ্ছিক)";
+            if (brLinkUrlInput) brLinkUrlInput.placeholder = "ব্রোকেন লিংকের URL (ঐচ্ছিক)";
+            if (brProblemText) brProblemText.placeholder = "কী সমস্যা হচ্ছে? (যেমন: চলছে না, কালো স্ক্রিন, লিংক পাওয়া যাচ্ছে না)*";
+            if (brNameInput) brNameInput.placeholder = "আপনার নাম (ঐচ্ছিক)";
+            if (brSubmitBtn) brSubmitBtn.innerText = "রিপোর্ট সাবমিট করুন";
         } else {
             pageTitle.innerText = "Report Broken Links.";
             pageSubtitle.innerText = "How to Report:";
@@ -833,6 +816,14 @@
             if (rcComposerText) rcComposerText.placeholder = "Comment Text*";
             if (rcComposerName) rcComposerName.placeholder = "Name*";
             if (rcComposerSubmitBtn) rcComposerSubmitBtn.innerText = "SUBMIT COMMENT";
+            if (brFormTitle) brFormTitle.innerText = "🔔 Report a Broken Link";
+            if (brMovieInput) brMovieInput.placeholder = "Movie / Series Name*";
+            if (brQualitySelect && brQualitySelect.options[0]) brQualitySelect.options[0].text = "Print Type (optional)";
+            if (brLinkTypeSelect && brLinkTypeSelect.options[0]) brLinkTypeSelect.options[0].text = "Link Type (optional)";
+            if (brLinkUrlInput) brLinkUrlInput.placeholder = "Broken Link URL (optional)";
+            if (brProblemText) brProblemText.placeholder = "What's wrong? (e.g. won't play, black screen, link not found)*";
+            if (brNameInput) brNameInput.placeholder = "Your Name (optional)";
+            if (brSubmitBtn) brSubmitBtn.innerText = "SUBMIT REPORT";
         }
 
         document.querySelectorAll('.step-text').forEach(el => {
@@ -1130,6 +1121,7 @@
     let offset = 0;
     let totalCount = 0;
     let lastGuestName = '';
+    let movieTitleMap = {}; // lowercase title -> movie id (for linking the report to the right movie)
 
     function escapeHtml(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
@@ -1329,7 +1321,93 @@
         updateCountLabel();
     };
 
+    // ---------- Broken Link Report form: movie title autocomplete ----------
+    async function loadMovieTitlesForReportForm() {
+        try {
+            const { data, error } = await sb.from('movies').select('id, title').order('title', { ascending: true });
+            if (error) { console.error('Load movie titles error:', error); return; }
+            const listEl = document.getElementById('brMovieList');
+            if (listEl) listEl.innerHTML = '';
+            (data || []).forEach(m => {
+                if (!m.title) return;
+                movieTitleMap[m.title.trim().toLowerCase()] = m.id;
+                if (listEl) {
+                    const opt = document.createElement('option');
+                    opt.value = m.title;
+                    listEl.appendChild(opt);
+                }
+            });
+        } catch (e) {
+            console.error('Unexpected error loading movie titles:', e);
+        }
+    }
+
+    function showBrMsg(text, isSuccess) {
+        const msgEl = document.getElementById('brFormMsg');
+        if (msgEl) { msgEl.textContent = text; msgEl.className = 'rc-form-msg' + (isSuccess ? ' success' : ''); }
+    }
+
+    // ---------- Broken Link Report form: submit ----------
+    // Inserts directly into the "link_alerts" table (the same table the admin
+    // panel's 🔔 Broken Link Reports tab reads from) tagged source: 'visitor_report',
+    // so it shows up there right away as "👤 Visitor Report" - no manual comment-reading needed.
+    window.submitBrokenLinkReport = async function () {
+        const movieInput = document.getElementById('brMovieInput');
+        const qualitySelect = document.getElementById('brQualitySelect');
+        const linkTypeSelect = document.getElementById('brLinkTypeSelect');
+        const urlInput = document.getElementById('brLinkUrlInput');
+        const problemText = document.getElementById('brProblemText');
+        const nameInput = document.getElementById('brNameInput');
+        const btn = document.getElementById('brSubmitBtn');
+
+        const movieTitle = (movieInput.value || '').trim().slice(0, 150);
+        const quality = qualitySelect.value;
+        const linkType = linkTypeSelect.value;
+        const url = (urlInput.value || '').trim().slice(0, 500);
+        const problem = (problemText.value || '').trim();
+        const reporterName = (nameInput.value || '').trim().slice(0, 40);
+
+        if (!movieTitle) { showBrMsg(currentLang === 'bn' ? 'অনুগ্রহ করে মুভি/সিরিজের নাম লিখুন।' : 'Please enter the movie/series name.'); movieInput.focus(); return; }
+        if (!problem) { showBrMsg(currentLang === 'bn' ? 'অনুগ্রহ করে সমস্যাটি লিখুন।' : "Please describe what's wrong."); problemText.focus(); return; }
+
+        btn.disabled = true;
+        btn.textContent = currentLang === 'bn' ? 'পাঠানো হচ্ছে…' : 'Submitting…';
+        showBrMsg('');
+
+        const matchedId = movieTitleMap[movieTitle.toLowerCase()] || null;
+        const labelParts = [quality, linkType].filter(Boolean).join(' - ');
+        let linkLabel = (labelParts ? labelParts + ' — ' : '') + problem.slice(0, 300);
+        if (reporterName) linkLabel += ` (reported by ${reporterName})`;
+
+        const { error } = await sb.from('link_alerts').insert([{
+            movie_id: matchedId,
+            movie_title: movieTitle,
+            link_label: linkLabel.slice(0, 500),
+            link_url: url,
+            source: 'visitor_report',
+            status: 'open'
+        }]);
+
+        btn.disabled = false;
+        btn.textContent = currentLang === 'bn' ? 'রিপোর্ট সাবমিট করুন' : 'SUBMIT REPORT';
+
+        if (error) {
+            console.error('Submit broken link report error:', error);
+            const detail = error.message ? ` (${error.message})` : '';
+            showBrMsg((currentLang === 'bn' ? 'দুঃখিত, রিপোর্ট পাঠানো যায়নি। একটু পর আবার চেষ্টা করুন।' : "Sorry, couldn't submit the report. Please try again shortly.") + detail);
+            return;
+        }
+
+        movieInput.value = '';
+        qualitySelect.value = '';
+        linkTypeSelect.value = '';
+        urlInput.value = '';
+        problemText.value = '';
+        showBrMsg(currentLang === 'bn' ? 'ধন্যবাদ! আপনার রিপোর্ট admin এর কাছে পৌঁছে গেছে।' : 'Thanks! Your report has been sent to the admin.', true);
+    };
+
     async function init() {
+        loadMovieTitlesForReportForm(); // report form-এর জন্য movie autocomplete লোড (non-blocking)
         const { count } = await sb.from('link_report_comments')
             .select('id', { count: 'exact', head: true })
             .is('parent_id', null);

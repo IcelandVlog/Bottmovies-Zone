@@ -33,6 +33,7 @@ function normalizeCategorySlug(slug) {
 }
 
 var allMovies = []; 
+var moviesDataLoaded = false; // Supabase থেকে movies data একবার সফলভাবে লোড হয়ে গেলে true হয়ে যায়
 var allDeletedMovies = [];
 var allLinkAlerts = [];
 const TRASH_RETENTION_DAYS = 30;
@@ -47,28 +48,24 @@ const EMAILJS_TEMPLATE_ID = "template_vpa657n";
 
 const ADMIN_TRIGGER_EMAIL = "702640Shamil@admin.com";
 const ADMIN_POSTER_BUCKET = "posters";
+const AVATAR_BUCKET = "avatars";
+const DEFAULT_AVATAR_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="76" height="76"><rect width="76" height="76" fill="#1a1c23"/><circle cx="38" cy="29" r="14" fill="#3a4457"/><path d="M12 66c4-16 18-24 26-24s22 8 26 24" fill="#3a4457"/></svg>'
+);
 const ADMIN_POSTER_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44"><rect width="44" height="44" rx="8" fill="#1a1c23"/><path d="M12 30l6-7 5 5 6-8 5 6" stroke="#475569" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="15" r="3" fill="#475569"/></svg>'
 );
 
 // via.placeholder.com is dead/unreliable in 2026 (SSL/DNS issues) - use a local SVG instead
 // so poster boxes never end up blank when there's no real poster to show.
-// Colors are picked based on the current theme so the placeholder matches
-// light/dark mode instead of always being dark.
 function makePosterPlaceholder(label) {
     const safeLabel = escapeHtml(label || 'No Poster');
-    const isLight = document.documentElement.classList.contains('light-mode');
-    const bg = isLight ? '#ffffff' : '#1a1c23';
-    const icon = isLight ? '#94a3b8' : '#475569';
-    const text = isLight ? '#64748b' : '#64748b';
     return "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="${bg}"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="${icon}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="${icon}"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="${text}" text-anchor="middle">${safeLabel}</text></svg>`
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#1a1c23"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="#475569" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="#475569"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${safeLabel}</text></svg>`
     );
 }
-// Use getters (not fixed constants) so the placeholder always reflects the
-// theme active at the moment it's actually used, not just at script load.
-function getPosterPlaceholderLoading() { return makePosterPlaceholder('Loading...'); }
-function getPosterPlaceholderMissing() { return makePosterPlaceholder('No Poster'); }
+const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
+const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
 
 // A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
 // warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
@@ -79,7 +76,7 @@ function handlePosterImgError(imgEl) {
     if (!imgEl) return;
     if (imgEl.dataset.posterRetried === '1') {
         imgEl.onerror = null;
-        imgEl.src = getPosterPlaceholderMissing();
+        imgEl.src = POSTER_PLACEHOLDER_MISSING;
         return;
     }
     imgEl.dataset.posterRetried = '1';
@@ -142,6 +139,7 @@ async function fetchMoviesFromSupabase() {
             // Split into active content and soft-deleted (recycle bin) content
             allMovies = parsedAll.filter(m => !m.deleted_at);
             allDeletedMovies = parsedAll.filter(m => !!m.deleted_at);
+            moviesDataLoaded = true; // data সফলভাবে লোড হয়ে গেছে — এরপর থেকে "No content found" দেখানো যাবে
 
             // Auto-purge items that have been in the recycle bin longer than the retention period
             purgeExpiredTrash();
@@ -165,8 +163,24 @@ async function fetchMoviesFromSupabase() {
                 initialCategory = document.body.getAttribute('data-category') || 'all';
             }
             switchCategory(initialCategory);
+
+            // page refresh এ যদি Admin Panel আগে থেকেই খোলা থাকে (URL এ ?dashboard=1),
+            // তাহলে movies data লোড হওয়ার আগেই ঐ ট্যাবের কন্টেন্ট রেন্ডার হয়ে "No content found" /
+            // stats 0 দেখাচ্ছিল — data লোড শেষ হওয়ার পর যেই ট্যাব খোলা আছে সেটাই আবার রিফ্রেশ করে দাও
+            const adminOverlayEl = document.getElementById('adminOverlay');
+            if (adminOverlayEl && adminOverlayEl.style.display !== 'none') {
+                if (currentAdminTab === 'dashboard') {
+                    loadAdminDashboardStats();
+                } else if (currentAdminTab === 'manage') {
+                    const searchInput = document.getElementById('adminSearchInput');
+                    renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
+                } else if (currentAdminTab === 'trash') {
+                    renderAdminTrashList();
+                }
+            }
         } else {
             console.warn('No movies found in database.');
+            moviesDataLoaded = true; // এই কল সফল হয়েছে, শুধু ডাটাবেজ খালি — তাই এখন থেকে "No content found" ঠিক দেখানো যাবে
         }
     } catch (err) {
         console.error('Unexpected error loading database:', err);
@@ -291,6 +305,13 @@ function copyDownloadLink(linkId, btnElement) {
     const linkElement = document.getElementById(linkId);
     if (linkElement && linkElement.href) {
         incrementMovieViews(currentModalMovie); // লিংক কপি করলে ভিউ কাউন্ট বাড়বে
+
+        // ডাউনলোড বাটনের মতোই, লিংক কপি করলেও সেটা Download History তে যোগ হবে
+        // (ইউজার লিংকটা কপি করে নিজে ব্রাউজার/ডাউনলোডার দিয়ে ডাউনলোড করবে ধরে নিয়ে)
+        const headerEl = linkElement.closest('.season-box-item')?.querySelector('.season-box-header');
+        const linkLabel = headerEl?.dataset.label || '';
+        logDownloadHistory(currentModalMovie, linkLabel);
+
         navigator.clipboard.writeText(linkElement.href).then(() => {
             const originalText = btnElement.innerText;
             btnElement.innerText = 'Copied!';
@@ -688,17 +709,26 @@ function renderMoviesByPage(movies, page) {
         const card = document.createElement('div');
         card.className = 'movie-card';
 
+        const isFav = isMovieFavorited(movie.id);
         card.innerHTML = `
         <div class="poster-wrapper">
             <div class="poster-rating-badge" id="card-rating-${index}">
                 <span>★</span> N/A
             </div>
-            <img src="${getPosterPlaceholderLoading()}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
+            <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
+            <img src="${POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;
 
         card.addEventListener('click', () => openMovieModal(movie));
+        const favBtn = card.querySelector(`#card-fav-${index}`);
+        if (favBtn) {
+            favBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleFavoriteMovie(movie, favBtn);
+            });
+        }
         grid.appendChild(card);
 
         getFullTMDBDetails(movie).then(tmdb => {
@@ -758,7 +788,7 @@ async function openMovieModal(movie) {
     `;
 
     let title = movie.title || "N/A";
-    let poster = movie.poster || getPosterPlaceholderMissing();
+    let poster = movie.poster || POSTER_PLACEHOLDER_MISSING;
     let year = movie.year || "N/A";
     let genre = movie.genre || "Drama";
     let plot = movie.plot || "No plot description available.";
@@ -826,7 +856,7 @@ let downloadHTML = '';
                     </div>
                     <div class="season-download-body" id="dl-body-${uid}">
                         <div class="download-button-group">
-                            <a href="${it.link}" target="_blank" class="btn-zip-download" id="dl-link-${uid}" onclick="incrementMovieViews(currentModalMovie)">Download ${fileTypeLabel}</a>
+                            <a href="${it.link}" target="_blank" class="btn-zip-download" id="dl-link-${uid}" onclick="incrementMovieViews(currentModalMovie); logDownloadHistory(currentModalMovie, '${jsAttrStr(cleanHeaderLabel + sizeText)}')">Download ${fileTypeLabel}</a>
                             <button type="button" class="btn-copy-link" onclick="copyDownloadLink('dl-link-${uid}', this)">Copy Link</button>
                         </div>
                     </div>
@@ -862,7 +892,7 @@ let downloadHTML = '';
                     </div>
                     <div class="season-download-body" id="dl-body-${idx}">
                         <div class="download-button-group">
-                            <a href="${sec.link}" target="_blank" class="btn-zip-download" id="dl-link-${idx}" onclick="incrementMovieViews(currentModalMovie)">Download ${fileTypeLabel}</a>
+                            <a href="${sec.link}" target="_blank" class="btn-zip-download" id="dl-link-${idx}" onclick="incrementMovieViews(currentModalMovie); logDownloadHistory(currentModalMovie, '${jsAttrStr(cleanLabel + sizeText)}')">Download ${fileTypeLabel}</a>
                             <button type="button" class="btn-copy-link" onclick="copyDownloadLink('dl-link-${idx}', this)">Copy Link</button>
                         </div>
                     </div>
@@ -950,6 +980,7 @@ fastServersList.forEach((fs, fIdx) => {
                     </div>
                 </div>
                 <div class="card-actions-row">
+                    <button type="button" id="modalFavoriteBtn" class="btn-favorite-action${isMovieFavorited(movie.id) ? ' active' : ''}" onclick="toggleFavoriteMovie(currentModalMovie, document.getElementById('modalFavoriteBtn'))">${isMovieFavorited(movie.id) ? '❤️ In Favorites' : '🤍 Add to Favorites'}</button>
                     <a href="${imdbUrl}" id="modalImdbBtn" target="_blank" class="btn-imdb-action">IMDb</a>
                     <a href="${tmdbUrl}" id="modalTmdbBtn" target="_blank" class="btn-tmdb-action">TMDb</a>
                     <a href="${googleUrl}" target="_blank" class="btn-google-action">Google it!</a>
@@ -1296,9 +1327,7 @@ function initApp() {
 
     loadAdminExtraCategories();
 
-    if (sessionStorage.getItem('isAdminLoggedIn') === 'true') {
-        openAdminPanel();
-    }
+    initAuth();
     setupNavigation();
 
     fetchMoviesFromSupabase();
@@ -1341,14 +1370,6 @@ function initApp() {
         searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchMovies(); });
         searchInput.addEventListener('input', function() {
             const query = this.value.trim();
-
-            if (query.toLowerCase() === ADMIN_TRIGGER_EMAIL.toLowerCase()) {
-                this.value = '';
-                searchSuggestions.innerHTML = '';
-                searchSuggestions.style.display = 'none';
-                openAdminPanel();
-                return;
-            }
 
             searchSuggestions.innerHTML = '';
             if (!query) {
@@ -1480,18 +1501,16 @@ function chatWidgetFormHTML() {
             </div>
         </div>
         <div class="chat-card-container">
-            <div class="chat-input-wrapper" id="chatMovieNameWrap">
-                <input type="text" id="chatMovieName" placeholder="Movie / Series Name (e.g. Inception)" autocomplete="off" oninput="clearChatFieldError('chatMovieNameWrap','chatMovieNameError')">
-                <div class="chat-field-error" id="chatMovieNameError"></div>
+            <div class="chat-input-wrapper">
+                <input type="text" id="chatMovieName" placeholder="Movie / Series Name (e.g. Inception)" autocomplete="off">
             </div>
             <div class="chat-input-wrapper">
                 <input type="text" id="chatMovieLink" placeholder="TMDB / IMDb Link (Optional)" autocomplete="off">
             </div>
-            <div class="chat-input-wrapper select-wrapper" id="chatMovieYearWrap">
-                <select id="chatMovieYear" onchange="clearChatFieldError('chatMovieYearWrap','chatMovieYearError')">
+            <div class="chat-input-wrapper select-wrapper">
+                <select id="chatMovieYear">
                     ${generateYearOptions()}
                 </select>
-                <div class="chat-field-error" id="chatMovieYearError"></div>
             </div>
             <button class="chat-submit-btn" onclick="submitChatRequest()">Submit</button>
         </div>
@@ -1582,22 +1601,6 @@ function closeChatWidget() {
     switchChatTab('request');
 }
 
-function setChatFieldError(wrapId, errorId, message) {
-    const wrap = document.getElementById(wrapId);
-    const errorEl = document.getElementById(errorId);
-    if (wrap) wrap.classList.add('has-error');
-    if (errorEl) {
-        errorEl.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="12" cy="12" r="10"/><rect x="11" y="6" width="2" height="7" fill="#fff"/><rect x="11" y="15" width="2" height="2" fill="#fff"/></svg><span>${message}</span>`;
-    }
-}
-
-function clearChatFieldError(wrapId, errorId) {
-    const wrap = document.getElementById(wrapId);
-    const errorEl = document.getElementById(errorId);
-    if (wrap) wrap.classList.remove('has-error');
-    if (errorEl) errorEl.innerHTML = '';
-}
-
 function submitChatRequest() {
     const nameInput = document.getElementById('chatMovieName');
     const linkInput = document.getElementById('chatMovieLink');
@@ -1607,20 +1610,10 @@ function submitChatRequest() {
     const link = linkInput ? linkInput.value.trim() : '';
     const year = yearSelect ? yearSelect.value : '';
 
-    let hasError = false;
     if (!name) {
-        setChatFieldError('chatMovieNameWrap', 'chatMovieNameError', 'Please enter a movie or series name');
-        hasError = true;
-    } else {
-        clearChatFieldError('chatMovieNameWrap', 'chatMovieNameError');
+        if (nameInput) nameInput.style.borderColor = '#ff3366';
+        return;
     }
-    if (!year) {
-        setChatFieldError('chatMovieYearWrap', 'chatMovieYearError', 'Please select a release year');
-        hasError = true;
-    } else {
-        clearChatFieldError('chatMovieYearWrap', 'chatMovieYearError');
-    }
-    if (hasError) return;
 
     let requestMsg = name;
     if (year) requestMsg += ` (${year})`;
@@ -1631,7 +1624,7 @@ function submitChatRequest() {
         status: "Movie / Series Request"
     };
 
-    supabaseClient.from('requests').insert([{ movie_title: name, reference_link: link || null, release_year: year || null }])
+    supabaseClient.from('requests').insert([{ movie_title: name, reference_link: link || null, release_year: year || null, user_id: currentAuthSession?.user?.id || null }])
         .then(({ error }) => {
             if (error) {
                 console.error('Request save error:', error);
@@ -1657,10 +1650,1460 @@ function submitChatRequest() {
             alert("Failed to send request. Please try again later.");
         });
 }
+// ==================== AUTHENTICATION (Sign In / Sign Up / Dashboard) ====================
+// Supabase Auth ব্যবহার করা হয়েছে — session ডিফল্টভাবেই localStorage-এ persist হয়,
+// তাই page refresh করলে বা site-এর অন্য পেজে গেলেও login state হারায় না।
+
+let currentAuthSession = null;
+
+function isCurrentUserAdmin(session) {
+    const email = session?.user?.email;
+    return !!email && email.toLowerCase() === ADMIN_TRIGGER_EMAIL.toLowerCase();
+}
+
+// user_metadata তে সাইনআপের সময় username সেভ করা থাকে - সেখান থেকেই দেখানো হয়,
+// (পুরনো account যেগুলোর username নেই, যেমন Admin - সেগুলোর জন্য email এর @ এর আগের অংশ দেখানো হয়)
+function getDisplayUsername(session) {
+    const uname = session?.user?.user_metadata?.username;
+    if (uname) return uname;
+    const email = session?.user?.email || '';
+    return email.split('@')[0] || email;
+}
+
+// Login/Forgot-Password ফিল্ডে username বা email - যা দেওয়া হয়েছে সেটা থেকে আসল email বের করে
+async function resolveLoginEmail(identifier) {
+    if (!identifier) return null;
+    if (identifier.includes('@')) return identifier; // সরাসরি email দেওয়া হয়েছে
+    try {
+        const { data, error } = await supabaseClient.rpc('get_email_for_username', { uname: identifier });
+        if (error) { console.error('Username lookup error:', error); return null; }
+        return data || null;
+    } catch (e) {
+        console.error('Username lookup error:', e);
+        return null;
+    }
+}
+
+function updateAuthUI(session) {
+    currentAuthSession = session;
+    const loggedOutBox = document.getElementById('authActionsLoggedOut');
+    const loggedInBox = document.getElementById('authActionsLoggedIn');
+    const emailLabel = document.getElementById('authUserEmail');
+    const mobileLabel = document.getElementById('authIconMobileLabel');
+    const dashboardBtn = document.getElementById('btnAuthDashboard');
+    if (!loggedOutBox || !loggedInBox) return;
+
+    if (session && session.user) {
+        loggedOutBox.style.display = 'none';
+        loggedInBox.style.display = 'flex';
+        if (emailLabel) {
+            const uname = getDisplayUsername(session);
+            emailLabel.textContent = isCurrentUserAdmin(session) ? `👑 ${uname}` : `👤 ${uname}`;
+        }
+        // Admin এর জন্য "Dashboard" (Admin Panel), সাধারণ ইউজারের জন্য "My Dashboard" — যাতে দুটো আলাদা বোঝা যায়
+        const dashboardLabel = isCurrentUserAdmin(session) ? 'Dashboard' : 'My Dashboard';
+        if (dashboardBtn) dashboardBtn.textContent = dashboardLabel;
+        if (mobileLabel) mobileLabel.textContent = dashboardLabel;
+        loadUserFavoriteIds(); // heart আইকনগুলো ঠিকমতো দেখানোর জন্য সাইনইন করার সাথে সাথেই favorites লোড করে নাও
+    } else {
+        loggedOutBox.style.display = 'flex';
+        loggedInBox.style.display = 'none';
+        if (emailLabel) emailLabel.textContent = '';
+        if (mobileLabel) mobileLabel.textContent = 'Login';
+        // sign out হয়ে গেলে dashboard/admin panel খোলা থাকলে বন্ধ করে দাও
+        closeAdminPanel();
+        closeUserDashboard();
+        userFavoriteIds = new Set(); // sign out করলে favorites cache খালি করে দাও
+    }
+    myCommentIdentityCache = null; // login/logout হলে পুরনো identity cache বাতিল
+    // comment box খোলা থাকলে login/logout এর সাথে সাথেই সেখানে avatar+নাম বা "please login" আপডেট হয়ে যাবে
+    if (commentsCurrentMovieId !== null && commentsCurrentMovieId !== undefined) renderCommentComposer();
+}
+
+async function initAuth() {
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        updateAuthUI(session);
+
+        const params = new URLSearchParams(window.location.search);
+        // dmca.html / report-broken-links.html ইত্যাদি পেজ থেকে "Dashboard" এ ক্লিক করলে
+        // ?dashboard=1 নিয়ে index.html-এ ফেরত আসে — সাথে সাথেই dashboard খুলে যায়
+        // (page refresh করলেও এই একই লজিকে Dashboard/Admin panel খোলা অবস্থাতেই থাকে, home এ ফিরে যায় না)
+        if (session && params.get('dashboard') === '1') {
+            openDashboard();
+        } else if (!session && params.has('dashboard')) {
+            clearDashboardUrlParam(); // session না থাকলে পুরনো ?dashboard=1 URL থেকে সরিয়ে দাও
+        }
+        // ?auth=signin বা ?auth=signup (পুরনো লিংকে ?auth=1 থাকলে সেটাও signin ধরে নেওয়া হয়) —
+        // page refresh দিলেও Login/Register পেজেই থাকবে, home এ চলে যাবে না
+        const authParam = params.get('auth');
+        if (!session && authParam) {
+            openAuthModal(authParam === 'signup' ? 'signup' : 'signin');
+        }
+    } catch (e) {
+        console.error('Auth init error:', e);
+    }
+
+    supabaseClient.auth.onAuthStateChange((_event, newSession) => {
+        updateAuthUI(newSession);
+    });
+}
+
+function openAuthModal(tab) {
+    const overlay = document.getElementById('authOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'block';
+    document.body.classList.add('modal-open');
+    switchAuthTab(tab || 'signin'); // এটাই URL সিঙ্ক করে দেয়, যাতে refresh এ এই পেজেই থাকে
+}
+function closeAuthModal() {
+    const overlay = document.getElementById('authOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    resetAuthForm(); // পেজ বন্ধ করার পর ফর্মে টাইপ করা কোনো লেখা যেন থেকে না যায়
+    // URL থেকে ?auth সরিয়ে দাও, নাহলে পরের বার refresh দিলে আবার এই পেজ খুলে যাবে
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('auth')) {
+        params.delete('auth');
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+        history.replaceState(null, '', newUrl);
+    }
+}
+
+// Login/Register মোডাল বন্ধ করলে দুটো ফর্মেরই সব input/message খালি করে দেয়,
+// যাতে আবার খুললে আগের টাইপ করা ইমেইল/পাসওয়ার্ড/এরর মেসেজ দেখা না যায়
+function resetAuthForm() {
+    ['signinEmail', 'signinPassword', 'signupUsername', 'signupEmail', 'signupPassword', 'signupPasswordConfirm', 'signupCaptchaInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    ['authSigninMsg', 'authSignupMsg', 'signupUsernameMsg'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+    updateAuthPasswordStrength('');
+}
+function switchAuthTab(tab) {
+    const signinTab = document.getElementById('authTabSignin');
+    const signupTab = document.getElementById('authTabSignup');
+    if (!signinTab || !signupTab) return;
+    const isSignup = tab === 'signup';
+    signinTab.style.display = isSignup ? 'none' : 'block';
+    signupTab.style.display = isSignup ? 'block' : 'none';
+
+    // উপরের Login/Register tab বাটন দুটোর active state সিঙ্ক করা
+    const signinBtn = document.getElementById('authTabBtnSignin');
+    const signupBtn = document.getElementById('authTabBtnSignup');
+    if (signinBtn && signupBtn) {
+        signinBtn.classList.toggle('active', !isSignup);
+        signupBtn.classList.toggle('active', isSignup);
+    }
+
+    if (isSignup) generateAuthCaptcha(); // Register পেজে গেলেই নতুন captcha code বসিয়ে দাও
+
+    // Auth পেজ এখন খোলা থাকলে URL এ ?auth=signin/signup বসিয়ে রাখো — page refresh এর পরও
+    // এই পেজেই থাকবে, home এ চলে যাবে না
+    const overlay = document.getElementById('authOverlay');
+    if (overlay && overlay.style.display !== 'none') {
+        const params = new URLSearchParams(window.location.search);
+        params.set('auth', isSignup ? 'signup' : 'signin');
+        params.delete('dashboard'); // auth আর dashboard একসাথে URL এ থাকবে না
+        const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+        history.replaceState(null, '', newUrl);
+    }
+}
+
+// ছোট device-এ header-এ শুধু account icon দেখা যায় (img2 এর মতো) - সেটাতে ক্লিক করলে
+// লগইন থাকলে Dashboard, না থাকলে Login page খুলে যায়
+function handleMobileAuthIconClick() {
+    if (currentAuthSession && currentAuthSession.user) {
+        openDashboard();
+    } else {
+        openAuthModal('signin');
+    }
+}
+
+// পাসওয়ার্ড ফিল্ডের চোখ আইকনে ক্লিক করলে টেক্সট show/hide হয়
+const AUTH_EYE_ICON_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+const AUTH_EYE_ICON_CLOSED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 4.22-5.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"></path><path d="M1 1l22 22"></path></svg>';
+function toggleAuthPasswordVisibility(fieldId, btn) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.classList.toggle('is-visible', !showing);
+    btn.innerHTML = showing ? AUTH_EYE_ICON_OPEN : AUTH_EYE_ICON_CLOSED;
+}
+
+// "Forgot Password?" - ইউজারের দেওয়া username/email এ Supabase দিয়ে reset link পাঠায়
+async function handleForgotPassword() {
+    const identifierInput = document.getElementById('signinEmail');
+    const identifier = (identifierInput?.value || '').trim();
+    const msgEl = document.getElementById('authSigninMsg');
+    if (!identifier) {
+        if (msgEl) { msgEl.textContent = 'Please enter your Username/Email first to send the reset link.'; msgEl.className = 'admin-form-msg error'; }
+        identifierInput?.focus();
+        return;
+    }
+    if (msgEl) { msgEl.textContent = 'Sending...'; msgEl.className = 'admin-form-msg'; }
+    try {
+        const email = await resolveLoginEmail(identifier);
+        if (!email) {
+            if (msgEl) { msgEl.textContent = 'Incorrect Username or Password'; msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+        if (error) {
+            if (msgEl) { msgEl.textContent = error.message; msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+        if (msgEl) { msgEl.textContent = 'A password reset link has been sent to your email ✅'; msgEl.className = 'admin-form-msg success'; }
+    } catch (e) {
+        if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
+    }
+}
+
+// ==================== REGISTER CAPTCHA ====================
+// প্রতিবার Register ট্যাব খুললে বা রিফ্রেশ আইকনে ক্লিক করলে নতুন র‍্যান্ডম সংখ্যা দেখায়।
+let currentAuthCaptcha = '';
+function generateAuthCaptcha() {
+    let code = '';
+    for (let i = 0; i < 4; i++) code += Math.floor(Math.random() * 10);
+    currentAuthCaptcha = code;
+    const codeEl = document.getElementById('authCaptchaCode');
+    if (codeEl) codeEl.textContent = code.split('').join('  ');
+    const captchaInput = document.getElementById('signupCaptchaInput');
+    if (captchaInput) captchaInput.value = '';
+}
+
+// ==================== USERNAME LIVE AVAILABILITY CHECK ====================
+// টাইপ করার সাথে সাথে (debounce করে) চেক করে এই username অন্য কেউ আগে থেকেই নিয়ে রেখেছে কিনা
+const usernameCheckTimers = {};
+async function checkUsernameLive(inputEl, msgElId, isDashboard) {
+    const msgEl = document.getElementById(msgElId);
+    if (!inputEl || !msgEl) return;
+    const value = (inputEl.value || '').trim();
+    clearTimeout(usernameCheckTimers[msgElId]);
+
+    if (!value) { msgEl.textContent = ''; msgEl.className = 'auth-field-msg'; return; }
+    if (!/^[a-z0-9_]{3,20}$/.test(value)) {
+        msgEl.textContent = 'Username: 3-20 chars, lowercase letters/numbers/_ only.';
+        msgEl.className = 'auth-field-msg taken';
+        return;
+    }
+
+    msgEl.textContent = 'Checking availability...';
+    msgEl.className = 'auth-field-msg checking';
+
+    usernameCheckTimers[msgElId] = setTimeout(async () => {
+        try {
+            let query = supabaseClient.from('profiles').select('id').ilike('username', value);
+            if (isDashboard && currentAuthSession?.user?.id) query = query.neq('id', currentAuthSession.user.id);
+            const { data, error } = await query.maybeSingle();
+            if (inputEl.value.trim() !== value) return; // ততক্ষণে ইউজার আরও টাইপ করেছে, পুরনো ফলাফল বাতিল
+            if (error) { msgEl.textContent = ''; msgEl.className = 'auth-field-msg'; return; }
+            if (data) {
+                msgEl.textContent = '✖ This username is already taken.';
+                msgEl.className = 'auth-field-msg taken';
+            } else {
+                msgEl.textContent = '✓ This username is available.';
+                msgEl.className = 'auth-field-msg available';
+            }
+        } catch (e) {
+            msgEl.textContent = '';
+            msgEl.className = 'auth-field-msg';
+        }
+    }, 450);
+}
+
+// ---------- Username suggestions (refresh icon, img6-style regenerate) ----------
+// শুধু lowercase letter/number রেখে বাকি সব বাদ দিয়ে একটা slug বানায়। খালি string ফেরত
+// দিতে পারে (fallback 'user' দেওয়া হয় না) যাতে caller বুঝতে পারে input আসলে খালি ছিল।
+function slugifyForUsername(name) {
+    return (name || '')
+        .toLowerCase()
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '') // accent বাদ দাও
+        .replace(/[^a-z0-9]+/g, '')
+        .slice(0, 14);
+}
+
+// Full Name আর Email এর মধ্যে মিল রেখে username এর বেস (mool অংশ) বানানো হয়:
+// - Full Name দেওয়া থাকলে সেটাই ব্যবহার হয়, যেমন "The Rain" -> "therain"
+// - Full Name খালি থাকলে Email এর @ চিহ্নের আগের অংশ ব্যবহার হয়, যেমন "john.doe@gmail.com" -> "johndoe"
+// - দুটোই খালি থাকলে খালি string ফেরত দেওয়া হয় (আর "user" এর মতো random fallback বসানো হয় না,
+//   যাতে Full Name/Email কিছু না দিলে username auto আসবে না)
+function getUsernameBase(fullName, email) {
+    const nameBase = slugifyForUsername(fullName);
+    if (nameBase) return nameBase;
+    const emailLocalPart = (email || '').split('@')[0];
+    return slugifyForUsername(emailLocalPart);
+}
+
+// বেস username (যেমন "therain") থেকে শুরু করে ক্রমান্বয়ে সংখ্যা যোগ করে (therain, therain1,
+// therain2, ...) প্রথম যেটা available পাওয়া যায় সেটা সাজেস্ট করে - এলোমেলো random সংখ্যার
+// বদলে predictable, নাম/ইমেইলের সাথে মিলযুক্ত username দেখানোর জন্য।
+// Full Name এবং Email দুটোই খালি থাকলে খালি string ('') ফেরত দেয় - অর্থাৎ কোনো suggestion দেয় না।
+async function generateAvailableUsername(fullName, excludeUserId, email) {
+    const base = getUsernameBase(fullName, email);
+    if (!base) return ''; // Full Name/Email কিছুই নেই - suggest করার মতো কিছু নেই
+    for (let suffix = 0; suffix <= 50; suffix++) {
+        let candidate = suffix === 0 ? base : (base + suffix);
+        candidate = candidate.slice(0, 20);
+        if (candidate.length < 3) candidate = (candidate + '000').slice(0, 3); // মিনিমাম ৩ ক্যারেক্টার
+        try {
+            let query = supabaseClient.from('profiles').select('id').ilike('username', candidate);
+            if (excludeUserId) query = query.neq('id', excludeUserId);
+            const { data } = await query.maybeSingle();
+            if (!data) return candidate;
+        } catch (e) {
+            return candidate; // চেক ব্যর্থ হলেও একটা সাজেশন দিয়ে দাও, সাবমিটের সময় আবার যাচাই হবেই
+        }
+    }
+    return (base + Date.now().toString().slice(-4)).slice(0, 20);
+}
+
+function suggestUsernameFromNameIfEmpty() {
+    const usernameInput = document.getElementById('signupUsername');
+    if (!usernameInput || usernameInput.value.trim()) return; // ইউজার নিজে কিছু লিখলে ওভাররাইট করবে না
+    const nameInput = document.getElementById('signupName');
+    const emailInput = document.getElementById('signupEmail');
+    // Full Name আর Email দুটোই খালি থাকলে auto-suggest করার কিছু নেই, চুপচাপ ফিরে যাও
+    if (!(nameInput?.value || '').trim() && !(emailInput?.value || '').trim()) return;
+    regenerateSignupUsername(null);
+}
+
+async function regenerateSignupUsername(btn) {
+    const nameInput = document.getElementById('signupName');
+    const emailInput = document.getElementById('signupEmail');
+    const usernameInput = document.getElementById('signupUsername');
+    const msgEl = document.getElementById('signupUsernameMsg');
+    if (!usernameInput) return;
+    // Full Name আর Email দুটোই খালি থাকলে suggest করার মতো কিছু নেই - "user123" এর মতো
+    // ভিত্তিহীন random নাম না বসিয়ে ইউজারকে জানিয়ে দাও
+    if (!(nameInput?.value || '').trim() && !(emailInput?.value || '').trim()) {
+        if (msgEl) { msgEl.textContent = 'Username সাজেস্ট করতে আগে Full Name অথবা Email লিখুন।'; msgEl.className = 'auth-field-msg'; }
+        return;
+    }
+    if (btn) btn.classList.add('spinning');
+    const suggestion = await generateAvailableUsername(nameInput?.value || '', null, emailInput?.value || '');
+    if (suggestion) {
+        usernameInput.value = suggestion;
+        checkUsernameLive(usernameInput, 'signupUsernameMsg');
+    }
+    if (btn) setTimeout(() => btn.classList.remove('spinning'), 300);
+}
+
+async function regenerateDashboardUsername(btn) {
+    const nameInput = document.getElementById('userDashFullNameInput');
+    const emailInput = document.getElementById('userDashEmail');
+    const usernameInput = document.getElementById('userDashUsernameInput');
+    const msgEl = document.getElementById('userDashUsernameMsg');
+    if (!usernameInput) return;
+    if (!(nameInput?.value || '').trim() && !(emailInput?.value || '').trim()) {
+        if (msgEl) { msgEl.textContent = 'Username সাজেস্ট করতে আগে Full Name অথবা Email লিখুন।'; msgEl.className = 'auth-field-msg'; }
+        return;
+    }
+    if (btn) btn.classList.add('spinning');
+    const suggestion = await generateAvailableUsername(nameInput?.value || '', currentAuthSession?.user?.id, emailInput?.value || '');
+    if (suggestion) {
+        usernameInput.value = suggestion;
+        checkUsernameLive(usernameInput, 'userDashUsernameMsg', true);
+    }
+    if (btn) setTimeout(() => btn.classList.remove('spinning'), 300);
+}
+
+// ---------- Password strength meter (Register form, img3-style) ----------
+function computePasswordStrength(pw) {
+    if (!pw) return 0;
+    let score = 0;
+    if (pw.length >= 6) score++;
+    if (pw.length >= 10) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+    return Math.min(score, 4);
+}
+const PW_STRENGTH_LABELS = ['Enter a password to check strength', 'Weak', 'Fair', 'Good', 'Strong'];
+const PW_STRENGTH_CLASSES = ['', 'on-weak', 'on-fair', 'on-good', 'on-strong'];
+function updateAuthPasswordStrength(pw) {
+    const track = document.getElementById('authPwStrengthTrack');
+    const label = document.getElementById('authPwStrengthLabel');
+    if (!track || !label) return;
+    const score = computePasswordStrength(pw);
+    const segs = track.querySelectorAll('.auth-pw-strength-seg');
+    segs.forEach((seg, i) => {
+        seg.className = 'auth-pw-strength-seg' + (i < score ? ' ' + PW_STRENGTH_CLASSES[score] : '');
+    });
+    label.textContent = pw ? PW_STRENGTH_LABELS[score] : PW_STRENGTH_LABELS[0];
+}
+
+async function handleSignIn() {
+    const identifier = (document.getElementById('signinEmail')?.value || '').trim();
+    const password = document.getElementById('signinPassword')?.value || '';
+    const msgEl = document.getElementById('authSigninMsg');
+    const btn = document.getElementById('signinSubmitBtn');
+    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'admin-form-msg'; }
+
+    if (!identifier || !password) {
+        if (msgEl) { msgEl.textContent = 'Please enter both Username/Email and Password.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Signing in...'; }
+    try {
+        const email = await resolveLoginEmail(identifier);
+        if (!email) {
+            if (msgEl) { msgEl.textContent = 'Incorrect Username or Password'; msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+            // Supabase নিরাপত্তার কারণে email/password এর মধ্যে কোনটা ভুল বলে না —
+            // তাই "Invalid login credentials" কে সহজ বাংলায় দেখানো হচ্ছে
+            const isBadCredentials = /invalid login credentials/i.test(error.message || '');
+            if (msgEl) {
+                msgEl.textContent = isBadCredentials ? 'Incorrect Username or Password' : error.message;
+                msgEl.className = 'admin-form-msg error';
+            }
+            return;
+        }
+        document.getElementById('signinEmail').value = '';
+        document.getElementById('signinPassword').value = '';
+        closeAuthModal(); // মোডাল বন্ধ হলে নিচের Home পেজ দেখা যাবে - Dashboard আর auto-open হবে না
+    } catch (e) {
+        if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Login'; }
+    }
+}
+
+async function handleSignUp() {
+    const fullName = (document.getElementById('signupName')?.value || '').trim();
+    const username = (document.getElementById('signupUsername')?.value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const email = (document.getElementById('signupEmail')?.value || '').trim();
+    const password = document.getElementById('signupPassword')?.value || '';
+    const confirmPassword = document.getElementById('signupPasswordConfirm')?.value || '';
+    const captchaInput = (document.getElementById('signupCaptchaInput')?.value || '').trim();
+    const msgEl = document.getElementById('authSignupMsg');
+    const btn = document.getElementById('signupSubmitBtn');
+    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'admin-form-msg'; }
+
+    if (!fullName || !username || !email || !password) {
+        if (msgEl) { msgEl.textContent = 'Please fill in Full Name, Username, Email and Password.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (fullName.length < 2 || fullName.length > 60 || !/^[a-zA-Z\u0980-\u09FF .'-]+$/.test(fullName)) {
+        if (msgEl) { msgEl.textContent = 'Please enter a valid Full Name.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    // Username এ শুধু lowercase অক্ষর, সংখ্যা আর আন্ডারস্কোর থাকতে পারবে — স্পেস বা বড় হাতের অক্ষর নয়
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+        if (msgEl) { msgEl.textContent = 'Username must be 3-20 characters: lowercase letters, numbers, and _ only (no spaces or capital letters).'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    // Email শুধুমাত্র পরিচিত provider (gmail, yahoo, outlook ইত্যাদি) থেকেই নেওয়া হবে —
+    // ভুয়া/এলোমেলো domain দিয়ে account খোলা আটকানোর জন্য
+    const ALLOWED_EMAIL_DOMAINS = [
+        'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'live.com',
+        'icloud.com', 'protonmail.com', 'proton.me', 'aol.com', 'msn.com', 'yandex.com'
+    ];
+    const emailDomain = email.toLowerCase().split('@')[1] || '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !ALLOWED_EMAIL_DOMAINS.includes(emailDomain)) {
+        if (msgEl) { msgEl.textContent = 'Please use a valid email from Gmail, Yahoo, Outlook, or another major provider.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (password.length < 6) {
+        if (msgEl) { msgEl.textContent = 'Password must be at least 6 characters.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (password !== confirmPassword) {
+        if (msgEl) { msgEl.textContent = 'Passwords do not match.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    // Captcha check - উপরে দেখানো সংখ্যার সাথে হুবহু মিলতে হবে
+    if (!captchaInput || captchaInput !== currentAuthCaptcha) {
+        if (msgEl) { msgEl.textContent = 'Please enter the code shown above correctly.'; msgEl.className = 'admin-form-msg error'; }
+        generateAuthCaptcha(); // ভুল হলে নতুন code দেখাও
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Creating account...'; }
+    try {
+        // একই username আগে থেকে কেউ নিয়ে থাকলে আটকে দাও (case-insensitive)
+        const { data: existingUser, error: checkErr } = await supabaseClient
+            .from('profiles')
+            .select('id')
+            .ilike('username', username)
+            .maybeSingle();
+        if (checkErr) console.error('Username check error:', checkErr);
+        if (existingUser) {
+            if (msgEl) { msgEl.textContent = 'This Username is already taken, please choose another.'; msgEl.className = 'admin-form-msg error'; }
+            generateAuthCaptcha();
+            return;
+        }
+
+        const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { username, full_name: fullName } }
+        });
+        if (error) {
+            const isUsernameConflict = /username_taken|Database error/i.test(error.message || '');
+            if (msgEl) {
+                msgEl.textContent = isUsernameConflict
+                    ? 'This Username is already taken, please choose another.'
+                    : error.message;
+                msgEl.className = 'admin-form-msg error';
+            }
+            generateAuthCaptcha();
+            return;
+        }
+
+        document.getElementById('signupName').value = '';
+        document.getElementById('signupUsername').value = '';
+        document.getElementById('signupEmail').value = '';
+        document.getElementById('signupPassword').value = '';
+        document.getElementById('signupPasswordConfirm').value = '';
+        generateAuthCaptcha();
+
+        if (data.session) {
+            // Supabase project-এ "Confirm email" বন্ধ থাকলে সাইনআপের সাথে সাথেই লগইন হয়ে যায়।
+            // Dashboard auto-open না করে Home পেজেই থাকতে দেওয়া হচ্ছে (মোডাল বন্ধ করলেই হয়)।
+            closeAuthModal();
+        } else {
+            if (msgEl) {
+                msgEl.textContent = 'Account created ✅ — please Sign In now.';
+                msgEl.className = 'admin-form-msg success';
+            }
+            switchAuthTab('signin');
+        }
+    } catch (e) {
+        if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
+        generateAuthCaptcha();
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Sign Up'; }
+    }
+}
+
+async function signOutUser() {
+    try {
+        await supabaseClient.auth.signOut();
+    } catch (e) {
+        console.error('Sign out error:', e);
+    }
+    // onAuthStateChange updateAuthUI(null) কল করবে, যেটা dashboard/admin panel বন্ধ করে দেবে
+}
+
+// Header-এর "Dashboard" বাটন — role অনুযায়ী Admin Panel বা সাধারণ User Dashboard খোলে
+function openDashboard() {
+    if (!currentAuthSession || !currentAuthSession.user) {
+        openAuthModal('signin');
+        return;
+    }
+    if (isCurrentUserAdmin(currentAuthSession)) {
+        openAdminPanel();
+    } else {
+        openUserDashboard();
+    }
+}
+
+function openUserDashboard() {
+    const overlay = document.getElementById('userDashboardOverlay');
+    if (!overlay || !currentAuthSession?.user) return;
+
+    const usernameInput = document.getElementById('userDashUsernameInput');
+    const emailEl = document.getElementById('userDashEmail');
+    const joinedEl = document.getElementById('userDashJoined');
+    const avatarEl = document.getElementById('userDashAvatarPreview');
+    const fullNameInput = document.getElementById('userDashFullNameInput');
+    if (usernameInput) usernameInput.value = getDisplayUsername(currentAuthSession);
+    if (emailEl) emailEl.value = currentAuthSession.user.email;
+    if (fullNameInput) fullNameInput.value = currentAuthSession.user.user_metadata?.full_name || '';
+    const usernameMsgEl = document.getElementById('userDashUsernameMsg');
+    if (usernameMsgEl) { usernameMsgEl.textContent = ''; usernameMsgEl.className = 'auth-field-msg'; }
+    if (joinedEl) {
+        const created = currentAuthSession.user.created_at ? new Date(currentAuthSession.user.created_at) : null;
+        joinedEl.textContent = created ? created.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    }
+    if (avatarEl) avatarEl.src = DEFAULT_AVATAR_PLACEHOLDER;
+    overlay.style.display = 'flex';
+    document.body.classList.add('modal-open');
+    setDashboardUrlParam(); // page refresh দিলেও এই ড্যাশবোর্ডেই থাকবে, home এ চলে যাবে না
+
+    switchUserTab('profile');
+    loadUserProfileExtras(); // avatar_url নিয়ে আসে (profiles টেবিল থেকে)
+    ['userProfileMsg', 'userAvatarMsg', 'userPasswordMsg'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.className = 'admin-form-msg'; }
+    });
+    const oldPassEl = document.getElementById('userOldPasswordInput');
+    const newPassEl = document.getElementById('userNewPasswordInput');
+    const confirmPassEl = document.getElementById('userConfirmPasswordInput');
+    if (oldPassEl) oldPassEl.value = '';
+    if (newPassEl) newPassEl.value = '';
+    if (confirmPassEl) confirmPassEl.value = '';
+}
+function closeUserDashboard() {
+    const overlay = document.getElementById('userDashboardOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    clearDashboardUrlParam();
+}
+
+// ---------- User Dashboard: tab switching (Profile / Favorites / My Requests / Security) ----------
+
+const USER_TAB_TITLES = { profile: 'Profile', favorites: 'Favorites', requests: 'My Requests', downloads: 'Download History' };
+
+function switchUserTab(tab) {
+    const tabs = ['profile', 'favorites', 'requests', 'downloads'];
+    const validTab = tabs.includes(tab) ? tab : 'profile';
+
+    tabs.forEach(function (t) {
+        const content = document.getElementById('userTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const navBtn = document.getElementById('userNavBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (content) content.style.display = (t === validTab) ? 'block' : 'none';
+        if (navBtn) navBtn.classList.toggle('active', t === validTab);
+    });
+
+    const titleEl = document.getElementById('userDashTopbarTitle');
+    if (titleEl) titleEl.textContent = USER_TAB_TITLES[validTab] || 'Profile';
+
+    if (validTab === 'favorites') {
+        fetchUserFavorites().then(() => {
+            const searchInput = document.getElementById('userFavoriteSearchInput');
+            renderUserFavoritesList(searchInput ? searchInput.value.trim() : '');
+        });
+    } else if (validTab === 'requests') {
+        fetchUserRequests().then(() => {
+            const searchInput = document.getElementById('userRequestSearchInput');
+            renderUserRequestsList(searchInput ? searchInput.value.trim() : '');
+        });
+    } else if (validTab === 'downloads') {
+        fetchUserDownloadHistory().then(() => {
+            const searchInput = document.getElementById('userDownloadSearchInput');
+            renderUserDownloadsList(searchInput ? searchInput.value.trim() : '');
+        });
+    }
+}
+
+// ---------- Profile tab: load avatar_url + keep username input in sync with profiles table ----------
+
+async function loadUserProfileExtras() {
+    if (!currentAuthSession?.user) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('profiles')
+            .select('username, avatar_url, full_name')
+            .eq('id', currentAuthSession.user.id)
+            .maybeSingle();
+
+        if (error) { console.error('Error loading profile:', error.message); return; }
+
+        const avatarEl = document.getElementById('userDashAvatarPreview');
+        if (avatarEl) avatarEl.src = (data && data.avatar_url) ? data.avatar_url : DEFAULT_AVATAR_PLACEHOLDER;
+
+        const usernameInput = document.getElementById('userDashUsernameInput');
+        if (usernameInput && data && data.username) usernameInput.value = data.username;
+
+        const fullNameInput = document.getElementById('userDashFullNameInput');
+        if (fullNameInput && data && data.full_name) fullNameInput.value = data.full_name;
+
+        myCommentIdentityCache = null; // ফ্রেশ ডেটা এলো, comment composer এর cache invalidate করে দাও
+    } catch (e) {
+        console.error('Unexpected error loading profile:', e);
+    }
+}
+
+// ---------- Profile edit/update (full name + username + profiles table sync) ----------
+
+async function handleUpdateProfile() {
+    const msgEl = document.getElementById('userProfileMsg');
+    const usernameInput = document.getElementById('userDashUsernameInput');
+    const fullNameInput = document.getElementById('userDashFullNameInput');
+    const newUsername = (usernameInput?.value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const newFullName = (fullNameInput?.value || '').trim();
+    if (usernameInput) usernameInput.value = newUsername;
+
+    if (!currentAuthSession?.user) return;
+    if (!newFullName || newFullName.length < 2 || newFullName.length > 60 || !/^[a-zA-Z\u0980-\u09FF .'-]+$/.test(newFullName)) {
+        if (msgEl) { msgEl.textContent = 'Please enter a valid Full Name.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (!newUsername) {
+        if (msgEl) { msgEl.textContent = 'Username cannot be empty.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    // Username এ শুধু lowercase অক্ষর, সংখ্যা আর আন্ডারস্কোর থাকতে পারবে — স্পেস বা বড় হাতের অক্ষর নয়
+    if (!/^[a-z0-9_]{3,20}$/.test(newUsername)) {
+        if (msgEl) { msgEl.textContent = 'Username must be 3-20 characters: lowercase letters, numbers, and _ only (no spaces or capital letters).'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (msgEl) { msgEl.textContent = 'Saving...'; msgEl.className = 'admin-form-msg'; }
+
+    try {
+        // একই username (case-insensitive) অন্য কেউ আগে থেকে নিয়ে রেখেছে কিনা চেক করে নাও
+        const { data: existing, error: checkError } = await supabaseClient
+            .from('profiles')
+            .select('id')
+            .ilike('username', newUsername)
+            .neq('id', currentAuthSession.user.id)
+            .maybeSingle();
+
+        if (checkError) throw checkError;
+        if (existing) {
+            if (msgEl) { msgEl.textContent = 'This username is already taken.'; msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+
+        const { error: profileError } = await supabaseClient
+            .from('profiles')
+            .update({ username: newUsername, full_name: newFullName })
+            .eq('id', currentAuthSession.user.id);
+        if (profileError) throw profileError;
+
+        const { data: updatedUser, error: authError } = await supabaseClient.auth.updateUser({ data: { username: newUsername, full_name: newFullName } });
+        if (authError) throw authError;
+
+        if (updatedUser?.user) {
+            currentAuthSession = { ...currentAuthSession, user: updatedUser.user };
+            updateAuthUI(currentAuthSession);
+        }
+
+        const usernameMsgEl = document.getElementById('userDashUsernameMsg');
+        if (usernameMsgEl) { usernameMsgEl.textContent = ''; usernameMsgEl.className = 'auth-field-msg'; }
+
+        if (msgEl) { msgEl.textContent = 'Profile updated successfully ✅'; msgEl.className = 'admin-form-msg success'; }
+    } catch (err) {
+        console.error('Update profile error:', err);
+        if (msgEl) { msgEl.textContent = '❌ Could not update profile: ' + (err?.message || 'Unknown error'); msgEl.className = 'admin-form-msg error'; }
+    }
+}
+
+// ---------- Profile picture upload (Supabase Storage: "avatars" bucket) ----------
+
+document.addEventListener('DOMContentLoaded', function () {
+    const avatarInput = document.getElementById('userAvatarFileInput');
+    if (avatarInput) {
+        avatarInput.addEventListener('change', function () {
+            const file = this.files && this.files[0];
+            this.value = ''; // একই ফাইল আবার সিলেক্ট করলেও change event যেন আবার ফায়ার হয়
+            if (file) openAvatarCropper(file);
+        });
+    }
+});
+
+async function uploadAvatarFile(file) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const fileName = `avatar_${currentAuthSession.user.id}_${Date.now()}.${ext}`;
+
+    const { error } = await supabaseClient.storage.from(AVATAR_BUCKET).upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || undefined
+    });
+
+    if (error) {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('bucket not found')) {
+            throw new Error(`Storage bucket "${AVATAR_BUCKET}" does not exist in Supabase. See user-dashboard-schema.sql for setup steps.`);
+        }
+        if (msg.includes('row-level security') || msg.includes('policy') || msg.includes('permission') || msg.includes('unauthorized')) {
+            throw new Error(`Upload blocked by Supabase Storage policy. See user-dashboard-schema.sql for the required policies.`);
+        }
+        throw error;
+    }
+
+    const { data } = supabaseClient.storage.from(AVATAR_BUCKET).getPublicUrl(fileName);
+    if (!data || !data.publicUrl) {
+        throw new Error('Upload succeeded but no public URL was returned. Check that the "avatars" bucket is set to Public.');
+    }
+    return data.publicUrl;
+}
+
+async function handleAvatarChange(file) {
+    const msgEl = document.getElementById('userAvatarMsg');
+    const avatarEl = document.getElementById('userDashAvatarPreview');
+    if (!currentAuthSession?.user) return;
+
+    if (!file.type || !file.type.startsWith('image/')) {
+        if (msgEl) { msgEl.textContent = 'Please choose an image file.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+
+    if (msgEl) { msgEl.textContent = 'Uploading...'; msgEl.className = 'admin-form-msg'; }
+
+    try {
+        const publicUrl = await uploadAvatarFile(file);
+
+        const { error } = await supabaseClient
+            .from('profiles')
+            .update({ avatar_url: publicUrl })
+            .eq('id', currentAuthSession.user.id);
+        if (error) throw error;
+
+        if (avatarEl) avatarEl.src = publicUrl;
+        myCommentIdentityCache = null; // নতুন ছবি সেভ হলো, comment identity cache বাতিল করো — যাতে পরের কমেন্টেই নতুন ছবি ব্যবহার হয়, লগআউট করা না লাগে
+        if (commentsCurrentMovieId !== null && commentsCurrentMovieId !== undefined) renderCommentComposer(); // comment box খোলা থাকলে সাথে সাথেই নতুন ছবি বসিয়ে দাও
+        if (msgEl) { msgEl.textContent = 'Profile picture updated ✅'; msgEl.className = 'admin-form-msg success'; }
+    } catch (err) {
+        console.error('Avatar upload error:', err);
+        if (msgEl) { msgEl.textContent = '❌ ' + (err?.message || 'Could not upload profile picture'); msgEl.className = 'admin-form-msg error'; }
+    }
+}
+
+// ---------- Facebook-style avatar cropper (zoom + drag, circular crop) ----------
+// ফাইল সিলেক্ট করার সাথে সাথে সরাসরি আপলোড না করে আগে এই মোডালে zoom in/out আর drag করে
+// পজিশন ঠিক করে নেওয়া যায়, তারপর Save চাপলে গোল আকারে crop হয়ে আপলোড হয়।
+const avatarCrop = {
+    naturalW: 0, naturalH: 0, coverScale: 1, stageSize: 0,
+    panX: 0, panY: 0, zoom: 1,
+    dragging: false, startClientX: 0, startClientY: 0, startPanX: 0, startPanY: 0
+};
+
+function openAvatarCropper(file) {
+    if (!file.type || !file.type.startsWith('image/')) {
+        const msgEl = document.getElementById('userAvatarMsg');
+        if (msgEl) { msgEl.textContent = 'Please choose an image file.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        const img = document.getElementById('avatarCropImg');
+        const overlay = document.getElementById('avatarCropOverlay');
+        const zoomSlider = document.getElementById('avatarCropZoomSlider');
+        if (!img || !overlay) return;
+        img.onload = function () {
+            const stage = document.getElementById('avatarCropStage');
+            avatarCrop.naturalW = img.naturalWidth;
+            avatarCrop.naturalH = img.naturalHeight;
+            avatarCrop.stageSize = stage.clientWidth || 300;
+            avatarCrop.coverScale = Math.max(avatarCrop.stageSize / avatarCrop.naturalW, avatarCrop.stageSize / avatarCrop.naturalH);
+            avatarCrop.zoom = 1;
+            avatarCrop.panX = (avatarCrop.stageSize - avatarCrop.naturalW * avatarCrop.coverScale) / 2;
+            avatarCrop.panY = (avatarCrop.stageSize - avatarCrop.naturalH * avatarCrop.coverScale) / 2;
+            if (zoomSlider) zoomSlider.value = 100;
+            applyAvatarCropTransform();
+        };
+        img.src = e.target.result;
+        avatarCrop._pendingFile = file;
+        overlay.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    };
+    reader.readAsDataURL(file);
+}
+
+function closeAvatarCropper() {
+    const overlay = document.getElementById('avatarCropOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    avatarCrop._pendingFile = null;
+}
+
+function clampAvatarPan() {
+    const w = avatarCrop.naturalW * avatarCrop.coverScale * avatarCrop.zoom;
+    const h = avatarCrop.naturalH * avatarCrop.coverScale * avatarCrop.zoom;
+    const minX = avatarCrop.stageSize - w, minY = avatarCrop.stageSize - h;
+    avatarCrop.panX = Math.min(0, Math.max(minX, avatarCrop.panX));
+    avatarCrop.panY = Math.min(0, Math.max(minY, avatarCrop.panY));
+}
+
+function applyAvatarCropTransform() {
+    clampAvatarPan();
+    const img = document.getElementById('avatarCropImg');
+    if (!img) return;
+    const w = avatarCrop.naturalW * avatarCrop.coverScale * avatarCrop.zoom;
+    const h = avatarCrop.naturalH * avatarCrop.coverScale * avatarCrop.zoom;
+    img.style.width = w + 'px';
+    img.style.height = h + 'px';
+    img.style.transform = `translate(${avatarCrop.panX}px, ${avatarCrop.panY}px)`;
+}
+
+// slider 100-300 => zoom 1x - 3x; zoom বদলালে center point ঠিক রাখতে pan সমানুপাতিক হারে adjust করা হয়
+function setAvatarZoom(newZoom) {
+    newZoom = Math.min(3, Math.max(1, newZoom));
+    const oldZoom = avatarCrop.zoom;
+    const cx = avatarCrop.stageSize / 2, cy = avatarCrop.stageSize / 2;
+    avatarCrop.panX = cx - ((cx - avatarCrop.panX) / oldZoom) * newZoom;
+    avatarCrop.panY = cy - ((cy - avatarCrop.panY) / oldZoom) * newZoom;
+    avatarCrop.zoom = newZoom;
+    const zoomSlider = document.getElementById('avatarCropZoomSlider');
+    if (zoomSlider) zoomSlider.value = Math.round(newZoom * 100);
+    applyAvatarCropTransform();
+}
+
+// − / + বাটনে ক্লিক করলে ধাপে ধাপে zoom in/out করে (slider drag না করেও)
+function stepAvatarZoom(deltaPercent) {
+    setAvatarZoom(avatarCrop.zoom + deltaPercent / 100);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const zoomSlider = document.getElementById('avatarCropZoomSlider');
+    const stage = document.getElementById('avatarCropStage');
+    if (zoomSlider) {
+        zoomSlider.addEventListener('input', function () {
+            setAvatarZoom(Number(this.value) / 100);
+        });
+    }
+    if (stage) {
+        const startDrag = (clientX, clientY) => {
+            avatarCrop.dragging = true;
+            avatarCrop.startClientX = clientX;
+            avatarCrop.startClientY = clientY;
+            avatarCrop.startPanX = avatarCrop.panX;
+            avatarCrop.startPanY = avatarCrop.panY;
+            stage.classList.add('dragging');
+        };
+        const moveDrag = (clientX, clientY) => {
+            if (!avatarCrop.dragging) return;
+            avatarCrop.panX = avatarCrop.startPanX + (clientX - avatarCrop.startClientX);
+            avatarCrop.panY = avatarCrop.startPanY + (clientY - avatarCrop.startClientY);
+            applyAvatarCropTransform();
+        };
+        const endDrag = () => { avatarCrop.dragging = false; stage.classList.remove('dragging'); };
+
+        stage.addEventListener('mousedown', e => { startDrag(e.clientX, e.clientY); e.preventDefault(); });
+        window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+        window.addEventListener('mouseup', endDrag);
+
+        stage.addEventListener('touchstart', e => { const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: true });
+        stage.addEventListener('touchmove', e => { const t = e.touches[0]; moveDrag(t.clientX, t.clientY); }, { passive: true });
+        stage.addEventListener('touchend', endDrag);
+    }
+});
+
+async function saveAvatarCrop() {
+    const file = avatarCrop._pendingFile;
+    if (!file) return;
+    const saveBtn = document.getElementById('avatarCropSaveBtn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    try {
+        const img = document.getElementById('avatarCropImg');
+        const OUT = 400; // আউটপুট গোল ছবির সাইজ (px)
+        const canvas = document.createElement('canvas');
+        canvas.width = OUT; canvas.height = OUT;
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath();
+        ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip(); // গোল আকারে ক্লিপ করে রাখা, বাইরের অংশ transparent থাকবে
+
+        const displayScale = avatarCrop.coverScale * avatarCrop.zoom;
+        const sourceX = -avatarCrop.panX / displayScale;
+        const sourceY = -avatarCrop.panY / displayScale;
+        const sourceSize = avatarCrop.stageSize / displayScale;
+        ctx.drawImage(img, sourceX, sourceY, sourceSize, sourceSize, 0, 0, OUT, OUT);
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.92));
+        if (!blob) throw new Error('Could not process the image, please try another photo.');
+        const croppedFile = new File([blob], 'avatar.png', { type: 'image/png' });
+
+        closeAvatarCropper();
+        await handleAvatarChange(croppedFile);
+    } catch (err) {
+        console.error('Avatar crop error:', err);
+        const msgEl = document.getElementById('userAvatarMsg');
+        if (msgEl) { msgEl.textContent = '❌ ' + (err?.message || 'Could not process the image'); msgEl.className = 'admin-form-msg error'; }
+        closeAvatarCropper();
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+    }
+}
+
+// ---------- Change Password ----------
+
+async function handleChangePassword() {
+    const msgEl = document.getElementById('userPasswordMsg');
+    const oldPass = document.getElementById('userOldPasswordInput')?.value || '';
+    const newPass = document.getElementById('userNewPasswordInput')?.value || '';
+    const confirmPass = document.getElementById('userConfirmPasswordInput')?.value || '';
+
+    if (!oldPass) {
+        if (msgEl) { msgEl.textContent = 'Please enter your old password.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (newPass.length < 6) {
+        if (msgEl) { msgEl.textContent = 'New password must be at least 6 characters.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (newPass !== confirmPass) {
+        if (msgEl) { msgEl.textContent = 'New passwords do not match.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (!currentAuthSession?.user?.email) return;
+
+    if (msgEl) { msgEl.textContent = 'Verifying old password...'; msgEl.className = 'admin-form-msg'; }
+    try {
+        // আগে old password টা ঠিক কিনা যাচাই করে নাও — ভুল হলে password change হবে না
+        const { error: verifyError } = await supabaseClient.auth.signInWithPassword({
+            email: currentAuthSession.user.email,
+            password: oldPass
+        });
+        if (verifyError) {
+            if (msgEl) { msgEl.textContent = '❌ Old password is incorrect.'; msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+
+        if (msgEl) { msgEl.textContent = 'Updating...'; msgEl.className = 'admin-form-msg'; }
+        const { error } = await supabaseClient.auth.updateUser({ password: newPass });
+        if (error) throw error;
+
+        if (msgEl) { msgEl.textContent = 'Password updated successfully ✅'; msgEl.className = 'admin-form-msg success'; }
+        document.getElementById('userOldPasswordInput').value = '';
+        document.getElementById('userNewPasswordInput').value = '';
+        document.getElementById('userConfirmPasswordInput').value = '';
+    } catch (err) {
+        console.error('Change password error:', err);
+        if (msgEl) { msgEl.textContent = '❌ ' + (err?.message || 'Could not update password'); msgEl.className = 'admin-form-msg error'; }
+    }
+}
+
+// ==================== FAVORITES / WATCHLIST ====================
+
+let userFavoriteIds = new Set();   // দ্রুত heart আইকন দেখানোর জন্য শুধু movie_id গুলো ক্যাশ করা থাকে
+let userFavoritesFull = [];        // Favorites ট্যাবে পুরো লিস্ট দেখানোর জন্য (title/poster/type সহ)
+let lastUserFavoritesFetchError = null;
+
+function isMovieFavorited(movieId) {
+    return movieId !== undefined && movieId !== null && userFavoriteIds.has(String(movieId));
+}
+
+// সাইন-ইন করার সাথে সাথেই শুধু id গুলো লোড করে নেয় (movie grid/modal এ heart আইকন ঠিকমতো দেখানোর জন্য)
+async function loadUserFavoriteIds() {
+    if (!currentAuthSession?.user) { userFavoriteIds = new Set(); return; }
+    try {
+        const { data, error } = await supabaseClient
+            .from('favorites')
+            .select('movie_id')
+            .eq('user_id', currentAuthSession.user.id);
+        if (error) { console.error('Error loading favorite ids:', error.message); return; }
+        userFavoriteIds = new Set((data || []).map(row => String(row.movie_id)));
+    } catch (e) {
+        console.error('Unexpected error loading favorite ids:', e);
+    }
+}
+
+async function fetchUserFavorites() {
+    if (!currentAuthSession?.user) { userFavoritesFull = []; return; }
+    try {
+        const { data, error } = await supabaseClient
+            .from('favorites')
+            .select('*')
+            .eq('user_id', currentAuthSession.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching favorites:', error.message);
+            lastUserFavoritesFetchError = error.message;
+            userFavoritesFull = [];
+            return;
+        }
+        lastUserFavoritesFetchError = null;
+        userFavoritesFull = data || [];
+    } catch (err) {
+        console.error('Unexpected error loading favorites:', err);
+        lastUserFavoritesFetchError = err?.message || 'Unknown error';
+        userFavoritesFull = [];
+    }
+}
+
+// হার্ট বাটনে ক্লিক করলে (movie card বা modal থেকে) favorite যোগ/মুছে ফেলে
+async function toggleFavoriteMovie(movie, btnEl) {
+    if (!currentAuthSession?.user) {
+        openAuthModal('signin');
+        return;
+    }
+    if (!movie || movie.id === undefined || movie.id === null) return;
+
+    const movieIdStr = String(movie.id);
+    const alreadyFav = isMovieFavorited(movieIdStr);
+
+    try {
+        if (alreadyFav) {
+            const { error } = await supabaseClient
+                .from('favorites')
+                .delete()
+                .eq('user_id', currentAuthSession.user.id)
+                .eq('movie_id', movieIdStr);
+            if (error) throw error;
+            userFavoriteIds.delete(movieIdStr);
+        } else {
+            const { error } = await supabaseClient
+                .from('favorites')
+                .insert([{
+                    user_id: currentAuthSession.user.id,
+                    movie_id: movieIdStr,
+                    movie_title: movie.title || null,
+                    movie_poster: movie.poster || null,
+                    movie_type: movie.tmdbType || 'movie',
+                    movie_year: movie.year || null
+                }]);
+            if (error) throw error;
+            userFavoriteIds.add(movieIdStr);
+        }
+
+        // যেকোনো heart বাটন (card বা modal) এই মুভির জন্য থাকলে সাথে সাথেই আপডেট করে দাও
+        const nowFav = isMovieFavorited(movieIdStr);
+        if (btnEl) {
+            btnEl.classList.toggle('active', nowFav);
+            if (btnEl.id === 'modalFavoriteBtn') {
+                btnEl.textContent = nowFav ? '❤️ In Favorites' : '🤍 Add to Favorites';
+                btnEl.title = '';
+            } else {
+                btnEl.textContent = nowFav ? '❤️' : '🤍';
+                btnEl.title = nowFav ? 'Remove from Favorites' : 'Add to Favorites';
+            }
+        }
+    } catch (err) {
+        console.error('Toggle favorite error:', err);
+        showNoticeModal('❌ Could not update favorites: ' + (err?.message || 'Unknown error'));
+    }
+}
+
+function renderUserFavoritesList(filter) {
+    const container = document.getElementById('userFavoritesList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (lastUserFavoritesFetchError) {
+        container.innerHTML = `<div class="admin-db-empty" style="color:#f87171;">⚠️ Could not load favorites (${escapeHtml(lastUserFavoritesFetchError)}).</div>`;
+        return;
+    }
+
+    const q = (filter || '').trim().toLowerCase();
+    const source = (Array.isArray(userFavoritesFull) ? userFavoritesFull : []).filter(f =>
+        !q || (f.movie_title || '').toLowerCase().includes(q)
+    );
+
+    if (source.length === 0) {
+        container.innerHTML = `<div class="admin-db-empty">${q ? 'No matching favorites found.' : 'You have not added any favorites yet. Tap the 🤍 icon on any title to save it here.'}</div>`;
+        return;
+    }
+
+    source.forEach(fav => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card';
+        const typeLabel = fav.movie_type === 'tv' ? 'TV Series' : 'Movie';
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${fav.movie_poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info admin-db-info-clickable">
+                <div class="admin-db-title">${escapeHtml(fav.movie_title || 'Untitled')}${fav.movie_year ? ` (${escapeHtml(String(fav.movie_year))})` : ''}</div>
+                <div class="admin-db-meta">${typeLabel}</div>
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-db-delete-btn">🗑 Remove</button>
+            </div>
+        `;
+        const liveMovie = Array.isArray(allMovies) ? allMovies.find(m => String(m.id) === String(fav.movie_id)) : null;
+
+        // যখন favorite করার সময় poster সেভ হয়নি (movie.poster খালি ছিল, TMDB থেকে live আসতো),
+        // তখন এখানে সেই একই মুভির জন্য TMDB থেকে আবার poster টা এনে thumbnail বসিয়ে দাও
+        if (!fav.movie_poster && liveMovie) {
+            const imgEl = card.querySelector('.admin-db-thumb');
+            if (liveMovie.poster) {
+                if (imgEl) imgEl.src = liveMovie.poster;
+            } else {
+                fetchTmdbPosterQuick(liveMovie).then(url => {
+                    if (url && imgEl && imgEl.isConnected) imgEl.src = url;
+                });
+            }
+        }
+
+        card.querySelector('.admin-db-info').addEventListener('click', () => {
+            if (liveMovie) {
+                closeUserDashboard();
+                openMovieModal(liveMovie);
+            } else {
+                showNoticeModal('This title is no longer available on the site.');
+            }
+        });
+        card.querySelector('.admin-db-delete-btn').addEventListener('click', async () => {
+            try {
+                const { error } = await supabaseClient
+                    .from('favorites')
+                    .delete()
+                    .eq('user_id', currentAuthSession.user.id)
+                    .eq('movie_id', fav.movie_id);
+                if (error) throw error;
+                userFavoriteIds.delete(String(fav.movie_id));
+                userFavoritesFull = userFavoritesFull.filter(f => f.id !== fav.id);
+                const searchInput = document.getElementById('userFavoriteSearchInput');
+                renderUserFavoritesList(searchInput ? searchInput.value.trim() : '');
+            } catch (err) {
+                console.error('Remove favorite error:', err);
+                showNoticeModal('❌ Could not remove favorite: ' + (err?.message || 'Unknown error'));
+            }
+        });
+        container.appendChild(card);
+    });
+}
+
+// ==================== MY REQUESTS (একজন ইউজারের নিজের করা movie/series request গুলো) ====================
+
+let userRequestsFull = [];
+let lastUserRequestsFetchError = null;
+
+async function fetchUserRequests() {
+    if (!currentAuthSession?.user) { userRequestsFull = []; return; }
+    try {
+        const { data, error } = await supabaseClient
+            .from('requests')
+            .select('*')
+            .eq('user_id', currentAuthSession.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching my requests:', error.message);
+            lastUserRequestsFetchError = error.message;
+            userRequestsFull = [];
+            return;
+        }
+        lastUserRequestsFetchError = null;
+        userRequestsFull = data || [];
+    } catch (err) {
+        console.error('Unexpected error loading my requests:', err);
+        lastUserRequestsFetchError = err?.message || 'Unknown error';
+        userRequestsFull = [];
+    }
+}
+
+function renderUserRequestsList(filter) {
+    const container = document.getElementById('userRequestsList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (lastUserRequestsFetchError) {
+        container.innerHTML = `<div class="admin-db-empty" style="color:#f87171;">⚠️ Could not load your requests (${escapeHtml(lastUserRequestsFetchError)}).</div>`;
+        return;
+    }
+
+    const q = (filter || '').trim().toLowerCase();
+    const source = (Array.isArray(userRequestsFull) ? userRequestsFull : []).filter(r =>
+        !q || (r.movie_title || '').toLowerCase().includes(q)
+    );
+
+    if (source.length === 0) {
+        container.innerHTML = `<div class="admin-db-empty">${q ? 'No matching requests found.' : 'You have not requested any movie/series yet. Use the "Request Here" widget to submit one.'}</div>`;
+        return;
+    }
+
+    source.forEach(reqItem => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card';
+        const timeAgo = formatTimeAgo(reqItem.created_at) || '';
+        const yearPart = reqItem.release_year ? ` (${escapeHtml(String(reqItem.release_year))})` : '';
+        const alreadyOnSite = !!findMatchingMovieForRequest(reqItem.movie_title);
+        const liveMovie = alreadyOnSite ? allMovies.find(m => {
+            const normalize = (s) => String(s || '').toLowerCase().replace(/\(\d{4}(-\d{2,4})?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+            return normalize(m.title) === normalize(reqItem.movie_title);
+        }) : null;
+        card.innerHTML = `
+            <div class="admin-db-info${alreadyOnSite ? ' admin-db-info-clickable' : ''}">
+                <div class="admin-db-title">${escapeHtml(reqItem.movie_title || 'Untitled')}${yearPart}</div>
+                <div class="admin-alert-meta-row">${alreadyOnSite ? '<span class="admin-alert-source-tag auto">✅ Already on Site</span>' : '<span class="admin-alert-source-tag">⏳ Pending</span>'}<span class="admin-alert-time">${timeAgo}</span></div>
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-db-delete-btn">🗑 Remove</button>
+            </div>
+        `;
+        // অ্যাডমিন যদি এই রিকোয়েস্ট করা মুভি/সিরিজটা ইতিমধ্যে সাইটে আপলোড করে দিয়ে থাকে, তাহলে ক্লিক করলেই সরাসরি সেটা ওপেন হয়ে যাবে
+        if (alreadyOnSite && liveMovie) {
+            card.querySelector('.admin-db-info').addEventListener('click', () => {
+                closeUserDashboard();
+                openMovieModal(liveMovie);
+            });
+        }
+        card.querySelector('.admin-db-delete-btn').addEventListener('click', () => deleteUserRequest(reqItem));
+        container.appendChild(card);
+    });
+}
+
+// নিজের করা request নিজেই dashboard থেকে remove করতে পারে
+async function deleteUserRequest(reqItem) {
+    if (!reqItem || !reqItem.id || !currentAuthSession?.user) return;
+    try {
+        const { error } = await supabaseClient
+            .from('requests')
+            .delete()
+            .eq('id', reqItem.id)
+            .eq('user_id', currentAuthSession.user.id);
+        if (error) throw error;
+        userRequestsFull = userRequestsFull.filter(r => r.id !== reqItem.id);
+        const searchInput = document.getElementById('userRequestSearchInput');
+        renderUserRequestsList(searchInput ? searchInput.value.trim() : '');
+    } catch (err) {
+        console.error('Delete my request error:', err);
+        showNoticeModal('❌ Could not remove request: ' + (err?.message || 'Unknown error'));
+    }
+}
+
+// ==================== DOWNLOAD HISTORY (লগইন করা ইউজার যা যা ডাউনলোড করেছে তার লিস্ট) ====================
+// প্রতিবার "Download ..." বাটনে ক্লিক করলে download_history টেবিলে একটা রো সেভ হয় (শুধু লগইন করা থাকলে)।
+// ইউজার নিজের Dashboard > Download History ট্যাব থেকে পুরো লিস্ট দেখতে এবং যেকোনো এন্ট্রি নিজে মুছে ফেলতে পারবে।
+
+let userDownloadsFull = [];
+let lastUserDownloadsFetchError = null;
+
+function logDownloadHistory(movie, linkLabel) {
+    if (!currentAuthSession?.user || !movie || movie.id === undefined || movie.id === null) return;
+    supabaseClient.from('download_history').insert([{
+        user_id: currentAuthSession.user.id,
+        movie_id: String(movie.id),
+        movie_title: movie.title || null,
+        movie_poster: movie.poster || null,
+        movie_type: movie.tmdbType || 'movie',
+        movie_year: movie.year || null,
+        link_label: linkLabel || null
+    }]).then(({ error }) => {
+        if (error) console.error('Download history save error:', error.message);
+    });
+}
+
+async function fetchUserDownloadHistory() {
+    if (!currentAuthSession?.user) { userDownloadsFull = []; return; }
+    try {
+        const { data, error } = await supabaseClient
+            .from('download_history')
+            .select('*')
+            .eq('user_id', currentAuthSession.user.id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching download history:', error.message);
+            lastUserDownloadsFetchError = error.message;
+            userDownloadsFull = [];
+            return;
+        }
+        lastUserDownloadsFetchError = null;
+        userDownloadsFull = data || [];
+    } catch (err) {
+        console.error('Unexpected error loading download history:', err);
+        lastUserDownloadsFetchError = err?.message || 'Unknown error';
+        userDownloadsFull = [];
+    }
+}
+
+function renderUserDownloadsList(filter) {
+    const container = document.getElementById('userDownloadsList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (lastUserDownloadsFetchError) {
+        container.innerHTML = `<div class="admin-db-empty" style="color:#f87171;">⚠️ Could not load download history (${escapeHtml(lastUserDownloadsFetchError)}).</div>`;
+        return;
+    }
+
+    const q = (filter || '').trim().toLowerCase();
+    const source = (Array.isArray(userDownloadsFull) ? userDownloadsFull : []).filter(d =>
+        !q || (d.movie_title || '').toLowerCase().includes(q)
+    );
+
+    if (source.length === 0) {
+        container.innerHTML = `<div class="admin-db-empty">${q ? 'No matching downloads found.' : 'You have not downloaded anything yet. Titles you download will show up here.'}</div>`;
+        return;
+    }
+
+    source.forEach(dl => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card';
+        const typeLabel = dl.movie_type === 'tv' ? 'TV Series' : 'Movie';
+        const timeAgo = formatTimeAgo(dl.created_at) || '';
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${dl.movie_poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info admin-db-info-clickable">
+                <div class="admin-db-title">${escapeHtml(dl.movie_title || 'Untitled')}${dl.movie_year ? ` (${escapeHtml(String(dl.movie_year))})` : ''}</div>
+                <div class="admin-db-meta">${typeLabel}${dl.link_label ? ' · ' + escapeHtml(dl.link_label) : ''}</div>
+                <div class="admin-alert-meta-row"><span class="admin-alert-time">${timeAgo}</span></div>
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-db-delete-btn">🗑 Remove</button>
+            </div>
+        `;
+        const liveMovie = Array.isArray(allMovies) ? allMovies.find(m => String(m.id) === String(dl.movie_id)) : null;
+
+        if (!dl.movie_poster && liveMovie) {
+            const imgEl = card.querySelector('.admin-db-thumb');
+            if (liveMovie.poster) {
+                if (imgEl) imgEl.src = liveMovie.poster;
+            } else {
+                fetchTmdbPosterQuick(liveMovie).then(url => {
+                    if (url && imgEl && imgEl.isConnected) imgEl.src = url;
+                });
+            }
+        }
+
+        card.querySelector('.admin-db-info').addEventListener('click', () => {
+            if (liveMovie) {
+                closeUserDashboard();
+                openMovieModal(liveMovie);
+            } else {
+                showNoticeModal('This title is no longer available on the site.');
+            }
+        });
+        card.querySelector('.admin-db-delete-btn').addEventListener('click', () => deleteUserDownloadHistory(dl));
+        container.appendChild(card);
+    });
+}
+
+// নিজের download history থেকে যেকোনো এন্ট্রি নিজেই remove করতে পারবে
+async function deleteUserDownloadHistory(dl) {
+    if (!dl || !dl.id || !currentAuthSession?.user) return;
+    try {
+        const { error } = await supabaseClient
+            .from('download_history')
+            .delete()
+            .eq('id', dl.id)
+            .eq('user_id', currentAuthSession.user.id);
+        if (error) throw error;
+        userDownloadsFull = userDownloadsFull.filter(d => d.id !== dl.id);
+        const searchInput = document.getElementById('userDownloadSearchInput');
+        renderUserDownloadsList(searchInput ? searchInput.value.trim() : '');
+    } catch (err) {
+        console.error('Delete download history error:', err);
+        showNoticeModal('❌ Could not remove from download history: ' + (err?.message || 'Unknown error'));
+    }
+}
+
+// URL এ ?dashboard=1 বসিয়ে রাখে (auth param থাকলে সরিয়ে) — refresh করলেও dashboard/admin
+// panel খোলা অবস্থাতেই থাকবে, home পেজে ফিরে যাবে না
+function setDashboardUrlParam() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('dashboard') === '1' && !params.has('auth')) return; // ইতিমধ্যেই ঠিক আছে
+    params.set('dashboard', '1');
+    params.delete('auth');
+    const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+    history.replaceState(null, '', newUrl);
+}
+function clearDashboardUrlParam() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('dashboard') && !params.has('tab')) return;
+    params.delete('dashboard');
+    params.delete('tab'); // panel বন্ধ হলে কোন ট্যাব খোলা ছিল সেই তথ্যও মুছে দাও
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    history.replaceState(null, '', newUrl);
+}
+
+// বর্তমানে কোন admin ট্যাব খোলা আছে সেটা URL এ সংরক্ষণ করে রাখে (?tab=alerts ইত্যাদি) —
+// page refresh করলে dashboard tab এ ফিরে না গিয়ে ঠিক এই একই ট্যাবেই থাকবে
+function setAdminTabUrlParam(tab) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('dashboard') !== '1') return; // admin panel URL এ খোলা অবস্থায় চিহ্নিত না থাকলে কিছু করার দরকার নেই
+    if (tab === 'dashboard') {
+        if (!params.has('tab')) return;
+        params.delete('tab');
+    } else {
+        if (params.get('tab') === tab) return;
+        params.set('tab', tab);
+    }
+    const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+    history.replaceState(null, '', newUrl);
+}
+
 // ==================== ADMIN PANEL (Hidden Content Manager) ====================
 
 let adminPanelInitialized = false;
 let adminSelectedCategories = new Set();
+let currentAdminTab = 'dashboard'; // movies data লোড হওয়ার পর dashboard খোলা থাকলে stats রিফ্রেশ করতে ব্যবহার হয়
 
 let adminExtraCategories = new Set();
 let adminTmdbType = 'movie';
@@ -1705,7 +3148,11 @@ async function saveNewCategoryToDb(slug) {
 // ---------- Open / Close / Tabs ----------
 
 function openAdminPanel() {
-    sessionStorage.setItem('isAdminLoggedIn', 'true');
+    if (!isCurrentUserAdmin(currentAuthSession)) {
+        // admin না হলে (বা login-ই না থাকলে) admin panel খুলবে না — sign-in প্রম্পট দেখাও
+        openAuthModal('signin');
+        return;
+    }
 
     if (!adminPanelInitialized) {
         setupAdminPanel();
@@ -1715,9 +3162,18 @@ function openAdminPanel() {
     if (!overlay) return;
     overlay.style.display = 'flex';
     document.body.classList.add('modal-open');
-    switchAdminTab('add');
+    setDashboardUrlParam(); // page refresh দিলেও admin panel খোলা অবস্থাতেই থাকবে, home এ চলে যাবে না
+
+    // refresh করার আগে যে ট্যাবে ছিলে (URL এর ?tab=...), সেই একই ট্যাবেই ফিরিয়ে আনো —
+    // নাহলে প্রতিবার Dashboard ট্যাবে চলে যেত
+    const savedTabParams = new URLSearchParams(window.location.search);
+    const savedTab = savedTabParams.get('tab') || 'dashboard';
+    switchAdminTab(savedTab);
     resetAdminForm();
     renderAdminDatabaseList('');
+    fetchLinkAlerts().then(updateAdminAlertsBadge); // sidebar badge count রিফ্রেশ
+    fetchAdminRequests().then(updateAdminRequestsBadge);
+    fetchAdminMessages().then(updateAdminMessagesBadge);
 
     if (!adminCategoriesLoaded) {
         loadAdminExtraCategories();
@@ -1725,51 +3181,144 @@ function openAdminPanel() {
 }
 
 function closeAdminPanel() {
-    sessionStorage.removeItem('isAdminLoggedIn');
-
     const overlay = document.getElementById('adminOverlay');
     if (overlay) overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
+    clearDashboardUrlParam();
 }
 
+const ADMIN_TAB_TITLES = {
+    dashboard: 'Dashboard',
+    add: 'Add / Edit Content',
+    manage: 'Database',
+    comments: 'Comments',
+    requests: 'Request Here',
+    messages: 'Messages',
+    alerts: 'Broken Link Reports',
+    trash: 'Recycle Bin'
+};
+
 function switchAdminTab(tab) {
-    const addTab = document.getElementById('adminTabAdd');
-    const manageTab = document.getElementById('adminTabManage');
-    const commentsTab = document.getElementById('adminTabComments');
-    const trashTab = document.getElementById('adminTabTrash');
-    const addBtn = document.getElementById('adminTabBtnAdd');
-    const manageBtn = document.getElementById('adminTabBtnManage');
-    const commentsBtn = document.getElementById('adminTabBtnComments');
-    const trashBtn = document.getElementById('adminTabBtnTrash');
-    if (!addTab || !manageTab || !commentsTab || !trashTab || !addBtn || !manageBtn || !commentsBtn || !trashBtn) return;
+    const tabs = ['dashboard', 'add', 'manage', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const validTab = tabs.includes(tab) ? tab : 'dashboard';
+    currentAdminTab = validTab;
+    setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
 
-    addTab.style.display = 'none';
-    manageTab.style.display = 'none';
-    commentsTab.style.display = 'none';
-    trashTab.style.display = 'none';
-    addBtn.classList.remove('active');
-    manageBtn.classList.remove('active');
-    commentsBtn.classList.remove('active');
-    trashBtn.classList.remove('active');
+    tabs.forEach(function (t) {
+        const content = document.getElementById('adminTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const navBtn = document.getElementById('adminNavBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (content) content.style.display = (t === validTab) ? 'block' : 'none';
+        if (navBtn) navBtn.classList.toggle('active', t === validTab);
+    });
 
-    if (tab === 'manage') {
-        manageTab.style.display = 'block';
-        manageBtn.classList.add('active');
+    const titleEl = document.getElementById('adminTopbarTitle');
+    if (titleEl) titleEl.textContent = ADMIN_TAB_TITLES[validTab] || 'Dashboard';
+
+    if (validTab === 'dashboard') {
+        loadAdminDashboardStats();
+    } else if (validTab === 'manage') {
         const searchInput = document.getElementById('adminSearchInput');
         renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
-    } else if (tab === 'comments') {
-        commentsTab.style.display = 'block';
-        commentsBtn.classList.add('active');
+    } else if (validTab === 'comments') {
         const searchInput = document.getElementById('adminCommentSearchInput');
         renderAdminCommentsList(searchInput ? searchInput.value.trim() : '');
-    } else if (tab === 'trash') {
-        trashTab.style.display = 'block';
-        trashBtn.classList.add('active');
+    } else if (validTab === 'requests') {
+        fetchAdminRequests().then(() => {
+            const searchInput = document.getElementById('adminRequestSearchInput');
+            renderAdminRequestsList(searchInput ? searchInput.value.trim() : '');
+        });
+    } else if (validTab === 'messages') {
+        fetchAdminMessages().then(renderAdminMessagesList);
+    } else if (validTab === 'alerts') {
+        fetchLinkAlerts().then(renderAdminAlertsList);
+    } else if (validTab === 'trash') {
         renderAdminTrashList();
-    } else {
-        addTab.style.display = 'block';
-        addBtn.classList.add('active');
     }
+}
+
+// ---------- Dashboard tab: real stats from the site's own database (no fake earning/premium numbers) ----------
+async function loadAdminDashboardStats() {
+    const movies = Array.isArray(allMovies) ? allMovies : [];
+    const movieCount = movies.filter(m => m.tmdbType !== 'tv').length;
+    const seriesCount = movies.filter(m => m.tmdbType === 'tv').length;
+
+    const catSet = new Set();
+    const catCounts = {};
+    movies.forEach(m => {
+        const cats = Array.isArray(m.category) ? m.category : (m.category ? String(m.category).split('|') : []);
+        cats.forEach(c => {
+            const name = (c || '').trim();
+            if (!name || name.toLowerCase() === 'all') return;
+            catSet.add(name);
+            catCounts[name] = (catCounts[name] || 0) + 1;
+        });
+    });
+
+    const totalViews = movies.reduce((sum, m) => sum + (Number(m.views) || 0), 0);
+
+    setAdminStat('adminStatTotalContent', movies.length);
+    setAdminStat('adminStatMovies', movieCount);
+    setAdminStat('adminStatSeries', seriesCount);
+    setAdminStat('adminStatTotalViews', totalViews.toLocaleString());
+    setAdminStat('adminStatCategories', catSet.size);
+    setAdminStat('adminStatTrash', Array.isArray(allDeletedMovies) ? allDeletedMovies.length : 0);
+    setAdminStat('adminStatAlerts', Array.isArray(allLinkAlerts) ? allLinkAlerts.length : '…');
+    setAdminStat('adminStatRequests', Array.isArray(allAdminRequests) ? allAdminRequests.length : '…');
+    setAdminStat('adminStatMessages', Array.isArray(allAdminMessages) ? allAdminMessages.length : '…');
+
+    // Recently Added (top 5 by created_at)
+    const recentEl = document.getElementById('adminDashRecent');
+    if (recentEl) {
+        const sorted = [...movies].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        recentEl.innerHTML = sorted.length ? sorted.map(m => `
+            <div class="admin-dash-row">
+                <span class="admin-dash-row-title">${escapeHtml(m.title || 'Untitled')}</span>
+                <span class="admin-dash-row-meta">${m.tmdbType === 'tv' ? 'TV' : 'Movie'} · ${formatTimeAgo(m.created_at) || ''}</span>
+            </div>
+        `).join('') : '<div class="admin-db-empty">No content yet.</div>';
+    }
+
+    // Top Views (top 5 by views, highest to lowest)
+    const topViewsEl = document.getElementById('adminDashTopViews');
+    if (topViewsEl) {
+        const byViews = [...movies].sort((a, b) => (Number(b.views) || 0) - (Number(a.views) || 0));
+        topViewsEl.innerHTML = byViews.length ? byViews.map(m => `
+            <div class="admin-dash-row">
+                <span class="admin-dash-row-title">${escapeHtml(m.title || 'Untitled')}</span>
+                <span class="admin-dash-row-meta">${(Number(m.views) || 0).toLocaleString()} views</span>
+            </div>
+        `).join('') : '<div class="admin-db-empty">No content yet.</div>';
+    }
+
+    // Top Categories (top 5 by count)
+    const catsEl = document.getElementById('adminDashCategories');
+    if (catsEl) {
+        const topCats = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
+        const maxCount = topCats.length ? topCats[0][1] : 1;
+        catsEl.innerHTML = topCats.length ? topCats.map(([name, count]) => `
+            <div class="admin-dash-row admin-dash-cat-row">
+                <span class="admin-dash-row-title">${escapeHtml(name)}</span>
+                <span class="admin-dash-row-meta">${count}</span>
+                <div class="admin-dash-bar-track"><div class="admin-dash-bar-fill" style="width:${Math.round((count / maxCount) * 100)}%;"></div></div>
+            </div>
+        `).join('') : '<div class="admin-db-empty">No categories yet.</div>';
+    }
+
+    // Comments count + Registered Users count (live DB counts, non-blocking)
+    supabaseClient.from('comments').select('*', { count: 'exact', head: true })
+        .then(({ count, error }) => { if (!error) setAdminStat('adminStatComments', count || 0); });
+    supabaseClient.from('profiles').select('*', { count: 'exact', head: true })
+        .then(({ count, error }) => { if (!error) setAdminStat('adminStatUsers', count || 0); });
+
+    // Alerts / Requests / Messages counts need their own fetch (not loaded until now)
+    fetchLinkAlerts().then(() => setAdminStat('adminStatAlerts', Array.isArray(allLinkAlerts) ? allLinkAlerts.length : 0));
+    fetchAdminRequests().then(() => setAdminStat('adminStatRequests', Array.isArray(allAdminRequests) ? allAdminRequests.length : 0));
+    fetchAdminMessages().then(() => setAdminStat('adminStatMessages', Array.isArray(allAdminMessages) ? allAdminMessages.length : 0));
+}
+
+function setAdminStat(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
 }
 
 // ---------- One-time wiring ----------
@@ -1823,6 +3372,13 @@ function setupAdminPanel() {
         });
     }
 
+    const adminRequestSearchInput = document.getElementById('adminRequestSearchInput');
+    if (adminRequestSearchInput) {
+        adminRequestSearchInput.addEventListener('input', function() {
+            renderAdminRequestsList(this.value.trim());
+        });
+    }
+
     const newCategoryInput = document.getElementById('adminNewCategoryInput');
     if (newCategoryInput) {
         newCategoryInput.addEventListener('keyup', function(e) {
@@ -1865,7 +3421,6 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     nl: 'Dutch', dut: 'Dutch', nld: 'Dutch', dutch: 'Dutch',
     sv: 'Swedish', swe: 'Swedish', swedish: 'Swedish',
     no: 'Norwegian', nor: 'Norwegian', norwegian: 'Norwegian',
-    nb: 'Norwegian Bokmål', nob: 'Norwegian Bokmål',
     da: 'Danish', dan: 'Danish', danish: 'Danish',
     fi: 'Finnish', fin: 'Finnish', finnish: 'Finnish',
     el: 'Greek', gre: 'Greek', ell: 'Greek', greek: 'Greek',
@@ -1920,59 +3475,6 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     ca: 'Catalan', cat: 'Catalan', catalan: 'Catalan',
     gl: 'Galician', glg: 'Galician', galician: 'Galician',
     ht: 'Haitian Creole', hat: 'Haitian Creole',
-
-    // ---- Extra languages (added to widen coverage to 132 total) ----
-    as: 'Assamese', asm: 'Assamese', assamese: 'Assamese',
-    or: 'Odia', ori: 'Odia', odia: 'Odia', oriya: 'Odia',
-    sd: 'Sindhi', snd: 'Sindhi', sindhi: 'Sindhi',
-    ks: 'Kashmiri', kas: 'Kashmiri', kashmiri: 'Kashmiri',
-    kok: 'Konkani', konkani: 'Konkani',
-    mai: 'Maithili', maithili: 'Maithili',
-    sa: 'Sanskrit', san: 'Sanskrit', sanskrit: 'Sanskrit',
-    bo: 'Tibetan', bod: 'Tibetan', tib: 'Tibetan', tibetan: 'Tibetan',
-    dz: 'Dzongkha', dzo: 'Dzongkha', dzongkha: 'Dzongkha',
-    ps: 'Pashto', pus: 'Pashto', pashto: 'Pashto',
-    ku: 'Kurdish', kur: 'Kurdish', kurdish: 'Kurdish',
-    tg: 'Tajik', tgk: 'Tajik', tajik: 'Tajik',
-    tk: 'Turkmen', tuk: 'Turkmen', turkmen: 'Turkmen',
-    ky: 'Kyrgyz', kir: 'Kyrgyz', kyrgyz: 'Kyrgyz',
-    tt: 'Tatar', tat: 'Tatar', tatar: 'Tatar',
-    ba: 'Bashkir', bak: 'Bashkir', bashkir: 'Bashkir',
-    ce: 'Chechen', che: 'Chechen', chechen: 'Chechen',
-    yi: 'Yiddish', yid: 'Yiddish', yiddish: 'Yiddish',
-    lb: 'Luxembourgish', ltz: 'Luxembourgish', luxembourgish: 'Luxembourgish',
-    br: 'Breton', bre: 'Breton', breton: 'Breton',
-    co: 'Corsican', cos: 'Corsican', corsican: 'Corsican',
-    sc: 'Sardinian', srd: 'Sardinian', sardinian: 'Sardinian',
-    oc: 'Occitan', oci: 'Occitan', occitan: 'Occitan',
-    fy: 'Frisian', fry: 'Frisian', frisian: 'Frisian',
-    fo: 'Faroese', fao: 'Faroese', faroese: 'Faroese',
-    be: 'Belarusian', bel: 'Belarusian', belarusian: 'Belarusian',
-    cv: 'Chuvash', chv: 'Chuvash', chuvash: 'Chuvash',
-    eo: 'Esperanto', epo: 'Esperanto', esperanto: 'Esperanto',
-    lat: 'Latin', latin: 'Latin',
-    sn: 'Shona', sna: 'Shona', shona: 'Shona',
-    ny: 'Chichewa', nya: 'Chichewa', chichewa: 'Chichewa', nyanja: 'Chichewa',
-    st: 'Sesotho', sot: 'Sesotho', sesotho: 'Sesotho',
-    tn: 'Setswana', tsn: 'Setswana', setswana: 'Setswana', tswana: 'Setswana',
-    ts: 'Tsonga', tso: 'Tsonga', tsonga: 'Tsonga',
-    ve: 'Venda', ven: 'Venda', venda: 'Venda',
-    nd: 'Ndebele', nde: 'Ndebele', ndebele: 'Ndebele',
-    rw: 'Kinyarwanda', kin: 'Kinyarwanda', kinyarwanda: 'Kinyarwanda',
-    rn: 'Kirundi', run: 'Kirundi', kirundi: 'Kirundi', rundi: 'Kirundi',
-    lg: 'Luganda', lug: 'Luganda', luganda: 'Luganda', ganda: 'Luganda',
-    ln: 'Lingala', lin: 'Lingala', lingala: 'Lingala',
-    kg: 'Kongo', kon: 'Kongo', kongo: 'Kongo',
-    wo: 'Wolof', wol: 'Wolof', wolof: 'Wolof',
-    ff: 'Fulah', ful: 'Fulah', fulah: 'Fulah', fula: 'Fulah',
-    bm: 'Bambara', bam: 'Bambara', bambara: 'Bambara',
-    mg: 'Malagasy', mlg: 'Malagasy', malagasy: 'Malagasy',
-    ti: 'Tigrinya', tir: 'Tigrinya', tigrinya: 'Tigrinya',
-    om: 'Oromo', orm: 'Oromo', oromo: 'Oromo',
-    ki: 'Kikuyu', kik: 'Kikuyu', kikuyu: 'Kikuyu',
-    tw: 'Twi', twi: 'Twi', akan: 'Twi',
-    ee: 'Ewe', ewe: 'Ewe',
-    fj: 'Fijian', fij: 'Fijian', fijian: 'Fijian',
 
     // ---- Spanish (es) — generic code + regional/locale variants ----
     es: 'Spanish', spa: 'Spanish', spanish: 'Spanish',
@@ -2328,21 +3830,6 @@ function mediaScanFormatMergedList(historyKey) {
     return `(${count}/${commonCount})- ${labels.join(', ')}`;
 }
 
-// এডিট মোডে ফর্ম লোড হওয়ার সময় আগে থেকে সেভ করা Audio/Subtitles টেক্সট
-// ("(2)- Hindi, English (01 Only)" এই স্টাইলের) থেকে প্লেইন ভাষার লিস্ট বের করে -
-// যাতে সেটাকে mediaScanHistory-এর প্রথম "scan" হিসেবে বসিয়ে দেওয়া যায় এবং এডিটের
-// সময় নতুন ফাইল স্ক্যান করলে আগের ডেটা মুছে না গিয়ে তার সাথে যোগ (merge) হয়,
-// ঠিক যেভাবে Season 1 / Season 2 / Season 3 -এর মতো একের পর এক জমা হয়।
-function mediaScanParseExistingField(str) {
-    if (!str) return [];
-    let s = String(str).trim();
-    s = s.replace(/^\(\d+(?:\/\d+)?\)-\s*/, ''); // leading "(n)-" / "(n/m)-" count prefix বাদ
-    if (!s) return [];
-    return s.split(',')
-        .map(item => item.replace(/\s*\([\d/.]+\s*Only\)\s*$/i, '').trim())
-        .filter(Boolean);
-}
-
 async function handleMediaScanFile(file) {
     const statusEl = document.getElementById('adminMediaScanStatus');
     const resultEl = document.getElementById('adminMediaScanResult');
@@ -2610,6 +4097,12 @@ function escapeAttr(str) {
     return String(str || '').replace(/"/g, '&quot;');
 }
 
+// download history তে সেভ করার জন্য লিংক-লেবেলটাকে HTML attribute + inline JS string — দুই জায়গাতেই নিরাপদভাবে বসানোর জন্য
+function jsAttrStr(str) {
+    const jsSafe = String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return escapeAttr(jsSafe);
+}
+
 function collectSeasons() {
     const blocks = document.querySelectorAll('#adminSeasonsList .admin-season-block');
     const result = [];
@@ -2733,15 +4226,6 @@ function loadMovieIntoAdminForm(movie) {
     document.getElementById('adminTmdbId').value = movie.tmdbId || '';
     document.getElementById('adminAudio').value = movie.languages || '';
     document.getElementById('adminSubtitles').value = movie.Subtitles || movie.subtitles || '';
-
-    // আগে থেকে সেভ করা Audio/Subtitles-কে mediaScanHistory-এর "scan #1" হিসেবে
-    // বসিয়ে রাখা হলো, যাতে এডিট করার সময় নতুন কোনো ফাইল স্ক্যান করলে সেটা এই
-    // পুরনো ডেটা মুছে না দিয়ে তার সাথে যোগ হয় (season-by-season merge)।
-    const existingScanAudio = mediaScanParseExistingField(movie.languages);
-    const existingScanSubs = mediaScanParseExistingField(movie.Subtitles || movie.subtitles);
-    if (existingScanAudio.length > 0 || existingScanSubs.length > 0) {
-        mediaScanHistory.push({ audio: existingScanAudio, subtitle: existingScanSubs });
-    }
 
     adminSelectedCategories = new Set(
         Array.isArray(movie.category) ? movie.category : (movie.category ? String(movie.category).split('|').map(s => s.trim()).filter(Boolean) : [])
@@ -2963,7 +4447,11 @@ function renderAdminDatabaseList(filter) {
     }) : source;
 
     if (filtered.length === 0) {
-        container.innerHTML = '<div class="admin-db-empty">No content found.</div>';
+        // movies data এখনো Supabase থেকে লোড হয়নি (page refresh এর ঠিক পরপর) —
+        // তখন "No content found" না দেখিয়ে loading দেখাও, data চলে আসলে আবার রেন্ডার হবে
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">No content found.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
         return;
     }
 
@@ -3179,7 +4667,9 @@ function renderAdminTrashList() {
 
     const source = Array.isArray(allDeletedMovies) ? allDeletedMovies : [];
     if (source.length === 0) {
-        container.innerHTML = '<div class="admin-db-empty">Recycle Bin is empty.</div>';
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">Recycle Bin is empty.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
         return;
     }
 
@@ -3217,8 +4707,245 @@ function renderAdminTrashList() {
     });
 }
 
+// ---------- 📥 Request Here (admin panel) ----------
+// Reads the "requests" table, populated by the floating "Request Here" widget's submitChatRequest().
+let allAdminRequests = [];
+let lastAdminRequestsFetchError = null;
+
+async function fetchAdminRequests() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching requests:', error.message);
+            lastAdminRequestsFetchError = error.message;
+            allAdminRequests = [];
+            return;
+        }
+        lastAdminRequestsFetchError = null;
+        allAdminRequests = data || [];
+        updateAdminRequestsBadge();
+    } catch (err) {
+        console.error('Unexpected error loading requests:', err);
+        lastAdminRequestsFetchError = err?.message || 'Unknown error';
+        allAdminRequests = [];
+    }
+}
+
+function updateAdminRequestsBadge() {
+    const badge = document.getElementById('adminRequestsCount');
+    if (!badge) return;
+    const count = Array.isArray(allAdminRequests) ? allAdminRequests.length : 0;
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; }
+    else badge.style.display = 'none';
+}
+
+// রিকোয়েস্ট করা নামটা সাইটে আগে থেকেই আপলোড করা আছে কিনা — টাইটেল মিলিয়ে (বছর/স্পেস/কেস উপেক্ষা করে) auto-detect করে
+function findMatchingMovieForRequest(requestTitle) {
+    if (!requestTitle || !Array.isArray(allMovies)) return null;
+    const normalize = (s) => String(s || '').toLowerCase().replace(/\(\d{4}(-\d{2,4})?\)/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const target = normalize(requestTitle);
+    if (!target) return null;
+    return allMovies.find(m => normalize(m.title) === target) || null;
+}
+
+// রিকোয়েস্টে দেওয়া reference_link ফিল্ডটা অনেক সময় শুধু IMDb/TMDB ID (যেমন tt8416494) অথবা প্লেইন লিংক হতে পারে।
+// এই ফাংশনটা যেটাই থাকুক না কেন সেটাকে একটা ক্লিকযোগ্য, ওপেন করা যায় এমন URL-এ বদলে দেয়, যাতে অ্যাডমিন
+// এক ক্লিকেই মুভি/সিরিজটা IMDb/TMDB-তে গিয়ে ভালোভাবে যাচাই করে নিতে পারে কোনটা রিকোয়েস্ট করা হয়েছে।
+function buildRequestReferenceUrl(rawLink) {
+    const link = String(rawLink || '').trim();
+    if (!link) return null;
+
+    // ইতিমধ্যে একটা পূর্ণ লিংক (IMDb/TMDB/অন্য যেকোনো URL) দেওয়া থাকলে সরাসরি সেটাই ব্যবহার হবে
+    if (/^https?:\/\//i.test(link)) return link;
+
+    // শুধু IMDb ID দেওয়া থাকলে (যেমন: tt8416494) সরাসরি IMDb টাইটেল পেজে নিয়ে যাবে
+    const imdbMatch = link.match(/^(tt\d{5,9})$/i);
+    if (imdbMatch) return `https://www.imdb.com/title/${imdbMatch[1].toLowerCase()}/`;
+
+    // www./ছাড়া ডোমেইন-এর মত কিছু দেওয়া থাকলে (যেমন themoviedb.org/movie/...) তার আগে https:// বসিয়ে দেওয়া হবে
+    if (/^[a-z0-9-]+\.[a-z]{2,}(\/|$)/i.test(link)) return `https://${link}`;
+
+    // শুধু সংখ্যা দেওয়া থাকলে (TMDB ID) — মুভি নাকি সিরিজ নিশ্চিত না হওয়ায় TMDB সার্চ পেজে নিয়ে যাবে
+    if (/^\d+$/.test(link)) return `https://www.themoviedb.org/search?query=${encodeURIComponent(link)}`;
+
+    // অন্য যেকোনো টেক্সট হলে সেটা দিয়ে IMDb-তে সার্চ করে দেখাবে
+    return `https://www.imdb.com/find/?q=${encodeURIComponent(link)}`;
+}
+
+function renderAdminRequestsList(filter) {
+    const container = document.getElementById('adminRequestsList');
+    if (!container) return;
+    container.innerHTML = '';
+    updateAdminRequestsBadge();
+
+    if (lastAdminRequestsFetchError) {
+        container.innerHTML = `<div class="admin-db-empty" style="color:#f87171;">⚠️ Could not load requests (${escapeHtml(lastAdminRequestsFetchError)}). This is usually a database permissions (RLS) issue — see fix-database-permissions.sql </div>`;
+        return;
+    }
+
+    const q = (filter || '').trim().toLowerCase();
+    const source = (Array.isArray(allAdminRequests) ? allAdminRequests : []).filter(r =>
+        !q || (r.movie_title || '').toLowerCase().includes(q)
+    );
+
+    if (source.length === 0) {
+        container.innerHTML = `<div class="admin-db-empty">${q ? 'No matching requests found.' : 'No requests yet.'}</div>`;
+        return;
+    }
+
+    source.forEach(reqItem => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card';
+        const timeAgo = formatTimeAgo(reqItem.created_at) || '';
+        const yearPart = reqItem.release_year ? ` (${escapeHtml(String(reqItem.release_year))})` : '';
+        const alreadyOnSite = !!findMatchingMovieForRequest(reqItem.movie_title); // টাইটেল মিলে গেলে auto-detect করে দেখায়
+        const referenceUrl = buildRequestReferenceUrl(reqItem.reference_link); // IMDb/TMDB id/link -> ওপেন করা যায় এমন URL
+        card.innerHTML = `
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(reqItem.movie_title || 'Untitled')}${yearPart}</div>
+                ${reqItem.reference_link ? `
+                <div class="admin-alert-url admin-request-link-row">
+                    <span class="admin-request-link-text">${escapeHtml(reqItem.reference_link)}</span>
+                    ${referenceUrl ? `<button type="button" class="admin-request-link-btn" title="IMDb/TMDB-তে ওপেন করে দেখুন">🔗 Open Link</button>` : ''}
+                </div>` : ''}
+                <div class="admin-alert-meta-row">${alreadyOnSite ? '<span class="admin-alert-source-tag auto">✅ Already on Site</span>' : ''}<span class="admin-alert-time">${timeAgo}</span></div>
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-db-edit-btn admin-request-add-btn">🎬 Add to Site</button>
+                <button type="button" class="admin-db-restore-btn admin-request-uploaded-btn">✅ Already Uploaded</button>
+                <button type="button" class="admin-db-delete-btn admin-request-delete-btn">🗑 Delete</button>
+            </div>
+        `;
+        const linkBtn = card.querySelector('.admin-request-link-btn');
+        if (linkBtn) linkBtn.addEventListener('click', () => window.open(referenceUrl, '_blank', 'noopener'));
+        card.querySelector('.admin-request-add-btn').addEventListener('click', () => addRequestToSite(reqItem));
+        card.querySelector('.admin-request-uploaded-btn').addEventListener('click', () => deleteAdminRequest(reqItem));
+        card.querySelector('.admin-request-delete-btn').addEventListener('click', () => deleteAdminRequest(reqItem));
+        container.appendChild(card);
+    });
+}
+
+// রিকোয়েস্ট করা নামটা সরাসরি Add/Edit Content ফর্মে বসিয়ে দেয়, যাতে দ্রুত আপলোড করা যায়
+function addRequestToSite(reqItem) {
+    switchAdminTab('add');
+    resetAdminForm();
+    const titleInput = document.getElementById('adminTitle');
+    if (titleInput) {
+        let prefill = reqItem.movie_title || '';
+        if (reqItem.release_year) prefill += ` (${reqItem.release_year})`;
+        titleInput.value = prefill;
+        titleInput.focus();
+    }
+}
+
+async function deleteAdminRequest(reqItem) {
+    if (!reqItem || !reqItem.id) return;
+    try {
+        const { error } = await supabaseClient.from('requests').delete().eq('id', reqItem.id);
+        if (error) throw error;
+        allAdminRequests = allAdminRequests.filter(r => r.id !== reqItem.id);
+        const searchInput = document.getElementById('adminRequestSearchInput');
+        renderAdminRequestsList(searchInput ? searchInput.value.trim() : '');
+    } catch (err) {
+        console.error('Delete request error:', err);
+        showNoticeModal('❌ Request ডিলিট করা যায়নি: ' + (err && err.message ? err.message : 'Unknown error'));
+    }
+}
+
+// ---------- ✉️ Messages (admin panel) ----------
+// Reads the "support_messages" table, populated by the floating widget's "Chat with support" tab.
+let allAdminMessages = [];
+let lastAdminMessagesFetchError = null;
+
+async function fetchAdminMessages() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('support_messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching messages:', error.message);
+            lastAdminMessagesFetchError = error.message;
+            allAdminMessages = [];
+            return;
+        }
+        lastAdminMessagesFetchError = null;
+        allAdminMessages = data || [];
+        updateAdminMessagesBadge();
+    } catch (err) {
+        console.error('Unexpected error loading messages:', err);
+        lastAdminMessagesFetchError = err?.message || 'Unknown error';
+        allAdminMessages = [];
+    }
+}
+
+function updateAdminMessagesBadge() {
+    const badge = document.getElementById('adminMessagesCount');
+    if (!badge) return;
+    const count = Array.isArray(allAdminMessages) ? allAdminMessages.filter(m => m.sender !== 'admin').length : 0;
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; }
+    else badge.style.display = 'none';
+}
+
+function renderAdminMessagesList() {
+    const container = document.getElementById('adminMessagesList');
+    if (!container) return;
+    container.innerHTML = '';
+    updateAdminMessagesBadge();
+
+    if (lastAdminMessagesFetchError) {
+        container.innerHTML = `<div class="admin-db-empty" style="color:#f87171;">⚠️ Could not load messages (${escapeHtml(lastAdminMessagesFetchError)}). This is usually a database permissions (RLS) issue — see fix-database-permissions.sql </div>`;
+        return;
+    }
+
+    const source = Array.isArray(allAdminMessages) ? allAdminMessages : [];
+    if (source.length === 0) {
+        container.innerHTML = '<div class="admin-db-empty">No messages yet.</div>';
+        return;
+    }
+
+    source.forEach(msg => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card';
+        const isAdminMsg = msg.sender === 'admin';
+        const timeAgo = formatTimeAgo(msg.created_at) || '';
+        card.innerHTML = `
+            <div class="admin-db-info">
+                <div class="admin-db-title">${isAdminMsg ? '🛠 Admin (You)' : '👤 Visitor'}</div>
+                <div class="admin-db-meta">${escapeHtml(msg.message || '')}</div>
+                <div class="admin-alert-meta-row"><span class="admin-alert-time">${timeAgo}</span></div>
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-db-delete-btn admin-message-delete-btn">🗑 Delete</button>
+            </div>
+        `;
+        card.querySelector('.admin-message-delete-btn').addEventListener('click', () => deleteAdminMessage(msg));
+        container.appendChild(card);
+    });
+}
+
+async function deleteAdminMessage(msg) {
+    if (!msg || !msg.id) return;
+    try {
+        const { error } = await supabaseClient.from('support_messages').delete().eq('id', msg.id);
+        if (error) throw error;
+        allAdminMessages = allAdminMessages.filter(m => m.id !== msg.id);
+        renderAdminMessagesList();
+    } catch (err) {
+        console.error('Delete message error:', err);
+        showNoticeModal('❌ Message ডিলিট করা যায়নি: ' + (err && err.message ? err.message : 'Unknown error'));
+    }
+}
+
 // ---------- 🔔 Broken Link Alerts (admin panel) ----------
 // Requires the "link_alerts" table. See link_alerts_schema.sql for the one-time database setup.
+
+let lastLinkAlertsFetchError = null; // fetch সত্যিই ফেইল করলে সেটা যেন "সব ঠিক আছে ✅" থেকে আলাদা দেখায়
 
 async function fetchLinkAlerts() {
     try {
@@ -3228,11 +4955,19 @@ async function fetchLinkAlerts() {
             .eq('status', 'open')
             .order('created_at', { ascending: false });
 
-        if (error) { console.error('Error fetching link alerts:', error.message); return; }
+        if (error) {
+            console.error('Error fetching link alerts:', error.message);
+            lastLinkAlertsFetchError = error.message;
+            allLinkAlerts = [];
+            return;
+        }
+        lastLinkAlertsFetchError = null;
         allLinkAlerts = data || [];
         updateAdminAlertsBadge();
     } catch (err) {
         console.error('Unexpected error loading link alerts:', err);
+        lastLinkAlertsFetchError = err?.message || 'Unknown error';
+        allLinkAlerts = [];
     }
 }
 
@@ -3255,9 +4990,16 @@ function renderAdminAlertsList() {
 
     updateAdminAlertsBadge();
 
+    // fetch টাই ব্যর্থ হলে (যেমন RLS SELECT policy না থাকলে) সেটা "সব ঠিক আছে ✅" এর
+    // বদলে স্পষ্ট এরর হিসেবে দেখাও, নাহলে আসল রিপোর্ট থাকলেও admin বুঝতে পারবে না
+    if (lastLinkAlertsFetchError) {
+        container.innerHTML = `<div class="admin-db-empty" style="color:#f87171;">⚠️ Could not load reports (${escapeHtml(lastLinkAlertsFetchError)}). This is usually a database permissions (RLS) issue — see fix-database-permissions.sql.</div>`;
+        return;
+    }
+
     const source = Array.isArray(allLinkAlerts) ? allLinkAlerts : [];
     if (source.length === 0) {
-        container.innerHTML = '<div class="admin-db-empty">কোনো Broken Link Alert নেই। সব লিংক ঠিক আছে ✅</div>';
+        container.innerHTML = '<div class="admin-db-empty">No Broken Link Alerts. All links are working fine ✅</div>';
         return;
     }
 
@@ -3332,7 +5074,39 @@ function openLinkAlertInEditor(alert) {
 
 const QUICK_EMOJIS = ['😀','😂','😍','😮','😢','😡','👍','🔥','❤️','🎬'];
 const REACTION_OPTIONS = ['❤️','👍','😂','😮','🔥'];
-let lastUsedGuestName = ''; // in-memory only, resets on page reload
+let myCommentIdentityCache = null; // লগইন করা ইউজারের নাম+ছবি ক্যাশ করে রাখে, বারবার প্রোফাইল ফেচ করতে হয় না
+
+// লগইন করা ইউজার থাকলে তার আসল নাম আর প্রোফাইল ছবি (profiles টেবিল থেকে) নিয়ে আসে -
+// comment box এ এখন আর কেউ নিজের নাম টাইপ করে না, এখান থেকেই বসে যায়
+async function getMyCommentIdentity() {
+    if (!currentAuthSession?.user) return null;
+    if (myCommentIdentityCache && myCommentIdentityCache.userId === currentAuthSession.user.id) return myCommentIdentityCache;
+
+    const isAdmin = isCurrentUserAdmin(currentAuthSession);
+    // Admin logs in with a synthetic "702640shamil@admin.com" address that has no real
+    // profile — falling back to the email's local-part would show "702640shamil" as the
+    // name, so admin always displays simply as "Admin" instead.
+    let name = isAdmin ? 'Admin' : (currentAuthSession.user.user_metadata?.full_name || getDisplayUsername(currentAuthSession));
+    let avatarUrl = '';
+    if (!isAdmin) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('username, full_name, avatar_url')
+                .eq('id', currentAuthSession.user.id)
+                .maybeSingle();
+            if (!error && data) {
+                name = data.full_name || data.username || name;
+                avatarUrl = data.avatar_url || '';
+            }
+        } catch (e) {
+            console.error('Could not load comment identity:', e);
+        }
+    }
+
+    myCommentIdentityCache = { userId: currentAuthSession.user.id, name, avatarUrl, isAdmin };
+    return myCommentIdentityCache;
+}
 
 function renderCommentsSectionShell() {
     const isCollapsed = localStorage.getItem('commentsCollapsed') === 'true';
@@ -3382,15 +5156,29 @@ function scrollToComments() {
 }
 
 // ---------------- Composer (top comment box) ----------------
-
+// কমেন্ট করতে হলে অবশ্যই লগইন থাকতে হবে - লগইন না থাকলে "Please login" prompt দেখায়,
+// লগইন থাকলে ইউজারের আসল প্রোফাইল ছবি আর নাম বসিয়ে দেয় (আর কোনো নাম টাইপ করার বক্স থাকে না)।
 function renderCommentComposer() {
     const wrap = document.getElementById('commentComposerWrap');
     if (!wrap) return;
+
+    if (!currentAuthSession?.user) {
+        wrap.innerHTML = `
+        <div class="comment-login-prompt">
+            <span>Please login to leave a comment.</span>
+            <button type="button" onclick="openAuthModal('signin')">Login</button>
+        </div>`;
+        return;
+    }
+
+    // আগে একটা lightweight loading state দেখাও, প্রোফাইল ফেচ শেষ হলে আসল avatar+নাম বসবে
     wrap.innerHTML = `
     <div class="comment-input-row">
-        <div class="comment-avatar" id="commentComposerAvatar">${commentInitial(lastUsedGuestName || 'G')}</div>
+        <div class="comment-avatar" id="commentComposerAvatar">…</div>
         <div class="comment-input-box">
-            <input type="text" id="commentNameInput" class="comment-name-input" placeholder="Your name" maxlength="40" value="${escapeHtml(lastUsedGuestName)}" oninput="updateComposerAvatar()">
+            <div class="comment-composer-identity">
+                <span class="comment-composer-name" id="commentComposerName">Loading…</span>
+            </div>
             <textarea id="commentMainInput" class="comment-textarea" placeholder="Share your thoughts..." rows="1" oninput="autoGrowTextarea(this)"></textarea>
             <div class="comment-input-actions">
                 <span class="comment-emoji-btn" onclick="toggleEmojiPicker('commentMainInput', this)">🙂</span>
@@ -3399,12 +5187,32 @@ function renderCommentComposer() {
             </div>
         </div>
     </div>`;
+
+    getMyCommentIdentity().then(identity => {
+        if (!identity) return; // ততক্ষণে হয়তো sign out হয়ে গেছে
+        renderComposerIdentity('commentComposerAvatar', 'commentComposerName', identity);
+    });
 }
 
-function updateComposerAvatar() {
-    const nameInput = document.getElementById('commentNameInput');
-    const avatar = document.getElementById('commentComposerAvatar');
-    if (nameInput && avatar) avatar.textContent = commentInitial(nameInput.value || 'G');
+// অ্যাভাটার box টাকে ছবি (থাকলে) অথবা নামের প্রথম অক্ষর দিয়ে ভরে দেয়, আর পাশে আসল নাম বসায়
+function renderComposerIdentity(avatarElId, nameElId, identity) {
+    const avatarEl = document.getElementById(avatarElId);
+    const nameEl = document.getElementById(nameElId);
+    if (avatarEl) {
+        avatarEl.innerHTML = identity.avatarUrl
+            ? `<img src="${escapeHtml(identity.avatarUrl)}" class="comment-composer-avatar-img" alt="">`
+            : '';
+        if (!identity.avatarUrl) avatarEl.textContent = commentInitial(identity.name);
+        avatarEl.classList.toggle('admin-avatar', !!identity.isAdmin);
+    }
+    if (nameEl) {
+        nameEl.textContent = identity.name;
+        const existingBadge = nameEl.parentElement?.querySelector('.comment-admin-badge');
+        if (existingBadge) existingBadge.remove();
+        if (identity.isAdmin) {
+            nameEl.insertAdjacentHTML('afterend', '<span class="comment-admin-badge">👑 Admin</span>');
+        }
+    }
 }
 
 // ---------------- Fetching & rendering comments ----------------
@@ -3504,20 +5312,23 @@ function renderReactionControls(comment) {
 }
 
 function renderSingleCommentHTML(comment, isReply) {
-    const isAdminViewer = sessionStorage.getItem('isAdminLoggedIn') === 'true';
+    const isAdminViewer = isCurrentUserAdmin(currentAuthSession);
     const name = comment.guest_name || 'Guest';
     const isAdminComment = !!comment.is_admin;
     const timeLabel = formatTimeAgo(comment.created_at) || 'just now';
     const { reactionBadge, reactPicker } = renderReactionControls(comment);
     const deleteBtn = isAdminViewer
         ? `<span class="comment-delete-btn" onclick="deleteCommentInline(${comment.id})" title="Delete comment">🗑</span>` : '';
+    const avatarInner = comment.avatar_url
+        ? `<img src="${escapeHtml(comment.avatar_url)}" class="comment-avatar-img" alt="">`
+        : commentInitial(name);
 
     return `
-        <div class="comment-avatar${isAdminComment ? ' admin-avatar' : ''}">${commentInitial(name)}</div>
+        <div class="comment-avatar${isAdminComment ? ' admin-avatar' : ''}">${avatarInner}</div>
         <div class="comment-content-col">
             <div class="comment-meta-row">
                 <span class="comment-author-name">${escapeHtml(name)}</span>
-                ${isAdminComment ? '<span class="comment-admin-badge">Admin</span>' : ''}
+                ${isAdminComment ? '<span class="comment-admin-badge">👑 Admin</span>' : ''}
                 <span class="comment-dot">•</span>
                 <span class="comment-time">${timeLabel}</span>
             </div>
@@ -3555,12 +5366,19 @@ function toggleReplyBox(commentId) {
         return;
     }
 
+    if (!currentAuthSession?.user) {
+        openAuthModal('signin'); // reply দিতে হলেও লগইন লাগবে
+        return;
+    }
+
     wrap.style.display = 'block';
     wrap.innerHTML = `
         <div class="comment-input-row reply-input-row">
-            <div class="comment-avatar" id="replyAvatar-${commentId}">${commentInitial(lastUsedGuestName || 'G')}</div>
+            <div class="comment-avatar" id="replyAvatar-${commentId}">…</div>
             <div class="comment-input-box">
-                <input type="text" id="replyNameInput-${commentId}" class="comment-name-input" placeholder="Your name" maxlength="40" value="${escapeHtml(lastUsedGuestName)}" oninput="updateReplyAvatar(${commentId})">
+                <div class="comment-composer-identity">
+                    <span class="comment-composer-name" id="replyName-${commentId}">Loading…</span>
+                </div>
                 <textarea id="replyInput-${commentId}" class="comment-textarea" placeholder="Reply…" rows="1" oninput="autoGrowTextarea(this)"></textarea>
                 <div class="comment-input-actions">
                     <span class="comment-emoji-btn" onclick="toggleEmojiPicker('replyInput-${commentId}', this)">🙂</span>
@@ -3572,35 +5390,35 @@ function toggleReplyBox(commentId) {
         </div>`;
     const input = document.getElementById(`replyInput-${commentId}`);
     if (input) input.focus();
+
+    getMyCommentIdentity().then(identity => {
+        if (!identity) return;
+        renderComposerIdentity(`replyAvatar-${commentId}`, `replyName-${commentId}`, identity);
+    });
 }
 
-function updateReplyAvatar(commentId) {
-    const nameInput = document.getElementById(`replyNameInput-${commentId}`);
-    const avatar = document.getElementById(`replyAvatar-${commentId}`);
-    if (nameInput && avatar) avatar.textContent = commentInitial(nameInput.value || 'G');
-}
-
-function submitTopLevelComment() {
-    const nameInput = document.getElementById('commentNameInput');
+async function submitTopLevelComment() {
+    if (!currentAuthSession?.user) { openAuthModal('signin'); return; }
     const input = document.getElementById('commentMainInput');
-    const name = (nameInput.value || '').trim();
-    const text = (input.value || '').trim();
-    if (!name) { nameInput.focus(); showNoticeModal('Please enter your name before commenting.'); return; }
+    const text = (input?.value || '').trim();
     if (!text) return;
-    postComment(text, null, name);
+    const identity = await getMyCommentIdentity();
+    if (!identity) { openAuthModal('signin'); return; }
+    postComment(text, null, identity.name, identity.avatarUrl);
 }
 
-function submitReply(parentId) {
-    const nameInput = document.getElementById(`replyNameInput-${parentId}`);
+async function submitReply(parentId) {
+    if (!currentAuthSession?.user) { openAuthModal('signin'); return; }
     const input = document.getElementById(`replyInput-${parentId}`);
-    const name = (nameInput.value || '').trim();
-    const text = (input.value || '').trim();
-    if (!name) { nameInput.focus(); showNoticeModal('Please enter your name before replying.'); return; }
+    const text = (input?.value || '').trim();
     if (!text) return;
-    postComment(text, parentId, name);
+    const identity = await getMyCommentIdentity();
+    if (!identity) { openAuthModal('signin'); return; }
+    postComment(text, parentId, identity.name, identity.avatarUrl);
 }
 
-async function postComment(content, parentId, name) {
+async function postComment(content, parentId, name, avatarUrl) {
+    if (!currentAuthSession?.user) { openAuthModal('signin'); return; }
     if (!name || commentsCurrentMovieId === null) return;
 
     const { error } = await supabaseClient.from('comments').insert([{
@@ -3608,7 +5426,8 @@ async function postComment(content, parentId, name) {
         parent_id: parentId || null,
         guest_name: name.slice(0, 40),
         content: content.slice(0, 1000),
-        is_admin: sessionStorage.getItem('isAdminLoggedIn') === 'true'
+        is_admin: isCurrentUserAdmin(currentAuthSession),
+        avatar_url: avatarUrl || null
     }]);
 
     if (error) {
@@ -3616,8 +5435,6 @@ async function postComment(content, parentId, name) {
         showNoticeModal('❌ Could not post comment: ' + error.message);
         return;
     }
-
-    lastUsedGuestName = name; // remembered in memory only, for this page view
 
     if (parentId) {
         const wrap = document.getElementById(`replyForm-${parentId}`);
@@ -3678,7 +5495,7 @@ async function setCommentReaction(commentId, emoji) {
 // ---------------- Admin: delete comments ----------------
 
 async function deleteCommentInline(commentId) {
-    if (sessionStorage.getItem('isAdminLoggedIn') !== 'true') return;
+    if (!isCurrentUserAdmin(currentAuthSession)) return;
     const ok = await showConfirmModal('Delete this comment? This cannot be undone.', { confirmText: 'Delete' });
     if (!ok) return;
 
@@ -3745,7 +5562,7 @@ async function renderAdminCommentsList(filter) {
         row.innerHTML = `
             <div class="admin-db-info">
                 <div class="admin-db-title">
-                    ${escapeHtml(c.guest_name || 'Guest')}${c.is_admin ? ' <span class="comment-admin-badge">Admin</span>' : ''}
+                    ${escapeHtml(c.guest_name || 'Guest')}${c.is_admin ? ' <span class="comment-admin-badge">👑 Admin</span>' : ''}
                     <span class="admin-comment-on">on ${escapeHtml(findMovieTitleById(c.movie_id))}</span>
                 </div>
                 ${parent ? `<div class="admin-comment-replying-to">↳ replying to ${escapeHtml(parent.guest_name || 'Guest')}</div>` : ''}
@@ -3873,10 +5690,13 @@ document.addEventListener('click', (e) => {
 // thake - eta kono blocking call na, tai page/logo load-e kono delay hoy na.
 (function () {
     function showBadge(countryCode) {
-        const badge = document.getElementById('logoCountryBadge');
-        if (!badge || !countryCode) return;
-        badge.textContent = countryCode.toUpperCase();
-        badge.classList.add('show');
+        // header-er logo + auth page-er logo - দুই জায়গাতেই একইসাথে বসিয়ে দেওয়া হয়
+        const badges = document.querySelectorAll('.logo-country-badge');
+        if (!badges.length || !countryCode) return;
+        badges.forEach(function (badge) {
+            badge.textContent = countryCode.toUpperCase();
+            badge.classList.add('show');
+        });
     }
 
     function tryFetchCountry(providers, index) {
@@ -3910,34 +5730,4 @@ document.addEventListener('click', (e) => {
     } else {
         init();
     }
-})();
-
-/* ==================== Cursor-follow background glow (all pages) ==================== */
-(function () {
-    var ticking = false;
-    var lastX = window.innerWidth / 2;
-    var lastY = window.innerHeight * 0.4;
-
-    function applyGlow(x, y) {
-        var px = (x / window.innerWidth) * 100;
-        var py = (y / window.innerHeight) * 100;
-        document.documentElement.style.setProperty('--mx', px + '%');
-        document.documentElement.style.setProperty('--my', py + '%');
-    }
-
-    function onMove(e) {
-        var point = e.touches && e.touches[0] ? e.touches[0] : e;
-        lastX = point.clientX;
-        lastY = point.clientY;
-        if (!ticking) {
-            window.requestAnimationFrame(function () {
-                applyGlow(lastX, lastY);
-                ticking = false;
-            });
-            ticking = true;
-        }
-    }
-
-    window.addEventListener('mousemove', onMove, { passive: true });
-    window.addEventListener('touchmove', onMove, { passive: true });
 })();
