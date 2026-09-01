@@ -931,6 +931,17 @@ fastServersList.forEach((fs, fIdx) => {
     function renderModalContent(finalRating = "N/A") {
         if (document.getElementById('movieModalOverlay').style.display !== 'flex') return;
 
+        // N/A / khali thakle shei row/field ta hide kore dao (auto-detect na hole dekhabe na)
+        const hasVal = (v) => v !== undefined && v !== null && String(v).trim() !== "" && String(v).trim().toUpperCase() !== "N/A";
+
+        const directorRow = hasVal(director) ? `<div id="modalDirectorDiv"><strong>DIRECTOR</strong> ${director}</div>` : '';
+        const writerRow = hasVal(writer) ? `<div id="modalWriterDiv"><strong>WRITER</strong> ${writer}</div>` : '';
+        const castRow = hasVal(cast) ? `<div id="modalCastDiv"><strong>CAST</strong> ${cast}</div>` : '';
+        const awardsRow = hasVal(awards) ? `<div><strong>AWARDS</strong> <span id="modalAwardsVal">${awards}</span></div>` : '';
+        const budgetRow = hasVal(budgetFormatted) ? `<div class="meta-inline-item" id="modalBudgetDiv"><strong>BUDGET</strong> ${budgetFormatted}</div>` : '';
+        const revenueRow = hasVal(revenueFormatted) ? `<div class="meta-inline-item" id="modalRevenueDiv"><strong>REVENUE</strong> ${revenueFormatted}</div>` : '';
+        const budgetRevenueGroup = (budgetRow || revenueRow) ? `<div class="meta-inline-group">${budgetRow}${revenueRow}</div>` : '';
+
         modalBox.innerHTML = `
         <span class="modal-close-btn" onclick="closeMovieModal()">✖</span>
         <div class="movie-summary-card">
@@ -970,14 +981,11 @@ fastServersList.forEach((fs, fIdx) => {
             <div class="card-body-info">
                 <p class="card-plot-text" id="modalPlotText">${plot}</p>
                 <div class="card-meta-list">
-                    <div id="modalDirectorDiv"><strong>DIRECTOR</strong> ${director}</div>
-                    <div id="modalWriterDiv"><strong>WRITER</strong> ${writer}</div>
-                    <div id="modalCastDiv"><strong>CAST</strong> ${cast}</div>
-                    <div><strong>AWARDS</strong> <span id="modalAwardsVal">${awards}</span></div>
-                    <div class="meta-inline-group">
-                        <div class="meta-inline-item" id="modalBudgetDiv"><strong>BUDGET</strong> ${budgetFormatted}</div>
-                        <div class="meta-inline-item" id="modalRevenueDiv"><strong>REVENUE</strong> ${revenueFormatted}</div>
-                    </div>
+                    ${directorRow}
+                    ${writerRow}
+                    ${castRow}
+                    ${awardsRow}
+                    ${budgetRevenueGroup}
                 </div>
                 <div class="card-actions-row">
                     <button type="button" id="modalFavoriteBtn" class="btn-favorite-action${isMovieFavorited(movie.id) ? ' active' : ''}" onclick="toggleFavoriteMovie(currentModalMovie, document.getElementById('modalFavoriteBtn'))">${isMovieFavorited(movie.id) ? '❤️ In Favorites' : '🤍 Add to Favorites'}</button>
