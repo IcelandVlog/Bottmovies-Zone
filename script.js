@@ -3421,6 +3421,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     nl: 'Dutch', dut: 'Dutch', nld: 'Dutch', dutch: 'Dutch',
     sv: 'Swedish', swe: 'Swedish', swedish: 'Swedish',
     no: 'Norwegian', nor: 'Norwegian', norwegian: 'Norwegian',
+    nb: 'Norwegian (Norsk Bokmål)', nob: 'Norwegian (Norsk Bokmål)',
     da: 'Danish', dan: 'Danish', danish: 'Danish',
     fi: 'Finnish', fin: 'Finnish', finnish: 'Finnish',
     el: 'Greek', gre: 'Greek', ell: 'Greek', greek: 'Greek',
