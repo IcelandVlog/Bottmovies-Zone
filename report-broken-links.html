@@ -887,6 +887,14 @@
     /* =========================================
        CHAT TOGGLE & MESSAGE LOGIC
        ========================================= */
+    // একই Supabase project যেটা script.js / index.html-এর "Messages" admin
+    // ট্যাব ব্যবহার করে, যাতে এই পেজ থেকে পাঠানো মেসেজও সেখানে দেখা যায়।
+    const CHAT_SUPABASE_URL = 'https://borglnmrvjafodkqhhhv.supabase.co';
+    const CHAT_SUPABASE_KEY = 'sb_publishable_Q3WcdMEHLJO7SkO3Sd7BDQ_Ohu8xAp9';
+    const chatSupabaseClient = (typeof supabase !== 'undefined')
+        ? supabase.createClient(CHAT_SUPABASE_URL, CHAT_SUPABASE_KEY)
+        : null;
+
     let selectedImageBase64 = null;
     let selectedImageFile = null;
     let userMessagesList = [];
@@ -961,34 +969,24 @@
 
         if (!text && !selectedImageBase64) return;
 
-        let imageUrlForEmail = null;
+        // Snapshot the image before we clear it below — the upload happens
+        // in the background, so we need our own copies of these.
+        const imageBase64ToShow = selectedImageBase64;
+        const imageFileToUpload = selectedImageFile;
 
-        if (selectedImageFile) {
-            const formData = new FormData();
-            formData.append('image', selectedImageFile);
+        // Show the message instantly (like Messenger/WhatsApp) instead of
+        // waiting for the image to finish uploading to ImgBB first — a big
+        // photo could otherwise take a few seconds before anything appears.
+        appendMessage(text, imageBase64ToShow, 'sent');
 
-            try {
-                const res = await fetch('https://api.imgbb.com/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-                if (data && data.data && data.data.url) {
-                    imageUrlForEmail = data.data.url;
-                }
-            } catch (err) {
-                console.error("Image Upload Failed:", err);
-            }
-        }
-
-        appendMessage(text, selectedImageBase64, 'sent');
-
-        userMessagesList.push({
+        const historyEntry = {
             time: new Date().toLocaleTimeString(),
             text: text || "[Sent an image]",
-            imageUrl: imageUrlForEmail
-        });
+            imageUrl: null // filled in below once the upload finishes
+        };
+        userMessagesList.push(historyEntry);
 
+        // Reset the input right away so it feels instant to the visitor
         input.value = '';
         removeFile();
         document.getElementById('emoji-picker').style.display = 'none';
@@ -996,6 +994,53 @@
         setTimeout(() => {
             appendMessage("Thank you for your feedback!", null, 'received');
         }, 1000);
+
+        // Upload the image (if any) and save to the database in the
+        // background — the visitor doesn't have to wait for this.
+        let imageUrlForEmail = null;
+        if (imageFileToUpload) {
+            const formData = new FormData();
+            formData.append('image', imageFileToUpload);
+
+            try {
+                const res = await fetch('https://api.imgbb.com/1/upload?key=2eefbfb00c952b1e751336a8d5e14417', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data && data.data && data.data.url) {
+                    // Prefer a smaller sized version (ImgBB provides "medium" or
+                    // "thumb" variants) so the admin panel's ✉️ Messages tab —
+                    // which only ever displays this at 180px — doesn't have to
+                    // download the full-resolution original just to shrink it.
+                    const info = data.data;
+                    imageUrlForEmail = (info.medium && info.medium.url) || (info.thumb && info.thumb.url) || info.url;
+                    historyEntry.imageUrl = imageUrlForEmail;
+                } else {
+                    console.error('Image Upload Failed: unexpected response', data);
+                    appendMessage("⚠️ Your photo couldn't be uploaded, so it wasn't attached. Your text message was still sent.", null, 'received');
+                }
+            } catch (err) {
+                console.error("Image Upload Failed:", err);
+                appendMessage("⚠️ Your photo couldn't be uploaded, so it wasn't attached. Your text message was still sent.", null, 'received');
+            }
+        }
+
+        // Save the message to the database so it actually shows up in the
+        // admin panel's ✉️ Messages tab (previously this only lived in the
+        // browser and was emailed on close — nothing was ever saved).
+        if (chatSupabaseClient) {
+            chatSupabaseClient.from('support_messages').insert([{
+                message: text || '[Sent an image]',
+                sender: 'visitor',
+                image_url: imageUrlForEmail || null
+            }]).then(({ error }) => {
+                if (error) {
+                    console.error('Support message save error:', error);
+                    appendMessage("⚠️ Couldn't save your message (" + error.message + "). It may still have been emailed.", null, 'received');
+                }
+            });
+        }
     }
 
     function appendMessage(text, imgData, type) {

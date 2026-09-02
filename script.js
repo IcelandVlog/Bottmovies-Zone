@@ -3429,6 +3429,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     nl: 'Dutch', dut: 'Dutch', nld: 'Dutch', dutch: 'Dutch',
     sv: 'Swedish', swe: 'Swedish', swedish: 'Swedish',
     no: 'Norwegian', nor: 'Norwegian', norwegian: 'Norwegian',
+    nb: 'Norwegian (Norsk Bokmål)', nob: 'Norwegian (Norsk Bokmål)',
     da: 'Danish', dan: 'Danish', danish: 'Danish',
     fi: 'Finnish', fin: 'Finnish', finnish: 'Finnish',
     el: 'Greek', gre: 'Greek', ell: 'Greek', greek: 'Greek',
@@ -3454,7 +3455,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     lv: 'Latvian', lav: 'Latvian', latvian: 'Latvian',
     et: 'Estonian', est: 'Estonian', estonian: 'Estonian',
     is: 'Icelandic', ice: 'Icelandic', isl: 'Icelandic', icelandic: 'Icelandic',
-    tl: 'Filipino', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
+    tl: 'Filipino (Tagalog)', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
     sw: 'Swahili', swa: 'Swahili', swahili: 'Swahili',
     af: 'Afrikaans', afr: 'Afrikaans', afrikaans: 'Afrikaans',
     am: 'Amharic', amh: 'Amharic', amharic: 'Amharic',
@@ -4926,6 +4927,7 @@ function renderAdminMessagesList() {
             <div class="admin-db-info">
                 <div class="admin-db-title">${isAdminMsg ? '🛠 Admin (You)' : '👤 Visitor'}</div>
                 <div class="admin-db-meta">${escapeHtml(msg.message || '')}</div>
+                ${msg.image_url ? `<a href="${escapeHtml(msg.image_url)}" target="_blank" rel="noopener"><img src="${escapeHtml(msg.image_url)}" alt="Attached image" loading="lazy" style="max-width:180px;max-height:180px;border-radius:8px;margin-top:8px;display:block;"></a>` : ''}
                 <div class="admin-alert-meta-row"><span class="admin-alert-time">${timeAgo}</span></div>
             </div>
             <div class="admin-db-actions">
