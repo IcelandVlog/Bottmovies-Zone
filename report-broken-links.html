@@ -244,6 +244,23 @@
     .rc-form-msg { font-size: 12.5px; color: var(--danger-color); min-height: 14px; }
     .rc-form-msg.success { color: #2e7d32; }
 
+    /* Shown instead of the "Your Name" input when the visitor is logged in -
+       pulls their real name + profile picture from "profiles" automatically. */
+    .rc-reporter-identity {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px;
+        padding: 8px 12px; font-size: 13px; color: var(--text-main);
+    }
+    .rc-reporter-identity img {
+        width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+    }
+    .rc-reporter-identity .rc-reporter-avatar-fallback {
+        width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+        background: var(--lang-btn-bg); color: var(--accent-color);
+        display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;
+    }
+    .rc-reporter-identity strong { color: var(--text-strong); }
+
     /* =========================================
        CHAT WIDGET STYLES
        ========================================= */
@@ -660,6 +677,7 @@
         </div>
         <input type="url" id="brLinkUrlInput" class="rc-input" placeholder="Broken Link URL (optional)" maxlength="500">
         <textarea id="brProblemText" class="rc-textarea" rows="3" placeholder="What's wrong? (e.g. won't play, black screen, link not found)*"></textarea>
+        <div class="rc-reporter-identity" id="brReporterIdentity" style="display:none;"></div>
         <input type="text" id="brNameInput" class="rc-input" placeholder="Your Name (optional)" maxlength="40">
         <button type="button" class="rc-btn-submit" id="brSubmitBtn" onclick="submitBrokenLinkReport()">SUBMIT REPORT</button>
         <div class="rc-form-msg" id="brFormMsg"></div>
@@ -680,6 +698,7 @@
         <div class="rc-composer">
             <h3 id="rcComposerTitle">ADD COMMENT</h3>
             <textarea id="rcComposerText" class="rc-textarea" rows="4" placeholder="Comment Text*"></textarea>
+            <div class="rc-reporter-identity" id="rcComposerIdentity" style="display:none;"></div>
             <input type="text" id="rcComposerName" class="rc-input" placeholder="Name*" maxlength="40">
             <button type="button" class="rc-btn-submit" id="rcComposerSubmitBtn" onclick="submitTopComment()">SUBMIT COMMENT</button>
             <div class="rc-form-msg" id="rcComposerMsg"></div>
@@ -1167,6 +1186,62 @@
     let totalCount = 0;
     let lastGuestName = '';
     let movieTitleMap = {}; // lowercase title -> movie id (for linking the report to the right movie)
+    let reporterIdentity = null; // { name, avatarUrl } - set when the visitor is logged in
+
+    // Logged-in visitors don't have to type their name on the broken-link
+    // report form OR the comment box below it anymore - their real name +
+    // profile picture (from "profiles") is pulled in automatically and both
+    // fields are locked. Logged-out visitors keep seeing the old "Name"
+    // inputs, unchanged.
+    function applyIdentityToField(nameInputId, identityBoxId, actionLabel, name, avatarUrl) {
+        const nameInput = document.getElementById(nameInputId);
+        const identityBox = document.getElementById(identityBoxId);
+        if (!name) {
+            if (nameInput) { nameInput.style.display = ''; nameInput.readOnly = false; }
+            if (identityBox) { identityBox.style.display = 'none'; identityBox.innerHTML = ''; }
+            return;
+        }
+        if (nameInput) { nameInput.value = name; nameInput.style.display = 'none'; nameInput.readOnly = true; }
+        if (identityBox) {
+            identityBox.style.display = 'flex';
+            identityBox.innerHTML = (avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="">` : `<div class="rc-reporter-avatar-fallback">${escapeHtml(initialOf(name))}</div>`)
+                + `<span>${actionLabel} <strong>${escapeHtml(name)}</strong></span>`;
+        }
+    }
+
+    async function applyReporterIdentity(session) {
+        if (!session || !session.user) {
+            reporterIdentity = null;
+            applyIdentityToField('brNameInput', 'brReporterIdentity', 'Reporting as', null, null);
+            applyIdentityToField('rcComposerName', 'rcComposerIdentity', 'Commenting as', null, null);
+            return;
+        }
+
+        const ADMIN_TRIGGER_EMAIL = '702640Shamil@admin.com';
+        const isAdmin = (session.user.email || '').toLowerCase() === ADMIN_TRIGGER_EMAIL.toLowerCase();
+        let name = isAdmin ? 'Admin' : (session.user.user_metadata?.full_name || session.user.user_metadata?.username || (session.user.email || '').split('@')[0]);
+        let avatarUrl = '';
+
+        if (!isAdmin) {
+            try {
+                const { data, error } = await sb
+                    .from('profiles')
+                    .select('username, full_name, avatar_url')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+                if (!error && data) {
+                    name = data.full_name || data.username || name;
+                    avatarUrl = data.avatar_url || '';
+                }
+            } catch (e) {
+                console.error('Could not load reporter identity:', e);
+            }
+        }
+
+        reporterIdentity = { name, avatarUrl };
+        applyIdentityToField('brNameInput', 'brReporterIdentity', 'Reporting as', name, avatarUrl);
+        applyIdentityToField('rcComposerName', 'rcComposerIdentity', 'Commenting as', name, avatarUrl);
+    }
 
     function escapeHtml(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
@@ -1430,7 +1505,8 @@
             link_label: linkLabel.slice(0, 500),
             link_url: url,
             source: 'visitor_report',
-            status: 'open'
+            status: 'open',
+            reporter_avatar_url: (reporterIdentity && reporterIdentity.avatarUrl) || null
         }]);
 
         btn.disabled = false;
@@ -1452,6 +1528,8 @@
     };
 
     async function init() {
+        sb.auth.getSession().then(res => applyReporterIdentity(res.data.session));
+        sb.auth.onAuthStateChange((_event, session) => applyReporterIdentity(session));
         loadMovieTitlesForReportForm(); // report form-এর জন্য movie autocomplete লোড (non-blocking)
         const { count } = await sb.from('link_report_comments')
             .select('id', { count: 'exact', head: true })

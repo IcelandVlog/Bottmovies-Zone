@@ -2,6 +2,21 @@ const OMDB_API_KEY = "d246cca2";
 const TMDB_API_KEY = "ffa63099e82a2b25d082dcd0c040c8fb"; 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
+// একই মুভির TMDB/OMDb ডিটেইলস বারবার fetch না করে ক্যাশ করে রাখার জন্য -
+// দেখুন getFullTMDBDetails() / getOMDbDetails() এর কমেন্ট
+const tmdbDetailsCache = new Map();
+const omdbDetailsCache = new Map();
+
+// দ্রুত একটার পর একটা কল হওয়া আটকায় (যেমন search বক্সে টাইপ করার সময়
+// প্রতিটা key press) - শেষ কলটার `wait` মিলিসেকেন্ড পরে আসল ফাংশনটা চলে
+function debounce(fn, wait) {
+    let t;
+    return function (...args) {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(this, args), wait);
+    };
+}
+
 // ==================== DATABASE CONFIG & INITIALIZATION ====================
 
 // Supabase Project Config
@@ -158,11 +173,21 @@ async function fetchMoviesFromSupabase() {
             } else {
                 allMovies = allMovies.reverse();
             }
+            // category নামের ঠিক পরে ?page= বসানো থাকে (যেমন #anime?page=2),
+            // তাই hash কে category আর page — এই দুই ভাগে ভেঙে পড়া হচ্ছে
             let initialCategory = window.location.hash.replace('#', '');
+            let initialPage = 1;
+            const initialQIndex = initialCategory.indexOf('?');
+            if (initialQIndex !== -1) {
+                const hashPageParams = new URLSearchParams(initialCategory.substring(initialQIndex + 1));
+                const p = parseInt(hashPageParams.get('page'), 10);
+                if (p && p > 0) initialPage = p;
+                initialCategory = initialCategory.substring(0, initialQIndex);
+            }
             if (!initialCategory) {
                 initialCategory = document.body.getAttribute('data-category') || 'all';
             }
-            switchCategory(initialCategory);
+            switchCategory(initialCategory, initialPage);
 
             // page refresh এ যদি Admin Panel আগে থেকেই খোলা থাকে (URL এ ?dashboard=1),
             // তাহলে movies data লোড হওয়ার আগেই ঐ ট্যাবের কন্টেন্ট রেন্ডার হয়ে "No content found" /
@@ -392,6 +417,19 @@ async function autoCheckDownloadLinks(movie) {
 // ==================== API DETAILS FETCHING ====================
 
 async function getFullTMDBDetails(movie) {
+    // একই মুভির জন্য বারবার TMDB কল না করে ক্যাশ করে রাখা হয় - না হলে
+    // search box এ প্রতিটা key press এ grid re-render হয় আর প্রতিটা card
+    // এর জন্য আবার নতুন করে fetch শুরু হয়, স্লো মোবাইল কানেকশনে এটা
+    // request জ্যাম তৈরি করে ফেলে (তখন মুভি খুললেও poster/rating "N/A"
+    // দেখায়, কারণ ততক্ষণে network এ ভিড় জমে থাকে বা rate-limit হয়ে যায়)।
+    const cacheKey = movie && (movie.id != null ? `id:${movie.id}` : `title:${(movie.searchName || movie.title || '').toLowerCase()}`);
+    if (cacheKey && tmdbDetailsCache.has(cacheKey)) return tmdbDetailsCache.get(cacheKey);
+    const promise = fetchFullTMDBDetailsUncached(movie);
+    if (cacheKey) tmdbDetailsCache.set(cacheKey, promise);
+    return promise;
+}
+
+async function fetchFullTMDBDetailsUncached(movie) {
     if (!TMDB_API_KEY) return null;
     try {
         let mediaType = movie.tmdbType || 'movie';
@@ -515,6 +553,16 @@ async function getFullTMDBDetails(movie) {
 }
 
 async function getOMDbDetails(movie) {
+    // TMDB এর মতো এটাতেও ক্যাশ - বারবার একই মুভির জন্য OMDb কল এড়াতে
+    // (OMDb এর free key তে rate limit আছে, বারবার কল করলে সেটাও ফুরিয়ে যেতে পারে)
+    const cacheKey = movie && (movie.id != null ? `id:${movie.id}` : `title:${(movie.searchName || movie.title || '').toLowerCase()}`);
+    if (cacheKey && omdbDetailsCache.has(cacheKey)) return omdbDetailsCache.get(cacheKey);
+    const promise = fetchOMDbDetailsUncached(movie);
+    if (cacheKey) omdbDetailsCache.set(cacheKey, promise);
+    return promise;
+}
+
+async function fetchOMDbDetailsUncached(movie) {
     try {
         const cleanImdb = extractImdbId(movie.imdbId);
         const cleanName = (movie.searchName || movie.title).replace(/\s*\([\d\-]+\)/g, '').trim();
@@ -689,6 +737,21 @@ function renderMoviesByPage(movies, page) {
     if (!grid) return;
     grid.innerHTML = '';
     currentPage = page;
+
+    // Refresh দিলেও যে page (1, 2, 3...) এ ছিলাম সেখানেই থাকার জন্য URL এর hash এ
+    // category নামের ঠিক পরে ?page= বসিয়ে রাখা হয় (যেমন #anime?page=2)
+    // (dashboard/auth মোডাল URL এ খোলা থাকলে সেটাতে হাত দেওয়া হয় না)
+    const pageUrlParams = new URLSearchParams(window.location.search);
+    if (!pageUrlParams.has('dashboard') && !pageUrlParams.has('auth')) {
+        const rawHash = window.location.hash.replace('#', '');
+        const hashQIndex = rawHash.indexOf('?');
+        const hashCategory = hashQIndex === -1 ? rawHash : rawHash.substring(0, hashQIndex);
+        const newHash = page > 1
+            ? '#' + hashCategory + '?page=' + page
+            : (hashCategory ? '#' + hashCategory : '');
+        const newUrl = window.location.pathname + window.location.search + newHash;
+        history.replaceState(null, '', newUrl);
+    }
 
     if (movies.length === 0) {
         grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #888; padding: 50px 0;">No content found!</p>`;
@@ -1234,7 +1297,7 @@ function searchMovies() {
 
 // ==================== NAVIGATION & CATEGORY SWITCH ====================
 
-function switchCategory(category) {
+function switchCategory(category, initialPage) {
     if (!category) return;
 
     const targetLink = document.querySelector(`.nav-link[data-target="${category}"]`);
@@ -1267,14 +1330,21 @@ function switchCategory(category) {
     }
     if (noticeBanner) noticeBanner.style.display = 'block';
 
-    const targetHash = `#${category}`;
+    // Home ("all") এ থাকলে URL এ #all লেখা থাকবে না - পরিষ্কার URL এর জন্য
+    // (hash এ "category?page=N" থাকতে পারে, তুলনা করার জন্য শুধু category অংশটুকু বের করা হচ্ছে)
+    const currentHashCategory = window.location.hash.replace('#', '').split('?')[0];
+    const targetHash = category === 'all' ? '' : `#${category}`;
     if (window.location.protocol === 'file:') {
-        if (window.location.hash !== targetHash) {
-            window.location.hash = category;
+        if (currentHashCategory !== (category === 'all' ? '' : category)) {
+            if (category === 'all') {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            } else {
+                window.location.hash = category;
+            }
         }
     } else {
         const cleanPath = window.location.pathname.replace(/index\.html$/, '');
-        if (window.location.hash !== targetHash || window.location.pathname.includes('index.html')) {
+        if (currentHashCategory !== (category === 'all' ? '' : category) || window.location.pathname.includes('index.html')) {
             history.pushState(null, '', cleanPath + targetHash);
         }
     }
@@ -1298,7 +1368,7 @@ function switchCategory(category) {
         if (searchInput) searchInput.value = '';
         if (searchSuggestions) searchSuggestions.style.display = 'none';
 
-        renderMoviesByPage(currentFilteredMovies, 1);
+        renderMoviesByPage(currentFilteredMovies, initialPage || 1);
     }
 }
 
@@ -1326,8 +1396,17 @@ function setupNavigation() {
     });
 
     window.addEventListener('popstate', function() {
-        const currentHash = window.location.hash.replace('#', '');
-        switchCategory(currentHash || 'all');
+        // hash এখন "category?page=N" ফরম্যাটে থাকে, তাই back/forward এ গেলে দুটোই আলাদা করে পড়া হচ্ছে
+        let currentHash = window.location.hash.replace('#', '');
+        let currentPageFromHash = 1;
+        const qIndex = currentHash.indexOf('?');
+        if (qIndex !== -1) {
+            const hashParams = new URLSearchParams(currentHash.substring(qIndex + 1));
+            const p = parseInt(hashParams.get('page'), 10);
+            if (p && p > 0) currentPageFromHash = p;
+            currentHash = currentHash.substring(0, qIndex);
+        }
+        switchCategory(currentHash || 'all', currentPageFromHash);
     });
 }
 
@@ -1376,8 +1455,8 @@ function initApp() {
     if (searchBtn) searchBtn.addEventListener('click', searchMovies);
     if (searchInput) {
         searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchMovies(); });
-        searchInput.addEventListener('input', function() {
-            const query = this.value.trim();
+        const handleSearchInput = debounce(function() {
+            const query = searchInput.value.trim();
 
             searchSuggestions.innerHTML = '';
             if (!query) {
@@ -1405,7 +1484,8 @@ function initApp() {
                 searchSuggestions.appendChild(item);
             });
             searchSuggestions.style.display = 'block';
-        });
+        }, 350);
+        searchInput.addEventListener('input', handleSearchInput);
     }
 
     const menuToggleBtn = document.getElementById('menuToggleBtn');
@@ -3455,7 +3535,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     lv: 'Latvian', lav: 'Latvian', latvian: 'Latvian',
     et: 'Estonian', est: 'Estonian', estonian: 'Estonian',
     is: 'Icelandic', ice: 'Icelandic', isl: 'Icelandic', icelandic: 'Icelandic',
-    tl: 'Filipino (Tagalog)', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
+    tl: 'Filipino', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
     sw: 'Swahili', swa: 'Swahili', swahili: 'Swahili',
     af: 'Afrikaans', afr: 'Afrikaans', afrikaans: 'Afrikaans',
     am: 'Amharic', amh: 'Amharic', amharic: 'Amharic',
@@ -5019,7 +5099,11 @@ function renderAdminAlertsList() {
         const isAuto = alert.source === 'auto_check';
         const sourceTag = isAuto ? '<span class="admin-alert-source-tag auto">🤖 Auto-Check</span>' : '<span class="admin-alert-source-tag">👤 Visitor Report</span>';
         const timeAgo = formatTimeAgo(alert.created_at) || '';
+        const reporterAvatar = alert.reporter_avatar_url
+            ? `<img class="admin-db-thumb" src="${escapeHtml(alert.reporter_avatar_url)}" referrerpolicy="no-referrer" style="border-radius:50%;" onerror="this.style.display='none';">`
+            : '';
         card.innerHTML = `
+            ${reporterAvatar}
             <div class="admin-db-info">
                 <div class="admin-db-title">${escapeHtml(alert.movie_title || 'Untitled')}</div>
                 <div class="admin-db-meta">${escapeHtml(alert.link_label || 'Download Link')}</div>
