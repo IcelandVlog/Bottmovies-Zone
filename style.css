@@ -1948,7 +1948,7 @@ html.light-mode .admin-request-link-btn:hover { background-color: #e6ddff; }
 
 .comments-list {
     display: flex; flex-direction: column; gap: 4px;
-    max-height: 520px; overflow-y: auto; padding-right: 6px;
+    max-height: 400px; overflow-y: auto; padding-right: 6px;
     scrollbar-width: thin; scrollbar-color: #2a3348 transparent;
 }
 .comments-list::-webkit-scrollbar { width: 8px; }

@@ -3563,6 +3563,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     eu: 'Basque', baq: 'Basque', eus: 'Basque', basque: 'Basque',
     ca: 'Catalan', cat: 'Catalan', catalan: 'Catalan',
     gl: 'Galician', glg: 'Galician', galician: 'Galician',
+    und: 'Unknown',
     ht: 'Haitian Creole', hat: 'Haitian Creole',
 
     // ---- Spanish (es) — generic code + regional/locale variants ----
