@@ -114,6 +114,22 @@
 </div>
 </header>
 
+<!-- ==================== HOME HERO BANNER (Featured / Trending slider) ====================
+     শুধু Home ("all" category) পেজেই দেখা যাবে - অন্য কোনো category/page-এ গেলে CSS দিয়ে hide
+     হয়ে যায় (দেখুন body[data-category] rule, style.css)। Admin Panel > Homepage Banner ট্যাব
+     থেকে কোন কোন Movie/Series এখানে দেখাবে সেটা add/remove করা যায়। কিছু add করা না থাকলে
+     এমনিতেই সবচেয়ে বেশি ভিউ হওয়া (Trending) কনটেন্ট থেকে সেরা কয়েকটা এখানে অটো দেখাবে।
+     প্রতিটা slide-এর background poster/backdrop আলাদাভাবে TMDB থেকে fetch করা হয় (script.js
+     এর fetchHeroBackdrop() ফাংশন) - movie card এর সাধারণ poster থেকে এটা আলাদা। -->
+<section class="hero-banner" id="heroBanner" aria-label="Featured content" style="display:none;">
+    <div class="hero-banner-track" id="heroBannerTrack">
+        <div class="hero-banner-loading" id="heroBannerLoading">Loading featured content...</div>
+    </div>
+    <button type="button" class="hero-nav-btn hero-nav-prev" id="heroPrevBtn" aria-label="Previous slide" onclick="heroPrev()">&#10094;</button>
+    <button type="button" class="hero-nav-btn hero-nav-next" id="heroNextBtn" aria-label="Next slide" onclick="heroNext()">&#10095;</button>
+    <div class="hero-dots" id="heroDots"></div>
+</section>
+
 <main class="content-container">
 <div class="movie-grid" id="movieGrid"></div>
 <div class="pagination" id="paginationContainer"></div>
@@ -398,6 +414,7 @@
                 <button type="button" class="admin-nav-btn active" id="adminNavBtnDashboard" onclick="switchAdminTab('dashboard')">📊 <span>Dashboard</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnAdd" onclick="switchAdminTab('add')">➕ <span>Add / Edit Content</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnManage" onclick="switchAdminTab('manage')">🗂 <span>Database</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎬 <span>Homepage Banner</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnRequests" onclick="switchAdminTab('requests')">📥 <span>Request Here</span><span class="admin-nav-badge" id="adminRequestsCount" style="display:none;"></span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnMessages" onclick="switchAdminTab('messages')">✉️ <span>Messages</span><span class="admin-nav-badge" id="adminMessagesCount" style="display:none;"></span></button>
@@ -578,6 +595,27 @@
                     <div class="admin-database-list" id="adminDatabaseList"></div>
                 </div>
 
+                <!-- HOMEPAGE BANNER TAB (Featured hero slider content management) -->
+                <div class="admin-tab-content" id="adminTabBanner" style="display:none;">
+                    <div class="admin-banner-columns">
+                        <div class="admin-banner-col">
+                            <div class="admin-banner-col-title">✅ Currently in Banner (<span id="adminBannerSelectedCount">0</span>)</div>
+                            <div class="admin-manage-search"><input type="text" id="adminBannerSelectedSearchInput" placeholder="🔍 Search added content..."></div>
+                            <div class="admin-banner-list" id="adminBannerSelectedList"><div class="admin-db-empty">No content added yet — Trending will auto-play.</div></div>
+                        </div>
+                        <div class="admin-banner-col">
+                            <div class="admin-banner-col-title">📚 All Content</div>
+                            <div class="admin-manage-search">
+                                <input type="text" id="adminBannerSearchInput" placeholder="🔍 Search content to add...">
+                            </div>
+                            <div class="admin-banner-list" id="adminBannerAllList"></div>
+                        </div>
+                    </div>
+
+                    <div id="adminBannerMsg" class="admin-form-msg"></div>
+                    <button type="button" class="admin-submit-btn" id="adminBannerSaveBtn" onclick="saveAdminBannerSelection()">💾 Save Banner</button>
+                </div>
+
                 <!-- COMMENTS TAB -->
                 <div class="admin-tab-content" id="adminTabComments" style="display:none;">
                     <div class="admin-manage-search">
@@ -615,6 +653,32 @@
 
     </div>
 </div>
+</div>
+
+<!-- BANNER IMAGE MODAL (used from the Homepage Banner admin tab, set/replace a manual banner image) -->
+<div class="modal-overlay" id="adminBannerImageModalOverlay" onclick="if(event.target===this) closeAdminBannerImageModal()">
+    <div class="modal-box" id="adminBannerImageModalBox" style="max-width:420px;">
+        <div class="modal-close-btn" onclick="closeAdminBannerImageModal()">✕</div>
+        <h3 style="margin:0 0 14px; font-size:16px; color:#fff;">🖼️ Set Banner Image</h3>
+        <div id="adminBannerImageModalMovieTitle" style="color:#94a3b8; font-size:12.5px; margin-bottom:14px;"></div>
+
+        <div class="admin-field">
+            <div class="admin-toggle-group" id="adminBannerImgModeGroup">
+                <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setAdminBannerImgMode('link')">🔗 Link</button>
+                <button type="button" class="admin-toggle-btn" data-value="file" onclick="setAdminBannerImgMode('file')">📁 Upload File</button>
+            </div>
+            <input type="text" id="adminBannerImgLinkInput" placeholder="https://... poster/banner image link" style="margin-top:8px;" oninput="updateAdminBannerImgPreview()">
+            <input type="file" id="adminBannerImgFileInput" accept="image/*" style="display:none; margin-top:8px;" onchange="handleAdminBannerImgFileChange(event)">
+            <div id="adminBannerImgPreviewWrap" style="display:none; margin-top:10px;"><img id="adminBannerImgPreview" class="admin-poster-preview"></div>
+        </div>
+
+        <div id="adminBannerImageModalMsg" class="admin-form-msg"></div>
+
+        <div style="display:flex; gap:10px; margin-top:6px;">
+            <button type="button" class="admin-submit-btn" id="adminBannerImageSaveBtn" onclick="saveAdminBannerImage()" style="flex:1;">💾 Save</button>
+            <button type="button" class="admin-cancel-edit-btn" onclick="removeAdminBannerImage()" style="flex:1; display:block;">🗑️ Remove &amp; Use Auto</button>
+        </div>
+    </div>
 </div>
 
 <footer class="main-footer" style="padding-top: 15px; padding-bottom: 15px;">
