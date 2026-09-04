@@ -28,20 +28,6 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DOWNLOAD_HEADER_ICON = '⚡';
 
-// ==================== HOME HERO BANNER (Featured / Trending slider) ====================
-// শুধুমাত্র Home ("all" category) এ দেখানো হয় - অন্য কোনো category তে গেলে hide হয়ে যায়
-// (দেখুন updateHeroBannerVisibility())। Admin যদি কিছু "featured" করে না রাখে, তাহলে
-// সবচেয়ে বেশি views হওয়া (Trending) কনটেন্ট থেকে সেরা কয়েকটা এখানে অটো চলবে।
-const HERO_AUTOPLAY_MS = 6000;
-const HERO_MIN_TRENDING_FALLBACK = 5;
-const HERO_MAX_TRENDING_FALLBACK = 7;
-const heroBackdropCache = {}; // movie id -> banner image URL (movie card এর মতোই একই poster resolve হয়, শুধু widescreen backdrop পাওয়া গেলে সেটা bonus হিসেবে ব্যবহার হয়)
-let heroSlidesData = [];
-let heroCurrentIndex = 0;
-let heroAutoplayTimer = null;
-let heroBannerBuilt = false;
-let heroTouchStartX = null;
-
 const DEFAULT_FAST_SERVERS = [
     { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://1024teradownloader.com/" },
     { label: "Server 02: Terabox Link To Fast Downloader WEB", link: "https://teraboxdl.site/" }
@@ -95,16 +81,6 @@ function makePosterPlaceholder(label) {
 }
 const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
 const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
-
-// Home hero banner এর জন্য widescreen (16:6.2) placeholder - TMDB/OMDb তে ম্যাচ না পাওয়া
-// গেলে এবং movie.poster ও খালি থাকলে, স্লাইড পুরোপুরি কালো/ফাঁকা না দেখিয়ে অন্তত মুভির
-// নাম সহ একটা ছবি দেখাবে - এতে বোঝা যাবে যে এটা লোডিং সমস্যা না, বরং ছবিই পাওয়া যায়নি
-function makeHeroPlaceholder(title) {
-    const safeLabel = escapeHtml((title || 'No Image Found').slice(0, 40));
-    return "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="500"><rect width="1280" height="500" fill="#14161c"/><path d="M560 250l60-70 55 55 65-85 60 68" stroke="#2a2f3d" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="600" cy="190" r="20" fill="#2a2f3d"/><text x="640" y="330" font-family="sans-serif" font-size="24" fill="#3a4152" text-anchor="middle">${safeLabel}</text></svg>`
-    );
-}
 
 // A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
 // warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
@@ -212,7 +188,6 @@ async function fetchMoviesFromSupabase() {
                 initialCategory = document.body.getAttribute('data-category') || 'all';
             }
             switchCategory(initialCategory, initialPage);
-            renderHeroBanner();
 
             // page refresh এ যদি Admin Panel আগে থেকেই খোলা থাকে (URL এ ?dashboard=1),
             // তাহলে movies data লোড হওয়ার আগেই ঐ ট্যাবের কন্টেন্ট রেন্ডার হয়ে "No content found" /
@@ -224,8 +199,6 @@ async function fetchMoviesFromSupabase() {
                 } else if (currentAdminTab === 'manage') {
                     const searchInput = document.getElementById('adminSearchInput');
                     renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
-                } else if (currentAdminTab === 'banner') {
-                    initAdminBannerTab();
                 } else if (currentAdminTab === 'trash') {
                     renderAdminTrashList();
                 }
@@ -1345,255 +1318,6 @@ function searchMovies() {
     }
 }
 
-// ==================== HOME HERO BANNER FUNCTIONS ====================
-
-// এই box এর ছবি এখন movie card এ যেই poster দেখানো হয় (movie.poster, না হলে
-// getFullTMDBDetails/getOMDbDetails দিয়ে resolve করা poster) সেটাই আগে ব্যবহার করে -
-// কারণ card এ যেটা reliably দেখা যাচ্ছে সেটাই এখানেও নিশ্চিতভাবে দেখানো উচিত।
-// শুধু TMDB তে widescreen backdrop_path পাওয়া গেলে সেটাকে বাড়তি bonus হিসেবে ব্যবহার
-// করা হয় (banner এ ভালো দেখায় বলে), কিন্তু সেটা না পাওয়া গেলেও poster দিয়েই কাজ চলবে -
-// আগের ভার্সনে backdrop_path না পেলে পুরো স্লাইড খালি/কালো দেখাতো, এখন আর তা হবে না।
-async function fetchHeroBackdrop(movie) {
-    if (!movie) return null;
-    const cacheKey = movie.id ?? movie.tmdbId ?? movie.imdbId ?? movie.searchName ?? movie.title;
-    if (cacheKey !== undefined && heroBackdropCache.hasOwnProperty(cacheKey)) {
-        return heroBackdropCache[cacheKey];
-    }
-
-    let result = null;
-
-    // ধাপ ১: movie.poster - এটা সবচেয়ে নির্ভরযোগ্য, সরাসরি ডাটাবেজ থেকে আসে
-    if (movie.poster) {
-        result = { backdrop: movie.poster, year: null };
-    }
-
-    // ধাপ ২: card এর জন্য যেটা ব্যবহার হয় সেই একই cached TMDB lookup - poster_path (widescreen
-    // backdrop_path থাকলে সেটাকেই প্রাধান্য দেওয়া হচ্ছে, কারণ banner এ ভালো মানায়)
-    try {
-        const tmdb = await getFullTMDBDetails(movie);
-        if (tmdb) {
-            let wideBackdrop = null;
-            if (tmdb.id) {
-                try {
-                    const mediaType = tmdb.mediaType || 'movie';
-                    const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${tmdb.id}?api_key=${TMDB_API_KEY}`, {}, 6000);
-                    if (detailRes.ok) {
-                        const detailData = await detailRes.json();
-                        if (detailData.backdrop_path) wideBackdrop = `https://image.tmdb.org/t/p/original${detailData.backdrop_path}`;
-                    }
-                } catch (e) { /* backdrop bonus না পেলেও সমস্যা নেই, নিচে poster fallback আছে */ }
-            }
-            if (wideBackdrop || tmdb.poster) {
-                result = {
-                    backdrop: wideBackdrop || result?.backdrop || tmdb.poster,
-                    year: tmdb.year && tmdb.year !== 'N/A' ? tmdb.year : null
-                };
-            }
-        }
-    } catch (e) {
-        console.warn('Hero TMDB fetch failed for', movie.title, e);
-    }
-
-    // ধাপ ৩: এখনো কিছু না পেলে OMDb (একই cached function যেটা card এ ব্যবহার হয়)
-    if (!result || !result.backdrop) {
-        try {
-            const omdb = await getOMDbDetails(movie);
-            if (omdb && omdb.poster) {
-                result = { backdrop: omdb.poster, year: (omdb.year || '').match(/\d{4}/)?.[0] || null };
-            }
-        } catch (e) {
-            console.warn('Hero OMDb fetch failed for', movie.title, e);
-        }
-    }
-
-    if (!result || !result.backdrop) {
-        result = { backdrop: movie.poster || null, year: (result && result.year) || null };
-    }
-    if (cacheKey !== undefined) heroBackdropCache[cacheKey] = result;
-    return result;
-}
-
-function getHeroCategoryLabel(movie) {
-    const cats = Array.isArray(movie.category) ? movie.category : (movie.category ? String(movie.category).split('|') : []);
-    const clean = cats.find(c => c && c.trim().toLowerCase() !== 'all');
-    if (!clean) return movie.tmdbType === 'tv' ? 'Web Series' : 'Movie';
-    return clean.trim().split(/[-_]/g).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
-
-// Admin কোনো কনটেন্ট "featured" হিসেবে সিলেক্ট না করলে, সবচেয়ে বেশি views হওয়া
-// (Trending) কনটেন্ট থেকে সেরা ৫-৭টা এখানে অটোমেটিক দেখানো হয়
-function buildHeroSlidesList() {
-    const source = Array.isArray(allMovies) ? allMovies : [];
-    const featured = source
-        .filter(m => m.featured)
-        .sort((a, b) => (Number(a.featured_order) || 0) - (Number(b.featured_order) || 0));
-
-    if (featured.length > 0) return featured;
-
-    const trending = [...source].sort((a, b) => (Number(b.views) || 0) - (Number(a.views) || 0));
-    return trending.slice(0, Math.min(HERO_MAX_TRENDING_FALLBACK, Math.max(HERO_MIN_TRENDING_FALLBACK, trending.length)));
-}
-
-function heroWatchNow(index) {
-    const movie = heroSlidesData[index];
-    if (movie) openMovieModal(movie);
-}
-
-function stopHeroAutoplay() {
-    if (heroAutoplayTimer) {
-        clearInterval(heroAutoplayTimer);
-        heroAutoplayTimer = null;
-    }
-}
-
-function startHeroAutoplay() {
-    stopHeroAutoplay();
-    if (heroSlidesData.length <= 1) return;
-    heroAutoplayTimer = setInterval(() => goToHeroSlide(heroCurrentIndex + 1), HERO_AUTOPLAY_MS);
-}
-
-function goToHeroSlide(index) {
-    if (!heroSlidesData.length) return;
-    heroCurrentIndex = ((index % heroSlidesData.length) + heroSlidesData.length) % heroSlidesData.length;
-
-    const track = document.getElementById('heroBannerTrack');
-    if (track) track.style.transform = `translateX(-${heroCurrentIndex * 100}%)`;
-
-    document.querySelectorAll('#heroDots .hero-dot').forEach((dot, i) => {
-        dot.classList.toggle('active', i === heroCurrentIndex);
-    });
-}
-
-function heroNext() {
-    goToHeroSlide(heroCurrentIndex + 1);
-    startHeroAutoplay(); // ম্যানুয়ালি ক্লিক করলে টাইমার রিসেট হবে
-}
-
-function heroPrev() {
-    goToHeroSlide(heroCurrentIndex - 1);
-    startHeroAutoplay();
-}
-
-function formatHeroDate(movie, tmdbYear) {
-    if (tmdbYear) {
-        const d = new Date(`${tmdbYear}-01-01`);
-        return tmdbYear;
-    }
-    if (movie.created_at) {
-        try {
-            return new Date(movie.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        } catch (e) {}
-    }
-    return '';
-}
-
-async function renderHeroBanner() {
-    const section = document.getElementById('heroBanner');
-    const track = document.getElementById('heroBannerTrack');
-    const dotsWrap = document.getElementById('heroDots');
-    if (!section || !track || !dotsWrap) return;
-
-    heroSlidesData = buildHeroSlidesList();
-    stopHeroAutoplay();
-
-    if (heroSlidesData.length === 0) {
-        section.style.display = 'none';
-        heroBannerBuilt = false;
-        return;
-    }
-
-    heroBannerBuilt = true;
-    heroCurrentIndex = 0;
-    track.style.transform = 'translateX(0%)';
-    track.innerHTML = heroSlidesData.map((movie, i) => {
-        const title = (movie.title || 'Untitled').replace(/\s*\([\d\-]+\)/g, '').trim();
-        const catLabel = getHeroCategoryLabel(movie);
-        const langLabel = (movie.languages || '').toLowerCase().includes(',') ? 'Dual Audio' : '';
-        return `
-        <div class="hero-slide" id="heroSlide${i}" data-index="${i}">
-            <div class="hero-slide-bg" id="heroSlideBg${i}" style="background-image:url('${(movie.featured_image || movie.poster || makeHeroPlaceholder(movie.title)).replace(/'/g, "%27")}');"></div>
-            <div class="hero-slide-overlay"></div>
-            <div class="hero-slide-content">
-                <div class="hero-badges-top">
-                    <span class="hero-badge hero-badge-featured">${movie.featured ? 'FEATURED' : 'TRENDING'}</span>
-                    ${langLabel ? `<span class="hero-badge">${langLabel}</span>` : `<span class="hero-badge">${catLabel}</span>`}
-                </div>
-                <h2 class="hero-title">${title}</h2>
-                <div class="hero-full-title">${movie.title || ''}</div>
-                <div class="hero-meta-row">
-                    <span class="hero-pill">HD</span>
-                    <span class="hero-pill hero-pill-date" id="heroDate${i}">${movie.created_at ? formatHeroDate(movie, null) : ''}</span>
-                </div>
-                <button type="button" class="hero-watch-btn" onclick="heroWatchNow(${i})">▶ Watch Now</button>
-            </div>
-        </div>`;
-    }).join('');
-
-    dotsWrap.innerHTML = heroSlidesData.map((_, i) =>
-        `<button type="button" class="hero-dot${i === 0 ? ' active' : ''}" aria-label="Go to slide ${i + 1}" onclick="goToHeroSlide(${i}); startHeroAutoplay();"></button>`
-    ).join('');
-
-    const navBtnsDisplay = heroSlidesData.length > 1 ? 'flex' : 'none';
-    const prevBtn = document.getElementById('heroPrevBtn');
-    const nextBtn = document.getElementById('heroNextBtn');
-    if (prevBtn) prevBtn.style.display = navBtnsDisplay;
-    if (nextBtn) nextBtn.style.display = navBtnsDisplay;
-    dotsWrap.style.display = heroSlidesData.length > 1 ? 'flex' : 'none';
-
-    // Swipe support (মোবাইল/ছোট ডিভাইসের জন্য)
-    section.ontouchstart = (e) => { heroTouchStartX = e.touches[0].clientX; };
-    section.ontouchend = (e) => {
-        if (heroTouchStartX === null) return;
-        const diff = e.changedTouches[0].clientX - heroTouchStartX;
-        if (Math.abs(diff) > 40) {
-            diff < 0 ? heroNext() : heroPrev();
-        }
-        heroTouchStartX = null;
-    };
-    section.onmouseenter = stopHeroAutoplay;
-    section.onmouseleave = startHeroAutoplay;
-
-    updateHeroBannerVisibility();
-    startHeroAutoplay();
-
-    // প্রতিটা slide এর জন্য আলাদাভাবে TMDB/OMDb থেকে backdrop/poster fetch করা হচ্ছে -
-    // তবে admin ম্যানুয়ালি কোনো banner image সেট করে থাকলে (movie.featured_image), সেটাই
-    // ব্যবহার হবে, নতুন করে আর fetch করার দরকার নেই
-    heroSlidesData.forEach((movie, i) => {
-        if (movie.featured_image) return;
-        fetchHeroBackdrop(movie).then(res => {
-            const bgEl = document.getElementById('heroSlideBg' + i);
-            if (bgEl) {
-                if (res && res.backdrop) {
-                    bgEl.style.backgroundImage = `url('${res.backdrop.replace(/'/g, "%27")}')`;
-                } else if (!movie.poster) {
-                    // TMDB/OMDb কোনোটাতেই ছবি পাওয়া যায়নি, movie.poster ও খালি -
-                    // console এ movie এর নাম/id লগ করে রাখা হচ্ছে, যাতে অ্যাডমিন সহজে বুঝতে
-                    // পারে ঠিক কোন কোন মুভির জন্য ব্যানারে ম্যানুয়ালি ছবি বসাতে হবে
-                    // (Admin Panel > Homepage Banner > 🖼️ আইকন)
-                    console.warn('[Hero Banner] No image found for:', movie.title, '(id:', movie.id, ') - set one manually from Admin Panel > Homepage Banner.');
-                }
-            }
-            const dateEl = document.getElementById('heroDate' + i);
-            if (dateEl && res && res.year && !movie.created_at) dateEl.textContent = res.year;
-        });
-    });
-}
-
-// Home ("all") এ থাকলেই শুধু এই box দেখা যাবে, অন্য কোনো category/page এ গেলে hide হয়ে যাবে
-function updateHeroBannerVisibility() {
-    const section = document.getElementById('heroBanner');
-    if (!section) return;
-    const isHome = document.body.getAttribute('data-category') === 'all';
-    if (isHome && heroBannerBuilt && heroSlidesData.length > 0) {
-        section.style.display = 'block';
-        startHeroAutoplay();
-    } else {
-        section.style.display = 'none';
-        stopHeroAutoplay();
-    }
-}
-
 // ==================== NAVIGATION & CATEGORY SWITCH ====================
 
 function switchCategory(category, initialPage) {
@@ -1612,7 +1336,6 @@ function switchCategory(category, initialPage) {
     }
 
     document.body.setAttribute('data-category', category);
-    updateHeroBannerVisibility();
 
     const noticeText = document.getElementById('noticeBannerText');
     const noticeBanner = document.getElementById('noticeBanner');
@@ -3579,7 +3302,6 @@ const ADMIN_TAB_TITLES = {
     dashboard: 'Dashboard',
     add: 'Add / Edit Content',
     manage: 'Database',
-    banner: 'Homepage Banner',
     comments: 'Comments',
     requests: 'Request Here',
     messages: 'Messages',
@@ -3588,7 +3310,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'banner', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -3608,8 +3330,6 @@ function switchAdminTab(tab) {
     } else if (validTab === 'manage') {
         const searchInput = document.getElementById('adminSearchInput');
         renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
-    } else if (validTab === 'banner') {
-        initAdminBannerTab();
     } else if (validTab === 'comments') {
         const searchInput = document.getElementById('adminCommentSearchInput');
         renderAdminCommentsList(searchInput ? searchInput.value.trim() : '');
@@ -4878,331 +4598,6 @@ function renderAdminDatabaseList(filter) {
             });
         }
     });
-}
-
-// ---------- Homepage Banner tab (Featured hero slider content management) ----------
-
-let adminBannerSelection = []; // pending (unsaved) ordered list of movie ids
-let adminBannerImageOverrides = {}; // movie id -> manually set banner image URL (pending, unsaved)
-
-function initAdminBannerTab() {
-    const source = Array.isArray(allMovies) ? allMovies : [];
-    adminBannerSelection = source
-        .filter(m => m.featured)
-        .sort((a, b) => (Number(a.featured_order) || 0) - (Number(b.featured_order) || 0))
-        .map(m => m.id);
-
-    adminBannerImageOverrides = {};
-    source.forEach(m => {
-        if (m.featured_image) adminBannerImageOverrides[m.id] = m.featured_image;
-    });
-
-    const searchInput = document.getElementById('adminBannerSearchInput');
-    if (searchInput && !searchInput.dataset.wired) {
-        searchInput.dataset.wired = '1';
-        searchInput.addEventListener('input', debounce(() => {
-            renderAdminBannerAllList(searchInput.value.trim());
-        }, 200));
-    }
-
-    const selectedSearchInput = document.getElementById('adminBannerSelectedSearchInput');
-    if (selectedSearchInput && !selectedSearchInput.dataset.wired) {
-        selectedSearchInput.dataset.wired = '1';
-        selectedSearchInput.addEventListener('input', debounce(() => {
-            renderAdminBannerSelectedList(selectedSearchInput.value.trim());
-        }, 200));
-    }
-
-    renderAdminBannerLists();
-}
-
-function renderAdminBannerLists() {
-    const selectedSearchInput = document.getElementById('adminBannerSelectedSearchInput');
-    renderAdminBannerSelectedList(selectedSearchInput ? selectedSearchInput.value.trim() : '');
-    const searchInput = document.getElementById('adminBannerSearchInput');
-    renderAdminBannerAllList(searchInput ? searchInput.value.trim() : '');
-}
-
-function renderAdminBannerSelectedList(filter) {
-    const container = document.getElementById('adminBannerSelectedList');
-    const countEl = document.getElementById('adminBannerSelectedCount');
-    if (!container) return;
-    if (countEl) countEl.textContent = adminBannerSelection.length;
-
-    if (adminBannerSelection.length === 0) {
-        container.innerHTML = moviesDataLoaded
-            ? '<div class="admin-db-empty">No content added yet — Trending will auto-play.</div>'
-            : '<div class="admin-db-empty">Loading content...</div>';
-        return;
-    }
-
-    const q = (filter || '').toLowerCase().trim();
-    const source = Array.isArray(allMovies) ? allMovies : [];
-
-    if (q) {
-        const matches = adminBannerSelection
-            .map((id, index) => ({ id, index, movie: source.find(m => m.id === id) }))
-            .filter(entry => entry.movie && ((entry.movie.title || '').toLowerCase().includes(q) || (entry.movie.searchName || '').toLowerCase().includes(q)));
-
-        if (matches.length === 0) {
-            container.innerHTML = '<div class="admin-db-empty">No matching content in banner.</div>';
-            return;
-        }
-
-        container.innerHTML = '';
-        matches.forEach(({ id, index, movie }) => renderAdminBannerSelectedCard(container, id, index, movie));
-        return;
-    }
-
-    container.innerHTML = '';
-    adminBannerSelection.forEach((id, index) => {
-        const movie = source.find(m => m.id === id);
-        if (!movie) return;
-        renderAdminBannerSelectedCard(container, id, index, movie);
-    });
-}
-
-function renderAdminBannerSelectedCard(container, id, index, movie) {
-    const imgSrc = adminBannerImageOverrides[id] || movie.poster || ADMIN_POSTER_PLACEHOLDER;
-    const card = document.createElement('div');
-    card.className = 'admin-db-card admin-banner-card';
-    card.innerHTML = `
-        <img class="admin-db-thumb" src="${imgSrc}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
-        <div class="admin-db-info">
-            <div class="admin-db-title">${index + 1}. ${movie.title || 'Untitled'}</div>
-            <div class="admin-db-meta">${movie.tmdbType === 'tv' ? 'TV Series' : 'Movie'}${adminBannerImageOverrides[id] ? ' · 🖼️ Custom image' : ''}</div>
-        </div>
-        <div class="admin-db-actions admin-banner-order-actions">
-            <button type="button" class="admin-mini-btn" title="Set banner image manually">🖼️</button>
-            <button type="button" class="admin-mini-btn" title="Move up" ${index === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" class="admin-mini-btn" title="Move down" ${index === adminBannerSelection.length - 1 ? 'disabled' : ''}>↓</button>
-            <button type="button" class="admin-db-delete-btn" title="Remove from banner">✖</button>
-        </div>
-    `;
-    const [imageBtn, upBtn, downBtn, removeBtn] = card.querySelectorAll('button');
-    imageBtn.addEventListener('click', () => adminBannerSetImage(id));
-    upBtn.addEventListener('click', () => adminBannerMove(id, -1));
-    downBtn.addEventListener('click', () => adminBannerMove(id, 1));
-    removeBtn.addEventListener('click', () => adminBannerRemove(id));
-    container.appendChild(card);
-}
-
-// ---------- Banner image modal (manual override for the Homepage Banner) ----------
-
-let adminBannerImgModalId = null; // which movie id the open modal is editing
-let adminBannerImgMode = 'link';
-
-function adminBannerSetImage(id) {
-    const source = Array.isArray(allMovies) ? allMovies : [];
-    const movie = source.find(m => m.id === id);
-    adminBannerImgModalId = id;
-
-    const titleEl = document.getElementById('adminBannerImageModalMovieTitle');
-    if (titleEl) titleEl.textContent = movie ? movie.title : '';
-
-    const linkInput = document.getElementById('adminBannerImgLinkInput');
-    const fileInput = document.getElementById('adminBannerImgFileInput');
-    const msgEl = document.getElementById('adminBannerImageModalMsg');
-    if (linkInput) linkInput.value = adminBannerImageOverrides[id] || '';
-    if (fileInput) fileInput.value = '';
-    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'admin-form-msg'; }
-
-    setAdminBannerImgMode('link');
-    updateAdminBannerImgPreview();
-
-    const overlay = document.getElementById('adminBannerImageModalOverlay');
-    if (overlay) overlay.style.display = 'flex';
-}
-
-function closeAdminBannerImageModal() {
-    const overlay = document.getElementById('adminBannerImageModalOverlay');
-    if (overlay) overlay.style.display = 'none';
-    adminBannerImgModalId = null;
-}
-
-function setAdminBannerImgMode(mode) {
-    adminBannerImgMode = mode;
-    document.querySelectorAll('#adminBannerImgModeGroup .admin-toggle-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-value') === mode);
-    });
-    const linkInput = document.getElementById('adminBannerImgLinkInput');
-    const fileInput = document.getElementById('adminBannerImgFileInput');
-    if (linkInput) linkInput.style.display = mode === 'link' ? 'block' : 'none';
-    if (fileInput) fileInput.style.display = mode === 'file' ? 'block' : 'none';
-    updateAdminBannerImgPreview();
-}
-
-function updateAdminBannerImgPreview() {
-    const prev = document.getElementById('adminBannerImgPreview');
-    const wrap = document.getElementById('adminBannerImgPreviewWrap');
-    if (!prev || !wrap) return;
-    if (adminBannerImgMode === 'link') {
-        const link = (document.getElementById('adminBannerImgLinkInput') || {}).value?.trim();
-        if (link) { prev.src = link; wrap.style.display = 'block'; }
-        else { wrap.style.display = 'none'; }
-    }
-}
-
-function handleAdminBannerImgFileChange(event) {
-    const file = event.target.files && event.target.files[0];
-    const prev = document.getElementById('adminBannerImgPreview');
-    const wrap = document.getElementById('adminBannerImgPreviewWrap');
-    if (!file || !prev || !wrap) return;
-    const reader = new FileReader();
-    reader.onload = () => { prev.src = reader.result; wrap.style.display = 'block'; };
-    reader.readAsDataURL(file);
-}
-
-async function saveAdminBannerImage() {
-    if (!adminBannerImgModalId) return;
-    const id = adminBannerImgModalId;
-    const msgEl = document.getElementById('adminBannerImageModalMsg');
-    const saveBtn = document.getElementById('adminBannerImageSaveBtn');
-    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'admin-form-msg'; }
-
-    try {
-        let imageUrl = null;
-        if (adminBannerImgMode === 'file') {
-            const fileInput = document.getElementById('adminBannerImgFileInput');
-            const file = fileInput && fileInput.files && fileInput.files[0];
-            if (!file) {
-                // কোনো নতুন ফাইল না দিলে, আগে থেকে সেভ করা লিংক থাকলে সেটাই রাখা হবে
-                imageUrl = adminBannerImageOverrides[id] || null;
-                if (!imageUrl) throw new Error('একটা ছবি বেছে নিন অথবা লিংক মোডে যান।');
-            } else {
-                if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Uploading...'; }
-                imageUrl = await uploadPosterFile(file);
-                const reachable = await verifyPosterUrlReachable(imageUrl);
-                if (!reachable) {
-                    throw new Error(
-                        'ছবি Storage-এ আপলোড হয়েছে, কিন্তু পাবলিক লিংকটা ব্রাউজারে লোড হচ্ছে না। ' +
-                        'Supabase → Storage → "' + ADMIN_POSTER_BUCKET + '" bucket টা Public করে দিন, তারপর আবার চেষ্টা করুন।'
-                    );
-                }
-            }
-        } else {
-            const linkInput = document.getElementById('adminBannerImgLinkInput');
-            imageUrl = linkInput ? linkInput.value.trim() : '';
-            if (!imageUrl) throw new Error('একটা ইমেজ লিংক দিন, অথবা "Remove & Use Auto" চাপুন।');
-        }
-
-        adminBannerImageOverrides[id] = imageUrl;
-        closeAdminBannerImageModal();
-        renderAdminBannerLists();
-    } catch (err) {
-        if (msgEl) {
-            msgEl.textContent = '❌ ' + (err && err.message ? err.message : 'Failed to set image.');
-            msgEl.className = 'admin-form-msg error';
-        }
-    } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save'; }
-    }
-}
-
-function removeAdminBannerImage() {
-    if (!adminBannerImgModalId) return;
-    delete adminBannerImageOverrides[adminBannerImgModalId];
-    closeAdminBannerImageModal();
-    renderAdminBannerLists();
-}
-
-function renderAdminBannerAllList(filter) {
-    const container = document.getElementById('adminBannerAllList');
-    if (!container) return;
-
-    const q = (filter || '').toLowerCase().trim();
-    const source = Array.isArray(allMovies) ? allMovies : [];
-    const filtered = (q ? source.filter(m => (m.title || '').toLowerCase().includes(q) || (m.searchName || '').toLowerCase().includes(q)) : source)
-        .filter(m => !adminBannerSelection.includes(m.id));
-
-    if (filtered.length === 0) {
-        container.innerHTML = moviesDataLoaded
-            ? '<div class="admin-db-empty">No content found.</div>'
-            : '<div class="admin-db-empty">Loading content...</div>';
-        return;
-    }
-
-    container.innerHTML = '';
-    filtered.slice(0, 60).forEach(movie => {
-        const card = document.createElement('div');
-        card.className = 'admin-db-card admin-banner-card';
-        card.innerHTML = `
-            <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
-            <div class="admin-db-info">
-                <div class="admin-db-title">${movie.title || 'Untitled'}</div>
-                <div class="admin-db-meta">${movie.tmdbType === 'tv' ? 'TV Series' : 'Movie'}</div>
-            </div>
-            <div class="admin-db-actions">
-                <button type="button" class="admin-mini-btn admin-banner-add-btn" title="Add to banner">+ Add</button>
-            </div>
-        `;
-        card.querySelector('.admin-banner-add-btn').addEventListener('click', () => adminBannerAdd(movie.id));
-        container.appendChild(card);
-
-        if (!movie.poster) {
-            const imgEl = card.querySelector('.admin-db-thumb');
-            fetchTmdbPosterQuick(movie).then(url => {
-                if (url && imgEl && imgEl.isConnected) imgEl.src = url;
-            });
-        }
-    });
-}
-
-function adminBannerAdd(id) {
-    if (!adminBannerSelection.includes(id)) adminBannerSelection.push(id);
-    renderAdminBannerLists();
-}
-
-function adminBannerRemove(id) {
-    adminBannerSelection = adminBannerSelection.filter(x => x !== id);
-    renderAdminBannerLists();
-}
-
-function adminBannerMove(id, direction) {
-    const i = adminBannerSelection.indexOf(id);
-    if (i === -1) return;
-    const j = i + direction;
-    if (j < 0 || j >= adminBannerSelection.length) return;
-    [adminBannerSelection[i], adminBannerSelection[j]] = [adminBannerSelection[j], adminBannerSelection[i]];
-    renderAdminBannerLists();
-}
-
-async function saveAdminBannerSelection() {
-    const msgEl = document.getElementById('adminBannerMsg');
-    const saveBtn = document.getElementById('adminBannerSaveBtn');
-    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'admin-form-msg'; }
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
-
-    try {
-        const source = Array.isArray(allMovies) ? allMovies : [];
-        const previouslyFeatured = source.filter(m => m.featured).map(m => m.id);
-        const toUnfeature = previouslyFeatured.filter(id => !adminBannerSelection.includes(id));
-
-        const updates = [];
-        adminBannerSelection.forEach((id, index) => {
-            updates.push(supabaseClient.from('movies').update({ featured: true, featured_order: index, featured_image: adminBannerImageOverrides[id] || null }).eq('id', id));
-        });
-        toUnfeature.forEach(id => {
-            updates.push(supabaseClient.from('movies').update({ featured: false, featured_order: null, featured_image: null }).eq('id', id));
-        });
-
-        const results = await Promise.all(updates);
-        const firstError = results.find(r => r && r.error);
-        if (firstError) throw firstError.error;
-
-        if (msgEl) { msgEl.textContent = '✅ Banner saved successfully!'; msgEl.className = 'admin-form-msg success'; }
-        await fetchMoviesFromSupabase();
-        initAdminBannerTab();
-        renderHeroBanner(); // হোমপেজের হিরো ব্যানারও সাথে সাথে আপডেট হয়ে যাবে, পেজ রিফ্রেশ ছাড়াই
-    } catch (err) {
-        console.error('Save banner error:', err);
-        if (msgEl) {
-            msgEl.textContent = '❌ Error: ' + (err && err.message ? err.message : 'Failed to save banner. Make sure the "featured", "featured_order" and "featured_image" columns exist in the movies table.');
-            msgEl.className = 'admin-form-msg error';
-        }
-    } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Banner'; }
-    }
 }
 
 // ---------- Recycle Bin (soft delete / restore / purge) ----------
