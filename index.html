@@ -114,6 +114,17 @@
 </div>
 </header>
 
+<section class="hero-banner" id="heroBanner" style="display:none;">
+    <div class="hero-border-wrap">
+        <div class="hero-viewport">
+        <div class="hero-track" id="heroTrack"></div>
+    </div>
+        <button type="button" class="hero-nav-btn hero-nav-prev" id="heroPrevBtn" aria-label="Previous slide">‹</button>
+        <button type="button" class="hero-nav-btn hero-nav-next" id="heroNextBtn" aria-label="Next slide">›</button>
+        <div class="hero-dots" id="heroDots"></div>
+    </div>
+</section>
+
 <main class="content-container">
 <div class="movie-grid" id="movieGrid"></div>
 <div class="pagination" id="paginationContainer"></div>
@@ -398,6 +409,7 @@
                 <button type="button" class="admin-nav-btn active" id="adminNavBtnDashboard" onclick="switchAdminTab('dashboard')">📊 <span>Dashboard</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnAdd" onclick="switchAdminTab('add')">➕ <span>Add / Edit Content</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnManage" onclick="switchAdminTab('manage')">🗂 <span>Database</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎞️ <span>Hero Banner</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnRequests" onclick="switchAdminTab('requests')">📥 <span>Request Here</span><span class="admin-nav-badge" id="adminRequestsCount" style="display:none;"></span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnMessages" onclick="switchAdminTab('messages')">✉️ <span>Messages</span><span class="admin-nav-badge" id="adminMessagesCount" style="display:none;"></span></button>
@@ -576,6 +588,15 @@
                         <input type="text" id="adminSearchInput" placeholder="🔍 Search all content in database...">
                     </div>
                     <div class="admin-database-list" id="adminDatabaseList"></div>
+                </div>
+
+                <!-- HERO BANNER TAB (select which movies/series show on the homepage auto-slide banner) -->
+                <div class="admin-tab-content" id="adminTabBanner" style="display:none;">
+                    <div class="admin-banner-note">Toggle "Show in Banner" for the titles you want in the homepage hero slider, then click Save — the slide order number is assigned automatically (no manual/duplicate numbers). Use ▲ / ▼ on a featured item to change its position in the slider. Custom Image is optional — leave blank to auto-load a widescreen backdrop from TMDB.</div>
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminBannerSearchInput" placeholder="🔍 Search content to feature in banner...">
+                    </div>
+                    <div class="admin-database-list" id="adminBannerList"></div>
                 </div>
 
                 <!-- COMMENTS TAB -->

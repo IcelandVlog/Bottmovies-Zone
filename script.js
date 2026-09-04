@@ -199,6 +199,9 @@ async function fetchMoviesFromSupabase() {
                 } else if (currentAdminTab === 'manage') {
                     const searchInput = document.getElementById('adminSearchInput');
                     renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
+                } else if (currentAdminTab === 'banner') {
+                    const searchInput = document.getElementById('adminBannerSearchInput');
+                    renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
                 } else if (currentAdminTab === 'trash') {
                     renderAdminTrashList();
                 }
@@ -209,6 +212,302 @@ async function fetchMoviesFromSupabase() {
         }
     } catch (err) {
         console.error('Unexpected error loading database:', err);
+    }
+}
+
+// ==================== HOME HERO BANNER FUNCTIONS ====================
+// হোমপেজের উপরে "Featured" ক্যারুসেল/স্লাইডার। Admin চাইলে movies টেবিলে
+// `featured` (boolean) + `featured_order` (integer) + `featured_image` (text, optional)
+// কলাম বসিয়ে নির্দিষ্ট কিছু movie বেছে নিতে পারে (SUPABASE_SETUP.sql দেখুন)। কিছু
+// বেছে না নিলে সবচেয়ে সাম্প্রতিক কয়েকটা movie/series এমনিতেই দেখানো হয় - ব্যানার
+// কখনো খালি থাকে না। শুধু Home ("all") ক্যাটাগরিতে দেখা যায়, অন্য ক্যাটাগরিতে গেলে
+// হাইড হয়ে যায় এবং autoplay টাইমার বন্ধ হয়ে যায় (অযথা network call বন্ধ রাখতে)।
+let heroSlidesData = [];
+let heroCurrentIndex = 0;
+let heroAutoplayTimer = null;
+let heroInitialized = false;
+const heroBackdropCache = new Map();
+
+function getFeaturedMoviesForHero() {
+    if (!Array.isArray(allMovies) || allMovies.length === 0) return [];
+
+    const manuallyFeatured = allMovies
+        .filter(m => m.featured === true)
+        .sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999));
+
+    if (manuallyFeatured.length > 0) return manuallyFeatured.slice(0, 8);
+
+    // Admin কিছু বেছে না নিলে - সবচেয়ে সাম্প্রতিক ৬টা content fallback হিসেবে দেখানো হয়
+    return allMovies.slice(0, 6);
+}
+
+function getHeroCategoryLabel(movie) {
+    const cats = Array.isArray(movie.category) ? movie.category : [];
+    if (!cats.length) return '';
+    const link = document.querySelector(`.nav-link[data-target="${cats[0]}"]`);
+    if (link) return link.textContent.trim();
+    return String(cats[0]).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function getYearFromTitle(title) {
+    const m = String(title || '').match(/\((\d{4}(?:-\d{2,4})?)\)\s*$/);
+    return m ? m[1] : '';
+}
+
+function formatHeroDateLabel(movie, isoDate) {
+    if (isoDate) {
+        const d = new Date(isoDate);
+        if (!isNaN(d.getTime())) return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    }
+    if (movie.year) return String(movie.year);
+    return getYearFromTitle(movie.title);
+}
+
+// প্রতিটা slide-এর জন্য widescreen "backdrop" ছবি আলাদাভাবে fetch হয় (grid এর পোর্ট্রেট
+// poster থেকে সম্পূর্ণ আলাদা ক্যাশ - getFullTMDBDetails/getOMDbDetails এ হাত দেওয়া হয়নি)
+async function fetchHeroBackdrop(movie) {
+    const cacheKey = movie && (movie.id != null ? `id:${movie.id}` : `title:${(movie.searchName || movie.title || '').toLowerCase()}`);
+    if (cacheKey && heroBackdropCache.has(cacheKey)) return heroBackdropCache.get(cacheKey);
+
+    const promise = (async () => {
+        if (movie.featured_image) return { backdrop: movie.featured_image, releaseDate: null };
+        if (!TMDB_API_KEY) return { backdrop: movie.poster || null, releaseDate: null };
+        try {
+            let mediaType = movie.tmdbType || 'movie';
+            let matchId = movie.tmdbId || null;
+            const cleanImdbId = extractImdbId(movie.imdbId);
+
+            if (!matchId && cleanImdbId) {
+                const findRes = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${cleanImdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`, {}, 6000);
+                if (findRes.ok) {
+                    const findData = await findRes.json();
+                    if (findData.movie_results && findData.movie_results.length > 0) {
+                        matchId = findData.movie_results[0].id; mediaType = 'movie';
+                    } else if (findData.tv_results && findData.tv_results.length > 0) {
+                        matchId = findData.tv_results[0].id; mediaType = 'tv';
+                    }
+                }
+            }
+
+            if (!matchId && (movie.title || movie.searchName)) {
+                const cleanQuery = (movie.searchName || movie.title).replace(/\s*\([\d\-]+\)/g, '').trim();
+                const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 6000);
+                if (searchRes.ok) {
+                    const searchData = await searchRes.json();
+                    const match = searchData?.results?.find(item => item.media_type === 'movie' || item.media_type === 'tv') || searchData?.results?.[0];
+                    if (match) { matchId = match.id; mediaType = match.media_type === 'tv' ? 'tv' : 'movie'; }
+                }
+            }
+
+            if (!matchId) return { backdrop: movie.poster || null, releaseDate: null };
+
+            const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}`, {}, 6000);
+            if (!detailRes.ok) return { backdrop: movie.poster || null, releaseDate: null };
+            const detailData = await detailRes.json();
+
+            return {
+                backdrop: detailData.backdrop_path ? `https://image.tmdb.org/t/p/w1280${detailData.backdrop_path}` : (movie.poster || null),
+                releaseDate: detailData.release_date || detailData.first_air_date || null
+            };
+        } catch (e) {
+            return { backdrop: movie.poster || null, releaseDate: null };
+        }
+    })();
+
+    if (cacheKey) heroBackdropCache.set(cacheKey, promise);
+    return promise;
+}
+
+function renderHeroSlides() {
+    const heroSection = document.getElementById('heroBanner');
+    const track = document.getElementById('heroTrack');
+    const dotsWrap = document.getElementById('heroDots');
+    if (!heroSection || !track || !dotsWrap) return;
+
+    stopHeroAutoplay();
+    heroSlidesData = getFeaturedMoviesForHero();
+
+    if (heroSlidesData.length === 0) {
+        heroSection.style.display = 'none';
+        track.innerHTML = '';
+        dotsWrap.innerHTML = '';
+        return;
+    }
+
+    heroCurrentIndex = 0;
+    track.innerHTML = '';
+    dotsWrap.innerHTML = '';
+
+    heroSlidesData.forEach((movie, i) => {
+        const catLabel = getHeroCategoryLabel(movie);
+        const fullTitle = movie.title || '';
+        const cleanTitle = fullTitle.replace(/\s*\([\d\-]+\)\s*$/, '').trim() || fullTitle;
+        const slide = document.createElement('div');
+        slide.className = 'hero-slide';
+        slide.innerHTML = `
+            <div class="hero-slide-bg" id="heroBg-${i}" style="background-image:url('${movie.poster || POSTER_PLACEHOLDER_LOADING}')"></div>
+            <div class="hero-slide-shade"></div>
+            <div class="hero-slide-top">
+                <span class="hero-badge hero-badge-featured">Featured</span>
+                ${catLabel ? `<span class="hero-badge hero-badge-cat">${catLabel}</span>` : ''}
+            </div>
+            <div class="hero-slide-info">
+                <h2 class="hero-slide-title">${cleanTitle}</h2>
+                <p class="hero-slide-subtitle">${fullTitle}</p>
+                <div class="hero-slide-meta-row">
+                    <span class="hero-meta-hd">HD</span>
+                    <span class="hero-meta-date" id="heroDate-${i}">${movie.year ? movie.year : getYearFromTitle(fullTitle)}</span>
+                </div>
+                <button type="button" class="hero-watch-btn" id="heroWatchBtn-${i}">▶ Watch Now</button>
+            </div>
+        `;
+        track.appendChild(slide);
+
+        const watchBtn = slide.querySelector(`#heroWatchBtn-${i}`);
+        if (watchBtn) watchBtn.addEventListener('click', () => openMovieModal(heroSlidesData[i]));
+
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', `Slide ${i + 1}`);
+        dot.addEventListener('click', () => goToHeroSlide(i));
+        dotsWrap.appendChild(dot);
+    });
+
+    heroSection.style.display = '';
+    updateHeroTrackPosition(false);
+    startHeroAutoplay();
+
+    // real backdrop + release date গুলো background এ lazy লোড হয় (poster দিয়ে instant দেখা যায়)
+    heroSlidesData.forEach((movie, i) => {
+        fetchHeroBackdrop(movie).then(data => {
+            const bgEl = document.getElementById(`heroBg-${i}`);
+            if (bgEl && data && data.backdrop) bgEl.style.backgroundImage = `url('${data.backdrop}')`;
+            const dateEl = document.getElementById(`heroDate-${i}`);
+            if (dateEl) {
+                const label = formatHeroDateLabel(movie, data && data.releaseDate);
+                dateEl.textContent = label ? `${label}` : '';
+            }
+        });
+    });
+}
+
+function updateHeroTrackPosition(animate = true) {
+    const track = document.getElementById('heroTrack');
+    if (!track) return;
+    track.style.transition = animate ? 'transform 0.6s cubic-bezier(.4,0,.2,1)' : 'none';
+    track.style.transform = `translateX(-${heroCurrentIndex * 100}%)`;
+    document.querySelectorAll('#heroDots .hero-dot').forEach((d, i) => d.classList.toggle('active', i === heroCurrentIndex));
+}
+
+function goToHeroSlide(i) {
+    if (!heroSlidesData.length) return;
+    heroCurrentIndex = ((i % heroSlidesData.length) + heroSlidesData.length) % heroSlidesData.length;
+    updateHeroTrackPosition(true);
+    startHeroAutoplay();
+}
+function heroGoNext() { goToHeroSlide(heroCurrentIndex + 1); }
+function heroGoPrev() { goToHeroSlide(heroCurrentIndex - 1); }
+
+function startHeroAutoplay() {
+    stopHeroAutoplay();
+    if (heroSlidesData.length <= 1) return;
+    heroAutoplayTimer = setInterval(heroGoNext, 6000);
+}
+function stopHeroAutoplay() {
+    if (heroAutoplayTimer) { clearInterval(heroAutoplayTimer); heroAutoplayTimer = null; }
+}
+
+// শুধু একবারই button click/swipe listener বসানো হয় - প্রতিটা slide re-render এ না
+function setupHeroBannerControls() {
+    if (heroInitialized) return;
+    heroInitialized = true;
+
+    const heroSection = document.getElementById('heroBanner');
+    const prevBtn = document.getElementById('heroPrevBtn');
+    const nextBtn = document.getElementById('heroNextBtn');
+    if (prevBtn) prevBtn.addEventListener('click', heroGoPrev);
+    if (nextBtn) nextBtn.addEventListener('click', heroGoNext);
+    if (!heroSection) return;
+
+    heroSection.addEventListener('mouseenter', stopHeroAutoplay);
+    heroSection.addEventListener('mouseleave', startHeroAutoplay);
+
+    let touchStartX = 0, touchDeltaX = 0, isTouching = false;
+    const track = document.getElementById('heroTrack');
+
+    heroSection.addEventListener('touchstart', (e) => {
+        isTouching = true; touchDeltaX = 0;
+        touchStartX = e.touches[0].clientX;
+        stopHeroAutoplay();
+        if (track) track.style.transition = 'none';
+    }, { passive: true });
+    heroSection.addEventListener('touchmove', (e) => {
+        if (!isTouching || !track) return;
+        touchDeltaX = e.touches[0].clientX - touchStartX;
+        // আঙুলের সাথে সাথে সাথে সাথে slide-টা লাইভ drag হবে (শুধু threshold পার হলে jump না)
+        const percent = (touchDeltaX / heroSection.offsetWidth) * 100;
+        track.style.transform = `translateX(calc(-${heroCurrentIndex * 100}% + ${percent}%))`;
+    }, { passive: true });
+    heroSection.addEventListener('touchend', () => {
+        if (!isTouching) return;
+        isTouching = false;
+        if (Math.abs(touchDeltaX) > 40) {
+            touchDeltaX < 0 ? heroGoNext() : heroGoPrev();
+        } else {
+            updateHeroTrackPosition(true); // যথেষ্ট swipe না হলে smoothly আগের slide-এ ফিরে যাবে
+            startHeroAutoplay();
+        }
+        touchDeltaX = 0;
+    });
+
+    // ---- মাউস/ট্র্যাকপ্যাড দিয়েও drag করা যাবে (বড় ডিভাইস/ল্যাপটপ) ----
+    const heroViewportEl = heroSection.querySelector('.hero-viewport');
+    let mouseStartX = 0, mouseDeltaX = 0, isMouseDragging = false;
+    heroSection.addEventListener('mousedown', (e) => {
+        isMouseDragging = true; mouseDeltaX = 0;
+        mouseStartX = e.clientX;
+        stopHeroAutoplay();
+        if (track) track.style.transition = 'none';
+        if (heroViewportEl) heroViewportEl.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!isMouseDragging || !track) return;
+        mouseDeltaX = e.clientX - mouseStartX;
+        const percent = (mouseDeltaX / heroSection.offsetWidth) * 100;
+        track.style.transform = `translateX(calc(-${heroCurrentIndex * 100}% + ${percent}%))`;
+    });
+    window.addEventListener('mouseup', () => {
+        if (!isMouseDragging) return;
+        isMouseDragging = false;
+        if (heroViewportEl) heroViewportEl.style.cursor = '';
+        if (Math.abs(mouseDeltaX) > 40) {
+            mouseDeltaX < 0 ? heroGoNext() : heroGoPrev();
+        } else {
+            updateHeroTrackPosition(true);
+            startHeroAutoplay();
+        }
+        mouseDeltaX = 0;
+    });
+}
+
+// Home ("all") ছাড়া অন্য কোনো ক্যাটাগরিতে গেলে ব্যানার হাইড হয়ে যায় ও autoplay বন্ধ হয়
+function updateHeroVisibilityForCategory(category) {
+    const heroSection = document.getElementById('heroBanner');
+    if (!heroSection) return;
+
+    if (category !== 'all') {
+        heroSection.style.display = 'none';
+        stopHeroAutoplay();
+        return;
+    }
+
+    if (heroSlidesData.length === 0) {
+        renderHeroSlides();
+    } else {
+        heroSection.style.display = '';
+        startHeroAutoplay();
     }
 }
 
@@ -1393,6 +1692,8 @@ function switchCategory(category, initialPage) {
 
         renderMoviesByPage(currentFilteredMovies, initialPage || 1);
     }
+
+    updateHeroVisibilityForCategory(category);
 }
 
 function setupNavigation() {
@@ -1439,6 +1740,7 @@ function initApp() {
 
     initAuth();
     setupNavigation();
+    setupHeroBannerControls();
 
     fetchMoviesFromSupabase();
 
@@ -3302,6 +3604,7 @@ const ADMIN_TAB_TITLES = {
     dashboard: 'Dashboard',
     add: 'Add / Edit Content',
     manage: 'Database',
+    banner: 'Hero Banner',
     comments: 'Comments',
     requests: 'Request Here',
     messages: 'Messages',
@@ -3310,7 +3613,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'banner', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -3330,6 +3633,9 @@ function switchAdminTab(tab) {
     } else if (validTab === 'manage') {
         const searchInput = document.getElementById('adminSearchInput');
         renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
+    } else if (validTab === 'banner') {
+        const searchInput = document.getElementById('adminBannerSearchInput');
+        renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
     } else if (validTab === 'comments') {
         const searchInput = document.getElementById('adminCommentSearchInput');
         renderAdminCommentsList(searchInput ? searchInput.value.trim() : '');
@@ -3473,6 +3779,13 @@ function setupAdminPanel() {
     if (adminSearchInput) {
         adminSearchInput.addEventListener('input', function() {
             renderAdminDatabaseList(this.value.trim());
+        });
+    }
+
+    const adminBannerSearchInput = document.getElementById('adminBannerSearchInput');
+    if (adminBannerSearchInput) {
+        adminBannerSearchInput.addEventListener('input', function() {
+            renderAdminBannerList(this.value.trim());
         });
     }
 
@@ -4598,6 +4911,192 @@ function renderAdminDatabaseList(filter) {
             });
         }
     });
+}
+
+// ---------- Hero Banner tab (choose which titles show in the homepage auto-slide banner) ----------
+
+function getFeaturedSortedMovies() {
+    const source = Array.isArray(allMovies) ? allMovies : [];
+    return source
+        .filter(m => m.featured === true)
+        .sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999));
+}
+
+function renderAdminBannerList(filter) {
+    const container = document.getElementById('adminBannerList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const q = (filter || '').toLowerCase().trim();
+    const source = Array.isArray(allMovies) ? allMovies : [];
+    const filtered = q ? source.filter(m => {
+        const t = (m.title || '').toLowerCase();
+        const sn = (m.searchName || '').toLowerCase();
+        return t.includes(q) || sn.includes(q);
+    }) : source;
+
+    if (filtered.length === 0) {
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">No content found.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
+        return;
+    }
+
+    // যেগুলো এখন banner-এ featured আছে সেগুলো order অনুযায়ী উপরে, বাকিগুলো নিচে
+    const sorted = [...filtered].sort((a, b) => {
+        const af = a.featured === true, bf = b.featured === true;
+        if (af && !bf) return -1;
+        if (!af && bf) return 1;
+        if (af && bf) return (a.featured_order ?? 999) - (b.featured_order ?? 999);
+        return 0;
+    });
+
+    const featuredList = getFeaturedSortedMovies();
+
+    sorted.forEach(movie => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card admin-banner-card';
+        const typeLabel = movie.tmdbType === 'tv' ? 'TV Series' : 'Movie';
+        const isFeatured = movie.featured === true;
+        const posIndex = isFeatured ? featuredList.findIndex(m => m.id === movie.id) : -1;
+        const posLabel = posIndex >= 0 ? `#${posIndex + 1}` : '';
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(movie.title || 'Untitled')}</div>
+                <div class="admin-db-meta">${typeLabel}</div>
+                <div class="admin-banner-fields">
+                    <label class="admin-banner-toggle">
+                        <input type="checkbox" class="admin-banner-featured-cb" ${isFeatured ? 'checked' : ''}>
+                        <span>Show in Banner</span>
+                    </label>
+                    ${isFeatured ? `
+                    <span class="admin-banner-position">${posLabel}</span>
+                    <button type="button" class="admin-banner-move-btn" data-dir="up" ${posIndex <= 0 ? 'disabled' : ''} title="Move earlier">▲</button>
+                    <button type="button" class="admin-banner-move-btn" data-dir="down" ${posIndex >= featuredList.length - 1 ? 'disabled' : ''} title="Move later">▼</button>
+                    ` : ''}
+                    <input type="text" class="admin-banner-image-input" placeholder="Custom banner image URL (optional — overrides TMDB backdrop)" value="${movie.featured_image || ''}">
+                </div>
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-mini-btn admin-banner-save-btn">Save</button>
+            </div>
+        `;
+        card.querySelector('.admin-banner-save-btn').addEventListener('click', () => {
+            const cb = card.querySelector('.admin-banner-featured-cb');
+            const imageInput = card.querySelector('.admin-banner-image-input');
+            saveBannerSettings(movie, {
+                featured: cb.checked,
+                featured_image: imageInput.value.trim() || null
+            });
+        });
+        const upBtn = card.querySelector('.admin-banner-move-btn[data-dir="up"]');
+        const downBtn = card.querySelector('.admin-banner-move-btn[data-dir="down"]');
+        if (upBtn) upBtn.addEventListener('click', () => moveBannerItem(movie, -1));
+        if (downBtn) downBtn.addEventListener('click', () => moveBannerItem(movie, 1));
+        container.appendChild(card);
+
+        if (!movie.poster) {
+            const imgEl = card.querySelector('.admin-db-thumb');
+            fetchTmdbPosterQuick(movie).then(url => {
+                if (url && imgEl && imgEl.isConnected) imgEl.src = url;
+            });
+        }
+    });
+}
+
+// ✔ order নাম্বার এখন অ্যাডমিনকে ম্যানুয়ালি টাইপ করতে হয় না (duplicate/ভুল নাম্বার বসার
+// সুযোগ ছিল) — Save করার সাথে সাথে auto পরের available number বসে যায়, আর
+// ▲ / ▼ বাটন দিয়ে পজিশন বদলালে বাকি সবগুলোর নাম্বার automatically re-sequence হয়ে যায়।
+async function saveBannerSettings(movie, changes) {
+    if (!movie || !movie.id) return;
+    try {
+        let featuredOrder = movie.featured_order ?? null;
+
+        if (changes.featured) {
+            if (movie.featured !== true) {
+                // নতুন করে banner-এ যোগ হচ্ছে - সবার শেষে (পরের available number) বসবে
+                const featuredList = getFeaturedSortedMovies().filter(m => m.id !== movie.id);
+                const maxOrder = featuredList.reduce((max, m) => Math.max(max, m.featured_order ?? -1), -1);
+                featuredOrder = maxOrder + 1;
+            }
+        } else {
+            featuredOrder = null;
+        }
+
+        const { error } = await supabaseClient
+            .from('movies')
+            .update({
+                featured: changes.featured,
+                featured_order: featuredOrder,
+                featured_image: changes.featured_image
+            })
+            .eq('id', movie.id);
+        if (error) throw error;
+
+        movie.featured = changes.featured;
+        movie.featured_order = featuredOrder;
+        movie.featured_image = changes.featured_image;
+
+        // remove করার পর বাকিগুলোর নাম্বার gap ছাড়া 0,1,2... করে re-sequence করে দাও
+        if (!changes.featured) {
+            await resequenceBannerOrder();
+        }
+
+        const searchInput = document.getElementById('adminBannerSearchInput');
+        renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
+        if (typeof renderHeroSlides === 'function') renderHeroSlides();
+        showNoticeModal('✅ Banner settings saved for "' + (movie.title || 'this item') + '"');
+    } catch (err) {
+        console.error('Save banner settings error:', err);
+        showNoticeModal('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'));
+    }
+}
+
+// ▲/▼ চাপলে নির্দিষ্ট movie-টা তার পাশের movie-র সাথে position swap করে (নাম্বার swap)
+async function moveBannerItem(movie, direction) {
+    const list = getFeaturedSortedMovies();
+    const index = list.findIndex(m => m.id === movie.id);
+    const targetIndex = index + direction;
+    if (index === -1 || targetIndex < 0 || targetIndex >= list.length) return;
+
+    const other = list[targetIndex];
+    const thisOrder = movie.featured_order ?? index;
+    const otherOrder = other.featured_order ?? targetIndex;
+
+    try {
+        const [{ error: err1 }, { error: err2 }] = await Promise.all([
+            supabaseClient.from('movies').update({ featured_order: otherOrder }).eq('id', movie.id),
+            supabaseClient.from('movies').update({ featured_order: thisOrder }).eq('id', other.id)
+        ]);
+        if (err1 || err2) throw (err1 || err2);
+
+        movie.featured_order = otherOrder;
+        other.featured_order = thisOrder;
+
+        const searchInput = document.getElementById('adminBannerSearchInput');
+        renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
+        if (typeof renderHeroSlides === 'function') renderHeroSlides();
+    } catch (err) {
+        console.error('Reorder banner error:', err);
+        showNoticeModal('❌ Reorder failed: ' + (err && err.message ? err.message : 'Unknown error'));
+    }
+}
+
+// Banner থেকে বাদ পড়ার পর বাকি featured item গুলোর নাম্বার 0,1,2... ধারাবাহিকভাবে বসিয়ে দাও
+// (যাতে gap বা duplicate না থাকে)
+async function resequenceBannerOrder() {
+    const list = getFeaturedSortedMovies();
+    const updates = [];
+    list.forEach((m, i) => {
+        if (m.featured_order !== i) {
+            m.featured_order = i;
+            updates.push(supabaseClient.from('movies').update({ featured_order: i }).eq('id', m.id));
+        }
+    });
+    if (updates.length) {
+        try { await Promise.all(updates); } catch (e) { console.error('Resequence error:', e); }
+    }
 }
 
 // ---------- Recycle Bin (soft delete / restore / purge) ----------

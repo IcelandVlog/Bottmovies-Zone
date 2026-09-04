@@ -3,3 +3,4 @@
 
 alter table movies add column if not exists featured boolean default false;
 alter table movies add column if not exists featured_order integer;
+alter table movies add column if not exists featured_image text;
