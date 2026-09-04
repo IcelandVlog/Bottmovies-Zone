@@ -2626,7 +2626,8 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
 }
 .hero-meta-hd {
     background-color: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.2);
+    /* border: 1px solid rgba(255,255,255,0.2); */
+    border: 1px solid rgb(255 122 26 / .4);
     color: #fff;
     font-size: 11px;
     font-weight: 800;
@@ -2635,7 +2636,8 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
 }
 .hero-meta-date {
     background-color: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.2);
+    /* border: 1px solid rgba(255,255,255,0.2); */
+    border: 1px solid rgb(255 122 26 / .4);
     color: #fff;
     font-size: 11px;
     font-weight: 800;
@@ -2674,7 +2676,7 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    border: 1.5px solid #e8620d;
+    border: 1.5px solid rgb(255 122 26 / .7);
     background-color: rgba(10,11,14,0.55);
     color: #fff;
     font-size: 18px;
