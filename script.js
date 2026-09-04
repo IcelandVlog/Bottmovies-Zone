@@ -254,6 +254,28 @@ async function fetchWithTimeout(url, options = {}, timeout = 2500) {
     }
 }
 
+// একসাথে অনেকগুলো মুভির TMDB/OMDb fetch একবারে পাঠালে ব্রাউজারের
+// per-domain connection limit (~৬টা) এ আটকে যায়, আর fetchWithTimeout এর
+// টাইমার request queue তে বসে থাকা অবস্থাতেই কাউন্ট হতে থাকে - ফলে
+// প্রথম কয়েকটা বাদে বাকি সবগুলো AbortError দিয়ে ফেইল করে (poster কালো/ফাঁকা
+// থেকে যায়)। এই হেল্পার দিয়ে একবারে সর্বোচ্চ `limit` সংখ্যক আইটেম প্রসেস
+// করা হয়, বাকিগুলো একটা শেষ হলে পরেরটা শুরু হয় - কানেকশন লিমিটের মধ্যে থেকে।
+async function runWithConcurrencyLimit(items, limit, worker) {
+    let cursor = 0;
+    const workerCount = Math.min(limit, items.length);
+    const runners = new Array(workerCount).fill(0).map(async () => {
+        while (cursor < items.length) {
+            const currentIndex = cursor++;
+            try {
+                await worker(items[currentIndex], currentIndex);
+            } catch (e) {
+                console.error("Card detail fetch error:", e);
+            }
+        }
+    });
+    await Promise.all(runners);
+}
+
 function extractImdbId(input) {
     if (!input) return null;
     const match = String(input).match(/tt\d+/);
@@ -820,28 +842,29 @@ function renderMoviesByPage(movies, page) {
             });
         }
         grid.appendChild(card);
+    });
 
-        getFullTMDBDetails(movie).then(tmdb => {
-            const imgEl = document.getElementById(`card-poster-${index}`);
-            const resolvedPoster = movie.poster || (tmdb && tmdb.poster) || null;
-            if (imgEl && resolvedPoster) {
-                imgEl.src = resolvedPoster;
-            }
-            const ratingEl = document.getElementById(`card-rating-${index}`);
-            if (ratingEl && tmdb && tmdb.tmdbRating !== "N/A") {
-                ratingEl.innerHTML = `<span>★</span> ${tmdb.tmdbRating}`;
-            }
+    // সব কার্ড DOM এ বসানো হয়ে গেছে - এখন পোস্টার/রেটিং fetch করা হচ্ছে,
+    // কিন্তু একবারে সবগুলো না পাঠিয়ে ব্যাচে ব্যাচে (দেখুন runWithConcurrencyLimit
+    // এর কমেন্ট - কেন এটা দরকার)।
+    runWithConcurrencyLimit(paginatedMovies, 4, async (movie, index) => {
+        const imgEl = document.getElementById(`card-poster-${index}`);
+        const ratingEl = document.getElementById(`card-rating-${index}`);
 
-            getOMDbDetails(movie).then(omdb => {
-                if (imgEl && !resolvedPoster && omdb && omdb.poster) {
-                    imgEl.src = omdb.poster;
-                }
-                const finalRating = getSmartRating(tmdb, omdb);
-                if (ratingEl && finalRating !== "N/A") {
-                    ratingEl.innerHTML = `<span>★</span> ${finalRating}`;
-                }
-            });
-        });
+        const [tmdb, omdb] = await Promise.all([
+            getFullTMDBDetails(movie),
+            getOMDbDetails(movie)
+        ]);
+
+        const resolvedPoster = movie.poster || (tmdb && tmdb.poster) || (omdb && omdb.poster) || null;
+        if (imgEl && resolvedPoster) {
+            imgEl.src = resolvedPoster;
+        }
+
+        const finalRating = getSmartRating(tmdb, omdb);
+        if (ratingEl && finalRating !== "N/A") {
+            ratingEl.innerHTML = `<span>★</span> ${finalRating}`;
+        }
     });
 
     renderPaginationControls(movies, page);
