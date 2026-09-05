@@ -1008,30 +1008,11 @@ async function fetchFullTMDBDetailsUncached(movie) {
         
         const finalImdbId = cleanImdbId || (detailData.external_ids && detailData.external_ids.imdb_id) || null;
 
-        // Trailer - shobcheye latest (recent-e release/upload hoya) official Trailer-take
-        // beche newa hocche, TMDB-r "published_at" date diye sort kore. Kono "Trailer"
-        // type video na paoya gele, official Teaser/onno video-r modhye latest-take neya
-        // hocche - r kono published_at-i na thakle age-r moto TMDB-r nijer order fallback
-        // hishebe use kora hocche.
-        let trailerKey = null;
-        if (detailData.videos && Array.isArray(detailData.videos.results)) {
-            const ytVids = detailData.videos.results.filter(v => v.site === 'YouTube' && v.key);
-            const byLatest = (a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0);
-
-            const officialTrailers = ytVids.filter(v => v.official && v.type === 'Trailer').sort(byLatest);
-            const anyTrailers = ytVids.filter(v => v.type === 'Trailer').sort(byLatest);
-            const officialAny = ytVids.filter(v => v.official).sort(byLatest);
-            const allSorted = [...ytVids].sort(byLatest);
-
-            const chosen = officialTrailers[0] || anyTrailers[0] || officialAny[0] || allSorted[0] || ytVids[0];
-            if (chosen) trailerKey = chosen.key;
-        }
-
-        // TMDB-e kono trailer na paoya gele, direct YouTube-e search kore trailer khoja hocche
-        if (!trailerKey) {
-            const ytTitle = detailData.title || detailData.name || movie.title;
-            trailerKey = await searchYoutubeTrailer(ytTitle, year !== "N/A" ? year : null);
-        }
+        // Trailer - ekhon sudhu YouTube theke-i direct search kore neya hocche
+        // (TMDB-r nijer videos data ar use kora hocche na), tai TMDB-e trailer thakuk
+        // ba na thakuk, YouTube-e paoya gele shei-ta-i dekhabe.
+        const ytTitle = detailData.title || detailData.name || movie.title;
+        const trailerKey = await searchYoutubeTrailer(ytTitle, year !== "N/A" ? year : null);
 
         return {
             id: matchId,
