@@ -8,13 +8,72 @@ const omdbDetailsCache = new Map();
 const youtubeTrailerCache = new Map();
 let lastYoutubeTrailerError = null;
 
-// TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e sরাসরি search kore
+// --- Persistent (localStorage) trailer cache -------------------------------
+// YouTube Data API free quota is small (100 search calls/day by default) and
+// every uncached call costs quota, so resolved trailer keys - including
+// "not found" results - are kept in localStorage across page loads/sessions.
+// This is the main fix for the "Quota exceeded ... search_list" 429 error.
+const YT_TRAILER_STORAGE_KEY = 'bmz_yt_trailer_cache_v1';
+const YT_TRAILER_FOUND_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 days for a found trailer
+const YT_TRAILER_MISS_TTL_MS = 24 * 60 * 60 * 1000;         // 1 day for "nothing found"
+
+function loadYoutubeTrailerStore() {
+    try {
+        const raw = localStorage.getItem(YT_TRAILER_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+}
+function saveYoutubeTrailerStore(store) {
+    try { localStorage.setItem(YT_TRAILER_STORAGE_KEY, JSON.stringify(store)); } catch (e) { /* storage full/disabled - ignore */ }
+}
+function getPersistedTrailerKey(cacheKey) {
+    const store = loadYoutubeTrailerStore();
+    const entry = store[cacheKey];
+    if (!entry) return undefined; // no entry at all
+    const ttl = entry.videoId ? YT_TRAILER_FOUND_TTL_MS : YT_TRAILER_MISS_TTL_MS;
+    if (Date.now() - entry.ts > ttl) return undefined; // expired
+    return entry.videoId; // may be null (cached "not found")
+}
+function setPersistedTrailerKey(cacheKey, videoId) {
+    const store = loadYoutubeTrailerStore();
+    store[cacheKey] = { videoId: videoId || null, ts: Date.now() };
+    saveYoutubeTrailerStore(store);
+}
+
+// TMDB nijer "videos" data-tei prai shob jonopriyo movie/show-r official
+// trailer thake - eta ekdom free, kono YouTube quota lage na. Tai eta-i
+// shobar age check kora hoy; shudhu eta na thakle YouTube Search API-e
+// jawa hoy (seta quota-costly, tai last resort).
+function pickTmdbTrailerKey(detailData) {
+    const results = detailData && detailData.videos && Array.isArray(detailData.videos.results)
+        ? detailData.videos.results
+        : [];
+    const onYoutube = results.filter(v => v && v.site === 'YouTube' && v.key);
+    if (!onYoutube.length) return null;
+
+    const byType = (type) =>
+        onYoutube.find(v => v.type === type && v.official) ||
+        onYoutube.find(v => v.type === type);
+
+    const pick = byType('Trailer') || byType('Teaser') || onYoutube[0];
+    return pick ? pick.key : null;
+}
+
+// TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e সরাসরি search kore
 // shobcheye relevant + notun official trailer-take niye ashe. Client-side exposed key,
 // tai Google Cloud Console-e "Websites" restriction diye site-r domain-e lock kora ache.
+// Quota bachate age localStorage-e cache kora result check kora hoy (found ba not-found
+// dutai), tারপর tobe live API call kora hoy।
 async function searchYoutubeTrailer(title, year) {
     if (!YOUTUBE_API_KEY || !title) return null;
     const cacheKey = `${title.toLowerCase()}|${year || ''}`;
     if (youtubeTrailerCache.has(cacheKey)) return youtubeTrailerCache.get(cacheKey);
+
+    const persisted = getPersistedTrailerKey(cacheKey);
+    if (persisted !== undefined) {
+        youtubeTrailerCache.set(cacheKey, Promise.resolve(persisted));
+        return persisted;
+    }
 
     const promise = (async () => {
         try {
@@ -25,15 +84,23 @@ async function searchYoutubeTrailer(title, year) {
                 // Failure-r asol karon (403 referrer block, quotaExceeded, keyInvalid, ইত্যাদি)
                 // console-e log kora hocche, jate DevTools-e giye exact reason dekha jay -
                 // noile trailer chupchap disappear hoye jay ar bujhar upay thake na keno.
+                // Note: eta ar user-facing UI-te dekhano hoy na (dekhle nijer error dekhabe
+                // shobaike, quota-o bachbe na) - shudhu console-e thake developer-r jonno.
                 let errBody = '';
                 try { errBody = JSON.stringify(await res.json()); } catch (e2) {}
                 console.error(`YouTube trailer search failed (HTTP ${res.status}):`, errBody);
                 lastYoutubeTrailerError = `HTTP ${res.status}: ${errBody}`;
+                // Quota/rate-limit (429) hole "not found" hishebe short-TTL cache kore rakha
+                // hoy, jate ei session-e baar baar retry kore quota aro na noshto hoy।
+                if (res.status === 429 || res.status === 403) setPersistedTrailerKey(cacheKey, null);
                 return null;
             }
             const data = await res.json();
             const items = Array.isArray(data.items) ? data.items : [];
-            if (items.length === 0) return null;
+            if (items.length === 0) {
+                setPersistedTrailerKey(cacheKey, null);
+                return null;
+            }
 
             // Title-e "trailer" shobdo thakle ba channel-ta official/verified-er moto
             // lagle age prefer kora hocche, na hole shobcheye upore-r (relevance-e first) result
@@ -50,7 +117,9 @@ async function searchYoutubeTrailer(title, year) {
                 })
                 .sort((a, b) => b.score - a.score || new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
 
-            return scored.length ? scored[0].videoId : null;
+            const result = scored.length ? scored[0].videoId : null;
+            setPersistedTrailerKey(cacheKey, result);
+            return result;
         } catch (e) {
             console.error('YouTube trailer search error:', e);
             lastYoutubeTrailerError = `Network/JS error: ${e && e.message ? e.message : e}`;
@@ -1019,11 +1088,15 @@ async function fetchFullTMDBDetailsUncached(movie) {
         
         const finalImdbId = cleanImdbId || (detailData.external_ids && detailData.external_ids.imdb_id) || null;
 
-        // Trailer - ekhon sudhu YouTube theke-i direct search kore neya hocche
-        // (TMDB-r nijer videos data ar use kora hocche na), tai TMDB-e trailer thakuk
-        // ba na thakuk, YouTube-e paoya gele shei-ta-i dekhabe.
+        // Trailer - age TMDB-r nijer "videos" data theke check kora hoy (free, quota lage
+        // na, ar beshirvag jonopriyo title-ei official trailer thake). Shudhu TMDB-e kichu
+        // na paoya gele - tobe-i YouTube Search API-e jawa hoy (quota-costly last resort),
+        // jate free quota-r ekta boro part bachano jay ar 429 "quota exceeded" kom hoy.
         const ytTitle = detailData.title || detailData.name || movie.title;
-        const trailerKey = await searchYoutubeTrailer(ytTitle, year !== "N/A" ? year : null);
+        let trailerKey = pickTmdbTrailerKey(detailData);
+        if (!trailerKey) {
+            trailerKey = await searchYoutubeTrailer(ytTitle, year !== "N/A" ? year : null);
+        }
 
         return {
             id: matchId,
@@ -1497,11 +1570,12 @@ fastServersList.forEach((fs, fIdx) => {
             </div>
             <div class="trailer-label">Watch Trailer</div>
         </div>
-        ` : (lastYoutubeTrailerError ? `
-        <div class="trailer-box" style="padding:10px; font-size:12px; color:#ff6b6b; background:#1a1a1a; border:1px solid #ff6b6b; border-radius:8px;">
-            ⚠ Trailer load hoyni (temporary debug message): ${escapeAttr(lastYoutubeTrailerError)}
-        </div>
-        ` : '');
+        ` : '';
+        // Note: trailer resolve na hole (TMDB-e video nei, YouTube quota shesh, etc.)
+        // ekhon r kono user-facing error box dekhano hoy na - trailer box-ta chupchap
+        // hide thake. Asol karon (HTTP status + response body) console-e already log
+        // kora ache (`lastYoutubeTrailerError` variable-e o dhora ache) - shudhu
+        // developer DevTools console kholeই seta dekhte pabe, shob visitor na.
 
         modalBox.innerHTML = `
         <span class="modal-close-btn" onclick="closeMovieModal()">✖</span>
