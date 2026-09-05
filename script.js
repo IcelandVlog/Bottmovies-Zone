@@ -1,9 +1,56 @@
 const OMDB_API_KEY = "d246cca2"; 
 const TMDB_API_KEY = "ffa63099e82a2b25d082dcd0c040c8fb"; 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const YOUTUBE_API_KEY = "AIzaSyDPOJwkO3l_5mCVm4iZw3qyrinryWckrG4";
 
 const tmdbDetailsCache = new Map();
 const omdbDetailsCache = new Map();
+const youtubeTrailerCache = new Map();
+
+// TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e sরাসরি search kore
+// shobcheye relevant + notun official trailer-take niye ashe. Client-side exposed key,
+// tai Google Cloud Console-e "Websites" restriction diye site-r domain-e lock kora ache.
+async function searchYoutubeTrailer(title, year) {
+    if (!YOUTUBE_API_KEY || !title) return null;
+    const cacheKey = `${title.toLowerCase()}|${year || ''}`;
+    if (youtubeTrailerCache.has(cacheKey)) return youtubeTrailerCache.get(cacheKey);
+
+    const promise = (async () => {
+        try {
+            const query = `${title} ${year || ''} official trailer`.trim();
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&order=relevance&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
+            const res = await fetchWithTimeout(url, {}, 6000);
+            if (!res.ok) return null;
+            const data = await res.json();
+            const items = Array.isArray(data.items) ? data.items : [];
+            if (items.length === 0) return null;
+
+            // Title-e "trailer" shobdo thakle ba channel-ta official/verified-er moto
+            // lagle age prefer kora hocche, na hole shobcheye upore-r (relevance-e first) result
+            const lowerTitle = title.toLowerCase();
+            const scored = items
+                .filter(it => it.id && it.id.videoId)
+                .map(it => {
+                    const vTitle = (it.snippet && it.snippet.title || '').toLowerCase();
+                    let score = 0;
+                    if (vTitle.includes('trailer')) score += 2;
+                    if (vTitle.includes(lowerTitle)) score += 1;
+                    if (vTitle.includes('official')) score += 1;
+                    return { videoId: it.id.videoId, publishedAt: it.snippet && it.snippet.publishedAt, score };
+                })
+                .sort((a, b) => b.score - a.score || new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+
+            return scored.length ? scored[0].videoId : null;
+        } catch (e) {
+            console.error('YouTube trailer search error:', e);
+            return null;
+        }
+    })();
+
+    youtubeTrailerCache.set(cacheKey, promise);
+    return promise;
+}
+
 
 function debounce(fn, wait) {
     let t;
@@ -978,6 +1025,12 @@ async function fetchFullTMDBDetailsUncached(movie) {
 
             const chosen = officialTrailers[0] || anyTrailers[0] || officialAny[0] || allSorted[0] || ytVids[0];
             if (chosen) trailerKey = chosen.key;
+        }
+
+        // TMDB-e kono trailer na paoya gele, direct YouTube-e search kore trailer khoja hocche
+        if (!trailerKey) {
+            const ytTitle = detailData.title || detailData.name || movie.title;
+            trailerKey = await searchYoutubeTrailer(ytTitle, year !== "N/A" ? year : null);
         }
 
         return {
