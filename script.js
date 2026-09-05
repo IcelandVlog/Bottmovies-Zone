@@ -961,14 +961,22 @@ async function fetchFullTMDBDetailsUncached(movie) {
         
         const finalImdbId = cleanImdbId || (detailData.external_ids && detailData.external_ids.imdb_id) || null;
 
-        // Trailer - TMDB-এর মিডিয়া পেজে "Most Popular" ট্যাবে যেই ভিডিওটা সবার উপরে/প্রথমে
-        // দেখায় (Official Trailer হোক বা Official Teaser), ঠিক সেটাই এখানে নেওয়া হচ্ছে -
-        // অর্থাৎ type (Trailer/Teaser) জোর করে prefer না করে, official flag আর TMDB-এর
-        // নিজের রিটার্ন-করা order (যেটা "Most Popular" এর সাথে মেলে) অনুসরণ করা হচ্ছে
+        // Trailer - shobcheye latest (recent-e release/upload hoya) official Trailer-take
+        // beche newa hocche, TMDB-r "published_at" date diye sort kore. Kono "Trailer"
+        // type video na paoya gele, official Teaser/onno video-r modhye latest-take neya
+        // hocche - r kono published_at-i na thakle age-r moto TMDB-r nijer order fallback
+        // hishebe use kora hocche.
         let trailerKey = null;
         if (detailData.videos && Array.isArray(detailData.videos.results)) {
             const ytVids = detailData.videos.results.filter(v => v.site === 'YouTube' && v.key);
-            const chosen = ytVids.find(v => v.official) || ytVids[0];
+            const byLatest = (a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0);
+
+            const officialTrailers = ytVids.filter(v => v.official && v.type === 'Trailer').sort(byLatest);
+            const anyTrailers = ytVids.filter(v => v.type === 'Trailer').sort(byLatest);
+            const officialAny = ytVids.filter(v => v.official).sort(byLatest);
+            const allSorted = [...ytVids].sort(byLatest);
+
+            const chosen = officialTrailers[0] || anyTrailers[0] || officialAny[0] || allSorted[0] || ytVids[0];
             if (chosen) trailerKey = chosen.key;
         }
 
@@ -1435,10 +1443,11 @@ fastServersList.forEach((fs, fIdx) => {
         const revenueRow = hasVal(revenueFormatted) ? `<div class="meta-inline-item" id="modalRevenueDiv"><strong>REVENUE</strong> ${revenueFormatted}</div>` : '';
         const budgetRevenueGroup = (budgetRow || revenueRow) ? `<div class="meta-inline-group">${budgetRow}${revenueRow}</div>` : '';
 
+        const trailerThumbUrl = movie.trailerThumb || (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg` : '');
         const trailerHTML = trailerKey ? `
-        <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey)}">
+        <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey)}" data-thumb="${escapeAttr(trailerThumbUrl)}">
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg" alt="${escapeAttr(title)} Trailer" loading="lazy">
+                <img class="trailer-thumb-img" src="${trailerThumbUrl}" alt="${escapeAttr(title)} Trailer" loading="lazy">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
@@ -1665,7 +1674,9 @@ function playModalTrailer(el) {
     // ei ekta frame-er jonno), kintu Firefox/Safari-te ei attribute support nei - tai
     // shei browser-gulor jonno ekta "Watch on YouTube" fallback link o rakha holo, jate
     // iframe block hole o user video-ta dekhte pare.
-    const thumbUrl = `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`;
+    // Admin panel theke manually thumbnail set kora thakle sheita age priority pabe,
+    // na thakle auto YouTube thumbnail fallback hishebe use hobe.
+    const thumbUrl = box.getAttribute('data-thumb') || `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`;
     // background-e thumbnail rekhe dewa holo, tai iframe block/blank thakle o box-ta
     // kokhono khali/kalo dekhabe na - thumbnail-i poster hishebe thakbe.
     box.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}')">
@@ -4117,6 +4128,9 @@ function setupAdminPanel() {
     const posterLinkInput = document.getElementById('adminPosterLink');
     if (posterLinkInput) posterLinkInput.addEventListener('input', updateAdminPosterPreview);
 
+    const trailerThumbInput = document.getElementById('adminTrailerThumb');
+    if (trailerThumbInput) trailerThumbInput.addEventListener('input', updateAdminTrailerThumbPreview);
+
     const posterFileInput = document.getElementById('adminPosterFile');
     if (posterFileInput) {
         posterFileInput.addEventListener('change', function() {
@@ -4786,6 +4800,20 @@ function updateAdminPosterPreview() {
     }
 }
 
+function updateAdminTrailerThumbPreview() {
+    const linkInput = document.getElementById('adminTrailerThumb');
+    const prev = document.getElementById('adminTrailerThumbPreview');
+    const wrap = document.getElementById('adminTrailerThumbPreviewWrap');
+    if (!linkInput || !prev || !wrap) return;
+    const link = linkInput.value.trim();
+    if (link) {
+        prev.src = link;
+        wrap.style.display = 'block';
+    } else {
+        wrap.style.display = 'none';
+    }
+}
+
 // ---------- Movie download link rows ----------
 
 // ---------- Movie download link rows ----------
@@ -4983,6 +5011,10 @@ function resetAdminForm() {
     updateAdminPosterPreview();
     setPosterMode('link');
 
+    const trailerThumbInput = document.getElementById('adminTrailerThumb');
+    if (trailerThumbInput) trailerThumbInput.value = '';
+    updateAdminTrailerThumbPreview();
+
     const mediaScanFileInput = document.getElementById('adminMediaScanFile');
     if (mediaScanFileInput) mediaScanFileInput.value = '';
     const mediaScanStatus = document.getElementById('adminMediaScanStatus');
@@ -5029,6 +5061,10 @@ function loadMovieIntoAdminForm(movie) {
     setPosterMode('link');
     document.getElementById('adminPosterLink').value = movie.poster || '';
     updateAdminPosterPreview();
+
+    const trailerThumbInput = document.getElementById('adminTrailerThumb');
+    if (trailerThumbInput) trailerThumbInput.value = movie.trailerThumb || '';
+    updateAdminTrailerThumbPreview();
 
     document.getElementById('adminMovieLinksList').innerHTML = '';
     document.getElementById('adminSeasonsList').innerHTML = '';
@@ -5112,6 +5148,7 @@ async function submitAdminContent() {
         }
 
         const downloadBlocks = (adminTmdbType === 'tv') ? collectSeasons() : collectMovieLinks();
+        const trailerThumbUrl = document.getElementById('adminTrailerThumb').value.trim() || null;
 
         const payload = {
             title: title,
@@ -5123,6 +5160,7 @@ async function submitAdminContent() {
             languages: audio,
             Subtitles: subtitles,
             poster: posterUrl,
+            trailerThumb: trailerThumbUrl,
             downloadBlocks: JSON.stringify(downloadBlocks)
         };
 
