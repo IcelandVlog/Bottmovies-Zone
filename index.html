@@ -567,8 +567,13 @@
                     </div>
 
                     <div class="admin-field">
-                        <label>Trailer Thumbnail <span class="admin-hint">(optional — leave empty to auto-use the YouTube trailer's own thumbnail)</span></label>
-                        <input type="text" id="adminTrailerThumb" placeholder="https://... custom trailer thumbnail image link">
+                        <label>Trailer Thumbnail <span class="admin-hint">(optional — link or upload, leave empty to auto-use the YouTube trailer's own thumbnail)</span></label>
+                        <div class="admin-toggle-group" id="adminTrailerThumbModeGroup">
+                            <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setTrailerThumbMode('link')">🔗 Link</button>
+                            <button type="button" class="admin-toggle-btn" data-value="file" onclick="setTrailerThumbMode('file')">📁 Upload File</button>
+                        </div>
+                        <input type="text" id="adminTrailerThumb" placeholder="https://... custom trailer thumbnail image link" style="margin-top:8px;">
+                        <input type="file" id="adminTrailerThumbFile" accept="image/*" style="display:none; margin-top:8px;">
                         <div id="adminTrailerThumbPreviewWrap" style="display:none;"><img id="adminTrailerThumbPreview" class="admin-poster-preview"></div>
                     </div>
 

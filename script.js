@@ -3929,6 +3929,7 @@ let currentAdminTab = 'dashboard'; // movies data লোড হওয়ার �
 let adminExtraCategories = new Set();
 let adminTmdbType = 'movie';
 let adminPosterMode = 'link';
+let adminTrailerThumbMode = 'link';
 let adminCategoriesLoaded = false;
 
 async function loadAdminExtraCategories() {
@@ -4173,6 +4174,21 @@ function setupAdminPanel() {
                 reader.onload = function(e) {
                     const prev = document.getElementById('adminPosterPreview');
                     const wrap = document.getElementById('adminPosterPreviewWrap');
+                    if (prev && wrap) { prev.src = e.target.result; wrap.style.display = 'block'; }
+                };
+                reader.readAsDataURL(this.files[0]);
+            }
+        });
+    }
+
+    const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
+    if (trailerThumbFileInput) {
+        trailerThumbFileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const prev = document.getElementById('adminTrailerThumbPreview');
+                    const wrap = document.getElementById('adminTrailerThumbPreviewWrap');
                     if (prev && wrap) { prev.src = e.target.result; wrap.style.display = 'block'; }
                 };
                 reader.readAsDataURL(this.files[0]);
@@ -4820,6 +4836,17 @@ function setPosterMode(mode) {
     if (fileInput) fileInput.style.display = mode === 'file' ? 'block' : 'none';
 }
 
+function setTrailerThumbMode(mode) {
+    adminTrailerThumbMode = mode;
+    document.querySelectorAll('#adminTrailerThumbModeGroup .admin-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-value') === mode);
+    });
+    const linkInput = document.getElementById('adminTrailerThumb');
+    const fileInput = document.getElementById('adminTrailerThumbFile');
+    if (linkInput) linkInput.style.display = mode === 'link' ? 'block' : 'none';
+    if (fileInput) fileInput.style.display = mode === 'file' ? 'block' : 'none';
+}
+
 function updateAdminPosterPreview() {
     const linkInput = document.getElementById('adminPosterLink');
     const prev = document.getElementById('adminPosterPreview');
@@ -4985,11 +5012,13 @@ function extractTmdbIdFromInput(input) {
     return numMatch ? numMatch[0] : null;
 }
 
-// ---------- Poster upload (Supabase Storage) ----------
+// ---------- Poster / Trailer Thumbnail upload (Supabase Storage) ----------
+// Same "posters" bucket reused for trailer thumbnails too, just with a different
+// filename prefix - so no extra Supabase bucket setup is needed for this feature.
 
-async function uploadPosterFile(file) {
+async function uploadPosterFile(file, prefix = 'poster') {
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const fileName = `poster_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
+    const fileName = `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
 
     const { error } = await supabaseClient.storage.from(ADMIN_POSTER_BUCKET).upload(fileName, file, {
         cacheControl: '3600',
@@ -5047,7 +5076,10 @@ function resetAdminForm() {
 
     const trailerThumbInput = document.getElementById('adminTrailerThumb');
     if (trailerThumbInput) trailerThumbInput.value = '';
+    const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
+    if (trailerThumbFileInput) trailerThumbFileInput.value = '';
     updateAdminTrailerThumbPreview();
+    setTrailerThumbMode('link');
 
     const mediaScanFileInput = document.getElementById('adminMediaScanFile');
     if (mediaScanFileInput) mediaScanFileInput.value = '';
@@ -5096,6 +5128,7 @@ function loadMovieIntoAdminForm(movie) {
     document.getElementById('adminPosterLink').value = movie.poster || '';
     updateAdminPosterPreview();
 
+    setTrailerThumbMode('link');
     const trailerThumbInput = document.getElementById('adminTrailerThumb');
     if (trailerThumbInput) trailerThumbInput.value = movie.trailerThumb || '';
     updateAdminTrailerThumbPreview();
@@ -5167,7 +5200,7 @@ async function submitAdminContent() {
             const fileInput = document.getElementById('adminPosterFile');
             if (fileInput && fileInput.files && fileInput.files[0]) {
                 submitBtn.textContent = 'Uploading poster...';
-                posterUrl = await uploadPosterFile(fileInput.files[0]);
+                posterUrl = await uploadPosterFile(fileInput.files[0], 'poster');
 
                 const reachable = await verifyPosterUrlReachable(posterUrl);
                 if (!reachable) {
@@ -5181,8 +5214,26 @@ async function submitAdminContent() {
             }
         }
 
+        let trailerThumbUrl = document.getElementById('adminTrailerThumb').value.trim() || null;
+        if (adminTrailerThumbMode === 'file') {
+            const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
+            if (trailerThumbFileInput && trailerThumbFileInput.files && trailerThumbFileInput.files[0]) {
+                submitBtn.textContent = 'Uploading trailer thumbnail...';
+                trailerThumbUrl = await uploadPosterFile(trailerThumbFileInput.files[0], 'trailer_thumb');
+
+                const reachable = await verifyPosterUrlReachable(trailerThumbUrl);
+                if (!reachable) {
+                    throw new Error(
+                        'Trailer thumbnail uploaded to Storage, but the public URL is not loading in the browser. ' +
+                        'This means the "' + ADMIN_POSTER_BUCKET + '" bucket is Private or missing a public read policy. ' +
+                        'Go to Supabase → Storage → posters → make the bucket Public (or add a public SELECT policy), then try again.'
+                    );
+                }
+                submitBtn.textContent = 'Saving...';
+            }
+        }
+
         const downloadBlocks = (adminTmdbType === 'tv') ? collectSeasons() : collectMovieLinks();
-        const trailerThumbUrl = document.getElementById('adminTrailerThumb').value.trim() || null;
 
         const payload = {
             title: title,
@@ -5197,6 +5248,7 @@ async function submitAdminContent() {
             trailerThumb: trailerThumbUrl,
             downloadBlocks: JSON.stringify(downloadBlocks)
         };
+
 
         let error;
         if (editingId) {
