@@ -235,6 +235,12 @@ function getFeaturedMoviesForHero() {
 }
 
 function getHeroCategoryLabel(movie) {
+    if (movie.featured_category_label) return movie.featured_category_label;
+    if (movie.featured_category) {
+        const overrideLink = document.querySelector(`.nav-link[data-target="${movie.featured_category}"]`);
+        if (overrideLink) return overrideLink.textContent.trim();
+        return String(movie.featured_category).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
     const cats = Array.isArray(movie.category) ? movie.category : [];
     if (!cats.length) return '';
     const link = document.querySelector(`.nav-link[data-target="${cats[0]}"]`);
@@ -335,6 +341,7 @@ function renderHeroSlides() {
 
     function buildSlideEl(movie, i, idSuffix) {
         const catLabel = getHeroCategoryLabel(movie);
+        const catSlug = movie.featured_category || (Array.isArray(movie.category) && movie.category.length ? movie.category[0] : '');
         const fullTitle = movie.title || '';
         const cleanTitle = fullTitle.replace(/\s*\([\d\-]+\)\s*$/, '').trim() || fullTitle;
         const isClone = idSuffix != null;
@@ -347,7 +354,7 @@ function renderHeroSlides() {
             <div class="hero-slide-shade"></div>
             <div class="hero-slide-top">
                 <span class="hero-badge hero-badge-featured">Featured</span>
-                ${catLabel ? `<span class="hero-badge hero-badge-cat">${catLabel}</span>` : ''}
+                ${catLabel ? `<span class="hero-badge hero-badge-cat" id="heroCat-${domId}">${catLabel}</span>` : ''}
             </div>
             <div class="hero-slide-info">
                 <h2 class="hero-slide-title" id="heroTitle-${domId}">${cleanTitle}</h2>
@@ -364,6 +371,15 @@ function renderHeroSlides() {
 
         const titleEl = slide.querySelector(`#heroTitle-${domId}`);
         if (titleEl) titleEl.addEventListener('click', () => openMovieModal(heroSlidesData[i]));
+
+        const catEl = slide.querySelector(`#heroCat-${domId}`);
+        if (catEl && catSlug) {
+            catEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchCategory(catSlug);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
 
         return slide;
     }
@@ -1663,7 +1679,7 @@ function switchCategory(category, initialPage) {
     document.querySelectorAll('.nav-link, .dropdown-toggle').forEach(el => el.classList.remove('active'));
     if (targetLink) {
         targetLink.classList.add('active');
-        const parentDropdown = targetLink.closest('.has-dropdown');
+        const parentDropdown = targetLink.closest('.has-dropdown:not(.sub-dropdown)');
         if (parentDropdown) {
             const toggle = parentDropdown.querySelector('.dropdown-toggle');
             if (toggle) toggle.classList.add('active');
@@ -1794,6 +1810,26 @@ function initApp() {
             const isOpen = parentLi.classList.contains('open');
             document.querySelectorAll('.has-dropdown').forEach(li => li.classList.remove('open'));
             if (!isOpen) parentLi.classList.add('open');
+        });
+    });
+
+    // নেস্টেড সাব-ড্রপডাউন (যেমন English Movies -> German/Spanish) — এটার toggle টপ-লেভেল
+    // ড্রপডাউন বন্ধ করবে না, শুধু নিজের সাব-মেনু খুলবে/বন্ধ করবে
+    const subDropdownToggles = document.querySelectorAll('.sub-dropdown-toggle');
+    subDropdownToggles.forEach(caret => {
+        caret.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const parentLi = this.closest('li.has-dropdown');
+            if (!parentLi) return;
+            const isOpen = parentLi.classList.contains('open');
+            const siblingList = parentLi.parentElement;
+            if (siblingList) {
+                Array.from(siblingList.children).forEach(li => {
+                    if (li !== parentLi) li.classList.remove('open');
+                });
+            }
+            parentLi.classList.toggle('open', !isOpen);
         });
     });
 
@@ -4982,6 +5018,7 @@ function renderAdminBannerList(filter) {
     });
 
     const featuredList = getFeaturedSortedMovies();
+    const bannerCatOptions = getAllKnownCategories();
 
     sorted.forEach(movie => {
         const card = document.createElement('div');
@@ -5005,6 +5042,11 @@ function renderAdminBannerList(filter) {
                     <button type="button" class="admin-banner-move-btn" data-dir="up" ${posIndex <= 0 ? 'disabled' : ''} title="Move earlier">▲</button>
                     <button type="button" class="admin-banner-move-btn" data-dir="down" ${posIndex >= featuredList.length - 1 ? 'disabled' : ''} title="Move later">▼</button>
                     ` : ''}
+                    <select class="admin-banner-category-select" title="Category badge shown on this banner slide">
+                        <option value="">Auto (from movie's category)</option>
+                        ${bannerCatOptions.map(cat => `<option value="${escapeAttr(cat)}" ${movie.featured_category === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
+                    </select>
+                    <input type="text" class="admin-banner-label-input" placeholder="Custom badge text (optional, e.g. Marvel)" value="${escapeAttr(movie.featured_category_label || '')}">
                     <input type="text" class="admin-banner-image-input" placeholder="Custom banner image URL (optional — overrides TMDB backdrop)" value="${movie.featured_image || ''}">
                 </div>
             </div>
@@ -5012,13 +5054,20 @@ function renderAdminBannerList(filter) {
                 <button type="button" class="admin-mini-btn admin-banner-save-btn">Save</button>
             </div>
         `;
-        card.querySelector('.admin-banner-save-btn').addEventListener('click', () => {
+        card.querySelector('.admin-banner-save-btn').addEventListener('click', (e) => {
+            const btn = e.currentTarget;
             const cb = card.querySelector('.admin-banner-featured-cb');
             const imageInput = card.querySelector('.admin-banner-image-input');
+            const catSelect = card.querySelector('.admin-banner-category-select');
+            const labelInput = card.querySelector('.admin-banner-label-input');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
             saveBannerSettings(movie, {
                 featured: cb.checked,
-                featured_image: imageInput.value.trim() || null
-            });
+                featured_image: imageInput.value.trim() || null,
+                featured_category: catSelect.value.trim() || null,
+                featured_category_label: labelInput.value.trim() || null
+            }, btn);
         });
         const upBtn = card.querySelector('.admin-banner-move-btn[data-dir="up"]');
         const downBtn = card.querySelector('.admin-banner-move-btn[data-dir="down"]');
@@ -5038,7 +5087,7 @@ function renderAdminBannerList(filter) {
 // ✔ order নাম্বার এখন অ্যাডমিনকে ম্যানুয়ালি টাইপ করতে হয় না (duplicate/ভুল নাম্বার বসার
 // সুযোগ ছিল) — Save করার সাথে সাথে auto পরের available number বসে যায়, আর
 // ▲ / ▼ বাটন দিয়ে পজিশন বদলালে বাকি সবগুলোর নাম্বার automatically re-sequence হয়ে যায়।
-async function saveBannerSettings(movie, changes) {
+async function saveBannerSettings(movie, changes, btn) {
     if (!movie || !movie.id) return;
     try {
         let featuredOrder = movie.featured_order ?? null;
@@ -5059,7 +5108,9 @@ async function saveBannerSettings(movie, changes) {
             .update({
                 featured: changes.featured,
                 featured_order: featuredOrder,
-                featured_image: changes.featured_image
+                featured_image: changes.featured_image,
+                featured_category: changes.featured_category,
+                featured_category_label: changes.featured_category_label
             })
             .eq('id', movie.id);
         if (error) throw error;
@@ -5067,6 +5118,8 @@ async function saveBannerSettings(movie, changes) {
         movie.featured = changes.featured;
         movie.featured_order = featuredOrder;
         movie.featured_image = changes.featured_image;
+        movie.featured_category = changes.featured_category;
+        movie.featured_category_label = changes.featured_category_label;
 
         // remove করার পর বাকিগুলোর নাম্বার gap ছাড়া 0,1,2... করে re-sequence করে দাও
         if (!changes.featured) {
@@ -5076,10 +5129,11 @@ async function saveBannerSettings(movie, changes) {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
         if (typeof renderHeroSlides === 'function') renderHeroSlides();
-        showNoticeModal('✅ Banner settings saved for "' + (movie.title || 'this item') + '"');
+        showToast('✅ Banner settings saved for "' + (movie.title || 'this item') + '"');
     } catch (err) {
         console.error('Save banner settings error:', err);
-        showNoticeModal('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'));
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
     }
 }
 
@@ -5178,6 +5232,30 @@ function showConfirmModal(message, options) {
 
         requestAnimationFrame(() => overlay.classList.add('open'));
     });
+}
+
+// ছোট, নিজে থেকে মিলিয়ে যাওয়া টোস্ট নোটিফিকেশন — বড় centered modal-এর বদলে
+// দ্রুত inline feedback দেয়ার জন্য (যেমন Banner Save করার পর)
+function showToast(message, type) {
+    let wrap = document.getElementById('toastWrap');
+    if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = 'toastWrap';
+        wrap.className = 'toast-wrap';
+        document.body.appendChild(wrap);
+    }
+    const toast = document.createElement('div');
+    toast.className = 'toast-item' + (type === 'error' ? ' toast-error' : '');
+    toast.textContent = message;
+    wrap.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+        setTimeout(() => toast.remove(), 500);
+    }, 2500);
 }
 
 function showNoticeModal(message, options) {
