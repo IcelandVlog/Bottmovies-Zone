@@ -5388,6 +5388,33 @@ async function submitAdminContent() {
         };
 
 
+        // নতুন content add করলে (edit নয়) সেটা সবসময় Serial #1-এ বসবে, আর যে item গুলোতে
+        // আগে থেকে ম্যানুয়ালি Serial (display_order) দেওয়া আছে, তারা সবাই ১ ঘর করে পিছিয়ে
+        // যাবে (2 → 3, 3 → 4 ...)। যাদের Serial এখনো Auto (display_order null), তাদের
+        // ছোঁয়া হচ্ছে না - তারা নিজেদের existing (recency) ক্রমেই এই পিন করা item গুলোর নিচে থাকবে।
+        if (!editingId) {
+            submitBtn.textContent = 'Reordering serials...';
+            const { data: pinnedMovies, error: pinnedFetchError } = await supabaseClient
+                .from('movies')
+                .select('id, display_order')
+                .not('display_order', 'is', null);
+
+            if (pinnedFetchError) throw pinnedFetchError;
+
+            if (pinnedMovies && pinnedMovies.length > 0) {
+                const bumpResults = await Promise.all(
+                    pinnedMovies.map(m =>
+                        supabaseClient.from('movies').update({ display_order: m.display_order + 1 }).eq('id', m.id)
+                    )
+                );
+                const bumpError = bumpResults.find(r => r.error);
+                if (bumpError) throw bumpError.error;
+            }
+
+            payload.display_order = 1;
+            submitBtn.textContent = 'Saving...';
+        }
+
         let error;
         if (editingId) {
             ({ error } = await supabaseClient.from('movies').update(payload).eq('id', editingId));
@@ -5591,6 +5618,35 @@ async function updateMovieDisplayOrder(movie, rawValue, btn) {
 
     if (btn) { btn.disabled = true; btn.textContent = '...'; }
     try {
+        // নতুন Serial number বসানো হলে (খালি করে Auto করা নয়), সেই নাম্বার এবং তার পরের
+        // নাম্বারগুলোতে যাদের আগে থেকে Serial ম্যানুয়ালি বসানো আছে, তাদের সবাইকে ১ ঘর করে
+        // পিছিয়ে দেওয়া হচ্ছে - যাতে দুটো item একই Serial নাম্বার নিয়ে duplicate না হয়ে যায়।
+        if (value !== null) {
+            const { data: toShift, error: shiftFetchError } = await supabaseClient
+                .from('movies')
+                .select('id, display_order')
+                .neq('id', movie.id)
+                .gte('display_order', value);
+
+            if (shiftFetchError) throw shiftFetchError;
+
+            if (toShift && toShift.length > 0) {
+                const shiftResults = await Promise.all(
+                    toShift.map(m =>
+                        supabaseClient.from('movies').update({ display_order: m.display_order + 1 }).eq('id', m.id)
+                    )
+                );
+                const shiftError = shiftResults.find(r => r.error);
+                if (shiftError) throw shiftError.error;
+
+                // মেমরিতে থাকা লিস্টেও (রি-ফেচ ছাড়াই) shift হওয়া নাম্বারগুলো আপডেট করে দাও
+                toShift.forEach(shifted => {
+                    const cached = allMovies.find(x => x.id === shifted.id);
+                    if (cached) cached.display_order = shifted.display_order + 1;
+                });
+            }
+        }
+
         const { error } = await supabaseClient
             .from('movies')
             .update({ display_order: value })
