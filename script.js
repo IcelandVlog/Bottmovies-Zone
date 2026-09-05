@@ -6,6 +6,7 @@ const YOUTUBE_API_KEY = "AIzaSyDPOJwkO3l_5mCVm4iZw3qyrinryWckrG4";
 const tmdbDetailsCache = new Map();
 const omdbDetailsCache = new Map();
 const youtubeTrailerCache = new Map();
+let lastYoutubeTrailerError = null;
 
 // TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e sরাসরি search kore
 // shobcheye relevant + notun official trailer-take niye ashe. Client-side exposed key,
@@ -27,6 +28,7 @@ async function searchYoutubeTrailer(title, year) {
                 let errBody = '';
                 try { errBody = JSON.stringify(await res.json()); } catch (e2) {}
                 console.error(`YouTube trailer search failed (HTTP ${res.status}):`, errBody);
+                lastYoutubeTrailerError = `HTTP ${res.status}: ${errBody}`;
                 return null;
             }
             const data = await res.json();
@@ -51,6 +53,7 @@ async function searchYoutubeTrailer(title, year) {
             return scored.length ? scored[0].videoId : null;
         } catch (e) {
             console.error('YouTube trailer search error:', e);
+            lastYoutubeTrailerError = `Network/JS error: ${e && e.message ? e.message : e}`;
             return null;
         }
     })();
@@ -1494,7 +1497,11 @@ fastServersList.forEach((fs, fIdx) => {
             </div>
             <div class="trailer-label">Watch Trailer</div>
         </div>
-        ` : '';
+        ` : (lastYoutubeTrailerError ? `
+        <div class="trailer-box" style="padding:10px; font-size:12px; color:#ff6b6b; background:#1a1a1a; border:1px solid #ff6b6b; border-radius:8px;">
+            ⚠ Trailer load hoyni (temporary debug message): ${escapeAttr(lastYoutubeTrailerError)}
+        </div>
+        ` : '');
 
         modalBox.innerHTML = `
         <span class="modal-close-btn" onclick="closeMovieModal()">✖</span>
