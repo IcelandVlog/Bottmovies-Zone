@@ -1665,9 +1665,12 @@ function playModalTrailer(el) {
     // ei ekta frame-er jonno), kintu Firefox/Safari-te ei attribute support nei - tai
     // shei browser-gulor jonno ekta "Watch on YouTube" fallback link o rakha holo, jate
     // iframe block hole o user video-ta dekhte pare.
-    box.innerHTML = `<div class="trailer-video-wrap">
+    const thumbUrl = `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`;
+    // background-e thumbnail rekhe dewa holo, tai iframe block/blank thakle o box-ta
+    // kokhono khali/kalo dekhabe na - thumbnail-i poster hishebe thakbe.
+    box.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}')">
         <iframe src="${embedUrl}" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen credentialless></iframe>
-        <a class="trailer-fallback-link" href="${watchUrl}" target="_blank" rel="noopener noreferrer">Trailer load hocche na? YouTube-e dekhun ↗</a>
+        <a class="trailer-fallback-link" href="${watchUrl}" target="_blank" rel="noopener noreferrer">▶ YouTube-e dekhun</a>
     </div>`;
 }
 
