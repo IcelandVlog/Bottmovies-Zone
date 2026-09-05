@@ -20,7 +20,15 @@ async function searchYoutubeTrailer(title, year) {
             const query = `${title} ${year || ''} official trailer`.trim();
             const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&order=relevance&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
             const res = await fetchWithTimeout(url, {}, 6000);
-            if (!res.ok) return null;
+            if (!res.ok) {
+                // Failure-r asol karon (403 referrer block, quotaExceeded, keyInvalid, ইত্যাদি)
+                // console-e log kora hocche, jate DevTools-e giye exact reason dekha jay -
+                // noile trailer chupchap disappear hoye jay ar bujhar upay thake na keno.
+                let errBody = '';
+                try { errBody = JSON.stringify(await res.json()); } catch (e2) {}
+                console.error(`YouTube trailer search failed (HTTP ${res.status}):`, errBody);
+                return null;
+            }
             const data = await res.json();
             const items = Array.isArray(data.items) ? data.items : [];
             if (items.length === 0) return null;
