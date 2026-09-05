@@ -901,7 +901,7 @@ async function fetchFullTMDBDetailsUncached(movie) {
 
         if (!matchId) return null;
 
-        const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids,release_dates,content_ratings`, {}, 6000);
+        const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids,release_dates,content_ratings,videos`, {}, 6000);
         if (!detailRes.ok) return null;
         const detailData = await detailRes.json();
 
@@ -961,6 +961,17 @@ async function fetchFullTMDBDetailsUncached(movie) {
         
         const finalImdbId = cleanImdbId || (detailData.external_ids && detailData.external_ids.imdb_id) || null;
 
+        // Trailer - TMDB-এর মিডিয়া পেজে "Most Popular" ট্যাবে যেই ভিডিওটা সবার উপরে/প্রথমে
+        // দেখায় (Official Trailer হোক বা Official Teaser), ঠিক সেটাই এখানে নেওয়া হচ্ছে -
+        // অর্থাৎ type (Trailer/Teaser) জোর করে prefer না করে, official flag আর TMDB-এর
+        // নিজের রিটার্ন-করা order (যেটা "Most Popular" এর সাথে মেলে) অনুসরণ করা হচ্ছে
+        let trailerKey = null;
+        if (detailData.videos && Array.isArray(detailData.videos.results)) {
+            const ytVids = detailData.videos.results.filter(v => v.site === 'YouTube' && v.key);
+            const chosen = ytVids.find(v => v.official) || ytVids[0];
+            if (chosen) trailerKey = chosen.key;
+        }
+
         return {
             id: matchId,
             mediaType: mediaType,
@@ -980,7 +991,8 @@ async function fetchFullTMDBDetailsUncached(movie) {
             imdbId: finalImdbId,
             contentRating: contentRating,
             budget: detailData.budget || 0,
-            revenue: detailData.revenue || 0
+            revenue: detailData.revenue || 0,
+            trailerKey: trailerKey
         };
     } catch(e) {
         console.error("TMDB Details Error or Timeout:", e);
@@ -1286,6 +1298,7 @@ async function openMovieModal(movie) {
     let fetchedImdbId = extractImdbId(movie.imdbId) || null;
     let smartRating = "N/A";
     let awards = "N/A";
+    let trailerKey = null;
 
     const isTV = movie.tmdbType === 'tv';
     let durationOrSeasonPill = movie.runtime || "N/A";
@@ -1422,6 +1435,16 @@ fastServersList.forEach((fs, fIdx) => {
         const revenueRow = hasVal(revenueFormatted) ? `<div class="meta-inline-item" id="modalRevenueDiv"><strong>REVENUE</strong> ${revenueFormatted}</div>` : '';
         const budgetRevenueGroup = (budgetRow || revenueRow) ? `<div class="meta-inline-group">${budgetRow}${revenueRow}</div>` : '';
 
+        const trailerHTML = trailerKey ? `
+        <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey)}">
+            <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
+                <img class="trailer-thumb-img" src="https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg" alt="${escapeAttr(title)} Trailer" loading="lazy">
+                <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
+            </div>
+            <div class="trailer-label">Watch Trailer</div>
+        </div>
+        ` : '';
+
         modalBox.innerHTML = `
         <span class="modal-close-btn" onclick="closeMovieModal()">✖</span>
         <div class="movie-summary-card">
@@ -1491,6 +1514,7 @@ fastServersList.forEach((fs, fIdx) => {
                 <li>• <strong>Quality:</strong> <span class="badge-quality">720p</span></li>
             </ul>
         </div>
+        ${trailerHTML}
         <div class="season-accordion-group">
             ${downloadHTML}
             ${fastServersHTML}
@@ -1532,6 +1556,7 @@ fastServersList.forEach((fs, fIdx) => {
             if (tmdb.budget) budgetFormatted = formatCurrency(tmdb.budget);
             if (tmdb.revenue) revenueFormatted = formatCurrency(tmdb.revenue);
             if (tmdb.id) tmdbUrl = `https://www.themoviedb.org/${tmdb.mediaType}/${tmdb.id}`;
+            if (tmdb.trailerKey) trailerKey = tmdb.trailerKey;
             if (!fetchedImdbId && tmdb.imdbId) {
                 fetchedImdbId = tmdb.imdbId;
                 imdbUrl = `https://www.imdb.com/title/${fetchedImdbId}/`;
@@ -1621,6 +1646,17 @@ function toggleAccordion(id) {
     document.querySelectorAll('.season-download-body').forEach(item => item.style.display = 'none');
     if (!isOpen) el.style.display = 'block';
     console.log('toggleAccordion: element found, now display =', el.style.display);
+}
+
+// Modal-এর Trailer বক্সে ক্লিক করলে thumbnail-এর জায়গায় YouTube video embed করে
+// autoplay শুরু করে দেয় (আগে থেকে iframe লোড না করে শুধু thumbnail দেখিয়ে rakha হয়,
+// tai modal khulei extra network/video load hoy na)
+function playModalTrailer(el) {
+    const box = el.closest('.trailer-box');
+    if (!box) return;
+    const ytId = box.getAttribute('data-ytid');
+    if (!ytId) return;
+    box.innerHTML = `<div class="trailer-video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
 }
 
 // ==================== SEARCH & FUZZY MATCH ====================

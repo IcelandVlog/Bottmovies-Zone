@@ -818,6 +818,50 @@ html.light-mode .search-container button.search-clear-btn:hover { color: #1d4ed8
     display: inline-block;
 }
 
+.trailer-box {
+    background: #151821;
+    border: 1px solid #282d3f;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+.trailer-thumb-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #000;
+}
+.trailer-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.trailer-play-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    color: #fff;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+.trailer-thumb-wrap:hover .trailer-play-btn { background: rgba(220, 38, 38, 0.85); transform: translate(-50%, -50%) scale(1.06); }
+.trailer-label { color: #e2e8f0; font-size: 13.5px; font-weight: 700; margin-top: 10px; }
+.trailer-video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; }
+.trailer-video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+html.light-mode .trailer-box { background: #f7f8fa; border-color: #e5e8ee; }
+html.light-mode .trailer-label { color: #333a45; }
+
 .season-accordion-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 
 .season-box-item { background: #5b4f8a; border-radius: 8px; overflow: hidden; }
