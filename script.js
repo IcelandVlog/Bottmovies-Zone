@@ -50,6 +50,29 @@ var allLinkAlerts = [];
 const TRASH_RETENTION_DAYS = 30;
 let moviesList = []; 
 let currentPage = 1;
+
+// admin panel-এ যাকে যে Serial (display_order) নাম্বার দেওয়া হয়, সে ঠিক সেই
+// position-এই (1-indexed) বসবে - বাকি "Auto" (display_order না-দেওয়া) item গুলো
+// নিজেদের আগের আপেক্ষিক ক্রম ঠিক রেখে ফাঁকা জায়গাগুলোয় বসে যাবে।
+// একাধিক item-এ একই serial দিলে, ছোট id / আগে processed হওয়া item আগে বসবে।
+function applyManualSerialPositions(list) {
+    if (!Array.isArray(list)) return list;
+    const autoItems = list.filter(m => m.display_order == null);
+    const manualItems = list
+        .filter(m => m.display_order != null)
+        .map((m, idx) => ({ m, idx })) // stable tie-break এর জন্য আগের index মনে রাখা
+        .sort((a, b) => (a.m.display_order - b.m.display_order) || (a.idx - b.idx))
+        .map(entry => entry.m);
+
+    const result = autoItems.slice();
+    manualItems.forEach(item => {
+        let pos = Math.round(item.display_order) - 1;
+        if (Number.isNaN(pos) || pos < 0) pos = 0;
+        if (pos > result.length) pos = result.length;
+        result.splice(pos, 0, item);
+    });
+    return result;
+}
 let moviesPerPage = 10; // recalculated responsively before every render - see getMoviesPerPage()
 let currentFilteredMovies = [];
 let sentRequests = new Set(); 
@@ -102,6 +125,7 @@ async function fetchMoviesFromSupabase() {
         const { data: movies, error } = await supabaseClient
             .from('movies')
             .select('*')
+            .order('display_order', { ascending: true, nullsFirst: false })
             .order('id', { ascending: false });
 
         if (error) {
@@ -169,6 +193,8 @@ async function fetchMoviesFromSupabase() {
             } else {
                 allMovies = allMovies.reverse();
             }
+            // Serial (display_order) দেওয়া item গুলোকে ঠিক সেই নাম্বার position-এ বসানো
+            allMovies = applyManualSerialPositions(allMovies);
             // category নামের ঠিক পরে ?page= বসানো থাকে (যেমন #anime?page=2),
             // তাই hash কে category আর page — এই দুই ভাগে ভেঙে পড়া হচ্ছে
             let initialCategory = window.location.hash.replace('#', '');
@@ -574,6 +600,20 @@ function setupHeroBannerControls() {
         }
         mouseDeltaX = 0;
     });
+}
+
+function updateHeroVisibilityForSearch(hasQuery) {
+    const heroSection = document.getElementById('heroBanner');
+    if (!heroSection) return;
+
+    if (hasQuery) {
+        heroSection.style.display = 'none';
+        stopHeroAutoplay();
+        return;
+    }
+
+    const currentCategory = document.body.getAttribute('data-category') || 'all';
+    updateHeroVisibilityForCategory(currentCategory);
 }
 
 function updateHeroVisibilityForCategory(category) {
@@ -1145,6 +1185,9 @@ function renderMoviesByPage(movies, page) {
     const paginatedMovies = movies.slice(startIndex, endIndex);
 
     paginatedMovies.forEach((movie, index) => {
+        // নাম্বার সবসময় sequential (1, 2, 3...) দেখাবে - admin-এর Serial (display_order)
+        // শুধু sort/order ঠিক করার জন্য ব্যবহার হয় (sortAllMoviesByDisplayOrder এ),
+        // কার্ডে raw serial value হিসেবে দেখানো হয় না, যাতে gap (1, 8, 3...) না হয়
         const serialNumber = ((currentPage - 1) * moviesPerPage) + index + 1;
         const card = document.createElement('div');
         card.className = 'movie-card';
@@ -1655,6 +1698,8 @@ function searchMovies() {
     const searchSuggestions = document.getElementById('searchSuggestions');
     if (searchSuggestions) searchSuggestions.style.display = 'none';
 
+    updateHeroVisibilityForSearch(!!query);
+
     if (!query) {
         currentFilteredMovies = [...moviesList];
         renderMoviesByPage(currentFilteredMovies, 1);
@@ -1746,14 +1791,225 @@ function switchCategory(category, initialPage) {
     updateHeroVisibilityForCategory(category);
 }
 
+// ============================================================
+// ডাইনামিক নেভিগেশন মেনু (Admin -> Navigation ট্যাব থেকে যোগ করা items)
+// ============================================================
+// index.html-এ যেসব dropdown/sub-dropdown item আগে থেকেই আছে (Movies, Web Series, OTT Shows
+// এবং তাদের ভেতরের সব লিংক), সেগুলোর প্রতিটার একটা স্থায়ী "manifest id" এখানে রাখা আছে।
+// Admin প্যানেল থেকে নতুন item যোগ করার সময় এই id-গুলোর যেকোনো একটাকে "parent" হিসেবে বেছে
+// নেওয়া যায় - এতে নতুন item ঠিক জায়গায় (সঠিক dropdown/sub-dropdown-এর ভেতরে) বসে যায়।
+const STATIC_NAV_MANIFEST = [
+    { id: 'movies', label: 'Movies (top menu)', kind: 'top' },
+    { id: 'movies__english', label: '— English Movies', parent: 'movies' },
+    { id: 'movies__hindi', label: '— Hindi Movies', parent: 'movies' },
+    { id: 'movies__bangla', label: '— Bangla Movies', parent: 'movies' },
+    { id: 'movies__korean', label: '— Korean Movies', parent: 'movies' },
+    { id: 'movies__german', label: '—— German Movies', parent: 'movies__english' },
+    { id: 'movies__spanish', label: '—— Spanish Movies', parent: 'movies__english' },
+
+    { id: 'webseries', label: 'Web Series (top menu)', kind: 'top' },
+    { id: 'webseries__english', label: '— English Series', parent: 'webseries' },
+    { id: 'webseries__hindi', label: '— Hindi Series', parent: 'webseries' },
+    { id: 'webseries__bangla', label: '— Bangla Series', parent: 'webseries' },
+    { id: 'webseries__korean', label: '— Korean Series', parent: 'webseries' },
+    { id: 'webseries__german', label: '—— German Series', parent: 'webseries__english' },
+    { id: 'webseries__spanish', label: '—— Spanish Series', parent: 'webseries__english' },
+
+    { id: 'ott', label: 'OTT Shows (top menu)', kind: 'top' },
+    { id: 'ott__netflix', label: '— Netflix', parent: 'ott' },
+    { id: 'ott__prime', label: '— Prime Video', parent: 'ott' },
+    { id: 'ott__hbomax', label: '— HBO MAX', parent: 'ott' },
+    { id: 'ott__disney', label: '— Disney+ Hotstar', parent: 'ott' },
+    { id: 'ott__marvel', label: '—— Marvel', parent: 'ott__disney' },
+    { id: 'ott__dc', label: '—— DC', parent: 'ott__disney' },
+    { id: 'ott__crunchyroll', label: '— Crunchyroll', parent: 'ott' },
+    { id: 'ott__hoichoi', label: '— Hoichoi', parent: 'ott' },
+    { id: 'ott__chorki', label: '— Chorki', parent: 'ott' }
+];
+
+// manifest id -> ওই <li> খুঁজে বের করার জন্য CSS selector (data-target ভিত্তিক)
+function resolveManifestNode(manifestId) {
+    const map = {
+        'movies': '#navMoviesToggle',
+        'webseries': '#navWebSeriesToggle',
+        'ott': '#navOttToggle',
+        'movies__english': '.nav-link[data-target="english"]',
+        'movies__hindi': '.nav-link[data-target="hindi"]',
+        'movies__bangla': '.nav-link[data-target="bangla"]',
+        'movies__korean': '.nav-link[data-target="korean"]',
+        'movies__german': '.nav-link[data-target="german"]',
+        'movies__spanish': '.nav-link[data-target="spanish"]',
+        'webseries__english': '.nav-link[data-target="english-series"]',
+        'webseries__hindi': '.nav-link[data-target="hindi-series"]',
+        'webseries__bangla': '.nav-link[data-target="bangla-series"]',
+        'webseries__korean': '.nav-link[data-target="korean-series"]',
+        'webseries__german': '.nav-link[data-target="german-series"]',
+        'webseries__spanish': '.nav-link[data-target="spanish-series"]',
+        'ott__netflix': '.nav-link[data-target="netflix"]',
+        'ott__prime': '.nav-link[data-target="prime-video"]',
+        'ott__hbomax': '.nav-link[data-target="hbo-max"]',
+        'ott__disney': '.nav-link[data-target="disney"]',
+        'ott__marvel': '.nav-link[data-target="marvel"]',
+        'ott__dc': '.nav-link[data-target="dc"]',
+        'ott__crunchyroll': '.nav-link[data-target="crunchyroll"]',
+        'ott__hoichoi': '.nav-link[data-target="hoichoi"]',
+        'ott__chorki': '.nav-link[data-target="chorki"]'
+    };
+    const selector = map[manifestId];
+    if (!selector) return null;
+    const el = document.querySelector(selector);
+    if (!el) return null;
+    // টপ-লেভেল toggle হলে সরাসরি ওর পাশের <ul class="dropdown-menu"> রিটার্ন করি
+    if (el.tagName === 'A' && el.classList.contains('dropdown-toggle')) {
+        return el.parentElement.querySelector(':scope > .dropdown-menu');
+    }
+    // নাহলে এটা একটা .nav-link — এর প্যারেন্ট <li>-টাকে যদি ইতিমধ্যে sub-dropdown বানানো
+    // না থাকে, বানিয়ে দিই (যাতে নতুন child বসানোর জায়গা তৈরি হয়)
+    return ensureSubDropdownContainer(el.closest('li'));
+}
+
+// একটা সাধারণ <li> (যার এখনো নিজের কোনো নেস্টেড dropdown নেই) -কে dynamic ভাবে
+// sub-dropdown বানিয়ে দেয় (arrow + খালি <ul class="dropdown-menu sub-menu"> যোগ করে)
+function ensureSubDropdownContainer(li) {
+    if (!li) return null;
+    let subMenu = li.querySelector(':scope > .dropdown-menu.sub-menu');
+    if (subMenu) return subMenu;
+
+    li.classList.add('has-dropdown', 'sub-dropdown');
+    const caret = document.createElement('span');
+    caret.className = 'sub-dropdown-toggle';
+    caret.setAttribute('role', 'button');
+    caret.setAttribute('aria-label', 'More options');
+    caret.textContent = '▾';
+    li.appendChild(caret);
+
+    subMenu = document.createElement('ul');
+    subMenu.className = 'dropdown-menu sub-menu';
+    li.appendChild(subMenu);
+    return subMenu;
+}
+
+// অ্যাডমিন প্যানেল থেকে যোগ করা সব custom nav item লোড করে ঠিক জায়গায় বসিয়ে দেয়।
+// আগে ইনজেক্ট করা custom item থাকলে সেগুলো আগে সরিয়ে (duplicate এড়াতে) আবার নতুন করে বসানো হয়।
+async function renderCustomNavItems() {
+    document.querySelectorAll('.custom-nav-item').forEach(el => el.remove());
+    document.querySelectorAll('.custom-nav-toplevel').forEach(el => el.remove());
+
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('nav_items')
+            .select('*')
+            .order('order_index', { ascending: true });
+        if (error) throw error;
+
+        window.__customNavItems = data || [];
+        if (!data || data.length === 0) return;
+
+        const byParent = {};
+        data.forEach(item => {
+            const key = item.parent_id == null ? (item.parent_manifest_id || 'ROOT') : ('db:' + item.parent_id);
+            if (!byParent[key]) byParent[key] = [];
+            byParent[key].push(item);
+        });
+
+        function renderInto(container, items) {
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'custom-nav-item';
+                li.setAttribute('data-nav-id', item.id);
+                const a = document.createElement('a');
+                a.href = '#';
+                a.className = 'nav-link';
+                if (item.category_slug) a.setAttribute('data-target', item.category_slug);
+                if (item.data_banner) a.setAttribute('data-banner', item.data_banner);
+                a.textContent = item.label;
+                li.appendChild(a);
+                container.appendChild(li);
+
+                const children = byParent['db:' + item.id];
+                if (children && children.length) {
+                    const subMenu = ensureSubDropdownContainer(li);
+                    if (subMenu) renderInto(subMenu, children);
+                }
+            });
+        }
+
+        // ROOT / নতুন টপ-লেভেল মেনু আইটেম (parent_manifest_id null এবং parent_id null)
+        const rootItems = (byParent['ROOT'] || []).filter(it => !it.parent_manifest_id);
+        const mainUl = document.querySelector('.main-nav > ul');
+        const sportsLi = document.getElementById('sportsMenuLink')?.closest('li');
+        rootItems.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'has-dropdown custom-nav-toplevel';
+            li.setAttribute('data-nav-id', item.id);
+            const a = document.createElement('a');
+            a.href = '#';
+            a.className = 'nav-link dropdown-toggle';
+            if (item.category_slug) a.setAttribute('data-target', item.category_slug);
+            a.textContent = item.label + ' ▾';
+            const subUl = document.createElement('ul');
+            subUl.className = 'dropdown-menu';
+            li.appendChild(a);
+            li.appendChild(subUl);
+            if (mainUl) {
+                if (sportsLi) mainUl.insertBefore(li, sportsLi);
+                else mainUl.appendChild(li);
+            }
+            const children = byParent['db:' + item.id];
+            if (children && children.length) renderInto(subUl, children);
+        });
+
+        // manifest-এর কোনো নির্দিষ্ট node-কে parent হিসেবে বেছে নেওয়া item গুলো
+        Object.keys(byParent).forEach(key => {
+            if (key === 'ROOT' || key.startsWith('db:')) return;
+            const container = resolveManifestNode(key);
+            if (container) renderInto(container, byParent[key]);
+        });
+    } catch (err) {
+        console.error('renderCustomNavItems error:', err);
+    }
+}
+
 function setupNavigation() {
-    const navLinks = document.querySelectorAll('.nav-link');
-
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
+    // ইভেন্ট ডেলিগেশন — document-এ একবারই লিসেনার বসানো থাকে (শুধু #mainNav-এ না, কারণ
+    // logo আর "Bangla Dubbed"/"Anime-Flix" বাটনও .nav-link কিন্তু header-এ, #mainNav-এর বাইরে),
+    // তাই অ্যাডমিন প্যানেল থেকে ডাইনামিকভাবে নতুন item যোগ হলেও আলাদা করে বাইন্ড করা লাগে না
+    const mainNavEl = document.getElementById('mainNav');
+    document.addEventListener('click', function(e) {
+        const subCaret = e.target.closest('.sub-dropdown-toggle');
+        if (subCaret) {
             e.preventDefault();
+            e.stopPropagation();
+            const parentLi = subCaret.closest('li.has-dropdown');
+            if (!parentLi) return;
+            const isOpen = parentLi.classList.contains('open');
+            const siblingList = parentLi.parentElement;
+            if (siblingList) {
+                Array.from(siblingList.children).forEach(li => {
+                    if (li !== parentLi) li.classList.remove('open');
+                });
+            }
+            parentLi.classList.toggle('open', !isOpen);
+            return;
+        }
 
-            const category = this.getAttribute('data-target');
+        const toggle = e.target.closest('.dropdown-toggle');
+        if (toggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            const parentLi = toggle.parentElement;
+            const isOpen = parentLi.classList.contains('open');
+            document.querySelectorAll('.has-dropdown').forEach(li => li.classList.remove('open'));
+            if (!isOpen) parentLi.classList.add('open');
+            return;
+        }
+
+        const link = e.target.closest('.nav-link');
+        if (link) {
+            e.preventDefault();
+            const category = link.getAttribute('data-target');
             if (!category) return;
 
             switchCategory(category);
@@ -1761,12 +2017,11 @@ function setupNavigation() {
             document.querySelectorAll('.has-dropdown').forEach(li => li.classList.remove('open'));
             if (document.activeElement) document.activeElement.blur();
 
-            const mainNav = document.getElementById('mainNav');
-            if (mainNav) mainNav.classList.remove('show-menu');
+            if (mainNavEl) mainNavEl.classList.remove('show-menu');
             document.body.classList.remove('menu-open');
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
+        }
     });
 
     window.addEventListener('popstate', function() {
@@ -1790,6 +2045,7 @@ function initApp() {
 
     initAuth();
     setupNavigation();
+    renderCustomNavItems();
     setupHeroBannerControls();
 
     fetchMoviesFromSupabase();
@@ -1800,38 +2056,6 @@ function initApp() {
             if (e.target === modalOverlay) closeMovieModal();
         });
     }
-
-    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
-    dropdownToggles.forEach(toggle => {
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const parentLi = this.parentElement;
-            const isOpen = parentLi.classList.contains('open');
-            document.querySelectorAll('.has-dropdown').forEach(li => li.classList.remove('open'));
-            if (!isOpen) parentLi.classList.add('open');
-        });
-    });
-
-    // নেস্টেড সাব-ড্রপডাউন (যেমন English Movies -> German/Spanish) — এটার toggle টপ-লেভেল
-    // ড্রপডাউন বন্ধ করবে না, শুধু নিজের সাব-মেনু খুলবে/বন্ধ করবে
-    const subDropdownToggles = document.querySelectorAll('.sub-dropdown-toggle');
-    subDropdownToggles.forEach(caret => {
-        caret.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const parentLi = this.closest('li.has-dropdown');
-            if (!parentLi) return;
-            const isOpen = parentLi.classList.contains('open');
-            const siblingList = parentLi.parentElement;
-            if (siblingList) {
-                Array.from(siblingList.children).forEach(li => {
-                    if (li !== parentLi) li.classList.remove('open');
-                });
-            }
-            parentLi.classList.toggle('open', !isOpen);
-        });
-    });
 
     document.addEventListener('click', function(e) {
         if (!e.target.closest('.has-dropdown')) {
@@ -1846,10 +2070,32 @@ function initApp() {
     const searchBtn = document.getElementById('searchBtn');
     const searchInput = document.getElementById('searchInput');
     const searchSuggestions = document.getElementById('searchSuggestions');
+    const searchClearBtn = document.getElementById('searchClearBtn');
 
     if (searchBtn) searchBtn.addEventListener('click', searchMovies);
     if (searchInput) {
         searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchMovies(); });
+
+        // প্রতি keystroke-এ সাথে সাথে (debounce ছাড়াই) clear (✕) বাটন আর hero banner টগল হবে,
+        // যাতে টাইপ করা মাত্রই responsive লাগে - ভারী filtering কাজটা নিচের debounced ফাংশনে থাকে
+        searchInput.addEventListener('input', function() {
+            const hasQuery = !!searchInput.value.trim();
+            if (searchClearBtn) searchClearBtn.style.display = hasQuery ? 'flex' : 'none';
+            updateHeroVisibilityForSearch(hasQuery);
+        });
+
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                searchClearBtn.style.display = 'none';
+                if (searchSuggestions) { searchSuggestions.innerHTML = ''; searchSuggestions.style.display = 'none'; }
+                currentFilteredMovies = [...moviesList];
+                renderMoviesByPage(currentFilteredMovies, 1);
+                updateHeroVisibilityForSearch(false);
+                searchInput.focus();
+            });
+        }
+
         const handleSearchInput = debounce(function() {
             const query = searchInput.value.trim();
 
@@ -3671,6 +3917,7 @@ const ADMIN_TAB_TITLES = {
     add: 'Add / Edit Content',
     manage: 'Database',
     banner: 'Hero Banner',
+    navigation: 'Navigation Menu',
     comments: 'Comments',
     requests: 'Request Here',
     messages: 'Messages',
@@ -3679,7 +3926,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'banner', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -3702,6 +3949,8 @@ function switchAdminTab(tab) {
     } else if (validTab === 'banner') {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
+    } else if (validTab === 'navigation') {
+        renderAdminNavList();
     } else if (validTab === 'comments') {
         const searchInput = document.getElementById('adminCommentSearchInput');
         renderAdminCommentsList(searchInput ? searchInput.value.trim() : '');
@@ -4947,16 +5196,34 @@ function renderAdminDatabaseList(filter) {
         return;
     }
 
-    filtered.forEach(movie => {
+    // homepage-এ যে order দেখানো হয় (Serial দেওয়া item গুলো ঠিক সেই position-এ), এই লিস্টেও
+    // ঠিক সেই একই order মেনে চলে - তাই পুরো source-এর উপর order বসিয়ে তারপর filter করা হচ্ছে
+    const orderedSource = applyManualSerialPositions(source);
+    const filteredIds = new Set(filtered.map(m => m.id));
+    const sorted = orderedSource.filter(m => filteredIds.has(m.id));
+
+    // যাদের Serial ম্যানুয়ালি সেট করা নেই, তাদের ঘরে খালি "Auto" না দেখিয়ে
+    // এখন তারা homepage-এ ঠিক কত নম্বরে আছে (effective position) সেটাই দেখানো হবে,
+    // যাতে অ্যাডমিন আগের/বর্তমান সিরিয়াল দেখে সহজে এডিট করে বদলাতে পারে
+    const positionMap = new Map();
+    orderedSource.forEach((m, idx) => positionMap.set(m.id, idx + 1));
+
+    sorted.forEach(movie => {
         const card = document.createElement('div');
         card.className = 'admin-db-card';
         const cats = Array.isArray(movie.category) ? movie.category.join(', ') : (movie.category || '');
         const typeLabel = movie.tmdbType === 'tv' ? 'TV Series' : 'Movie';
+        const displaySerial = movie.display_order != null ? movie.display_order : (positionMap.get(movie.id) ?? '');
         card.innerHTML = `
             <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
             <div class="admin-db-info">
                 <div class="admin-db-title">${movie.title || 'Untitled'}</div>
                 <div class="admin-db-meta">${typeLabel} · ${cats || 'No category'}</div>
+                <div class="admin-db-order-row">
+                    <label for="order-${movie.id}">Serial:</label>
+                    <input type="number" id="order-${movie.id}" class="admin-db-order-input" placeholder="Auto" value="${displaySerial}">
+                    <button type="button" class="admin-db-order-save-btn">Save</button>
+                </div>
             </div>
             <div class="admin-db-actions">
                 <button type="button" class="admin-db-edit-btn">Edit</button>
@@ -4965,6 +5232,10 @@ function renderAdminDatabaseList(filter) {
         `;
         card.querySelector('.admin-db-edit-btn').addEventListener('click', () => loadMovieIntoAdminForm(movie));
         card.querySelector('.admin-db-delete-btn').addEventListener('click', () => deleteMovieToTrash(movie));
+        const orderInput = card.querySelector('.admin-db-order-input');
+        const orderSaveBtn = card.querySelector('.admin-db-order-save-btn');
+        orderSaveBtn.addEventListener('click', () => updateMovieDisplayOrder(movie, orderInput.value, orderSaveBtn));
+        orderInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') updateMovieDisplayOrder(movie, orderInput.value, orderSaveBtn); });
         container.appendChild(card);
 
         // No poster saved manually — auto-fetch a small poster thumbnail from TMDB
@@ -4979,7 +5250,233 @@ function renderAdminDatabaseList(filter) {
     });
 }
 
-// ---------- Hero Banner tab (choose which titles show in the homepage auto-slide banner) ----------
+// serial/display order manually সেট করা - ছোট নাম্বার আগে দেখাবে। খালি রাখলে/মুছে দিলে
+// আবার site-এর default order (recently added আগে) ফিরে আসবে
+// display_order অনুযায়ী allMovies-কে in-place সাজায় (ছোট নাম্বার আগে, তারপর যাদের
+// serial সেট করা নেই তারা id descending অনুযায়ী - অর্থাৎ Supabase fetch-এর order-টাই মিরর করে)
+function sortAllMoviesByDisplayOrder() {
+    if (!Array.isArray(allMovies)) return;
+    allMovies = applyManualSerialPositions(allMovies);
+}
+
+// currentFilteredMovies (যেটা এখন homepage-এ দেখানো হচ্ছে) কে allMovies-এর নতুন order
+// অনুযায়ী পুনরায় সাজায় - filter/search এর ফলাফল একই থাকে, শুধু ক্রম আপডেট হয়
+function reorderFilteredMoviesToMatchAllMovies() {
+    if (!Array.isArray(currentFilteredMovies) || !Array.isArray(allMovies)) return;
+    const orderIndex = new Map();
+    allMovies.forEach((m, idx) => orderIndex.set(m.id, idx));
+    currentFilteredMovies.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
+}
+
+async function updateMovieDisplayOrder(movie, rawValue, btn) {
+    const trimmed = String(rawValue ?? '').trim();
+    const value = trimmed === '' ? null : parseInt(trimmed, 10);
+    if (trimmed !== '' && Number.isNaN(value)) {
+        showToast('❌ Serial-e sudhu number likho', 'error');
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+    try {
+        const { error } = await supabaseClient
+            .from('movies')
+            .update({ display_order: value })
+            .eq('id', movie.id);
+        if (error) throw error;
+
+        movie.display_order = value;
+        showToast('✅ Serial updated for "' + (movie.title || 'this item') + '"');
+
+        // page reload chara-i live site-e (homepage grid) notun order shathe shathe dekhano
+        sortAllMoviesByDisplayOrder();
+        moviesList = [...allMovies];
+        reorderFilteredMoviesToMatchAllMovies();
+        renderMoviesByPage(currentFilteredMovies, currentPage || 1);
+
+        const searchInput = document.getElementById('adminSearchInput');
+        renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
+    } catch (err) {
+        console.error('updateMovieDisplayOrder error:', err);
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+    }
+}
+
+
+
+async function fetchAdminNavItems() {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return [];
+    try {
+        const { data, error } = await supabaseClient.from('nav_items').select('*').order('order_index', { ascending: true });
+        if (error) throw error;
+        return data || [];
+    } catch (err) {
+        console.error('fetchAdminNavItems error:', err);
+        return [];
+    }
+}
+
+function buildNavParentSelectOptions(customItems) {
+    let html = '<option value="">➕ Top Level (new main menu tab, next to SPORTS)</option>';
+    html += '<optgroup label="Existing Menu Items">';
+    STATIC_NAV_MANIFEST.forEach(m => {
+        html += `<option value="${escapeAttr(m.id)}">${escapeHtml(m.label)}</option>`;
+    });
+    html += '</optgroup>';
+    if (customItems.length) {
+        html += '<optgroup label="Your Custom Items">';
+        customItems.forEach(it => {
+            html += `<option value="db:${it.id}">${escapeHtml(it.label)}</option>`;
+        });
+        html += '</optgroup>';
+    }
+    return html;
+}
+
+function getNavSiblings(items, item) {
+    const pid = item.parent_id ?? null;
+    const pmid = item.parent_manifest_id || null;
+    return items
+        .filter(x => (x.parent_id ?? null) === pid && (x.parent_manifest_id || null) === pmid)
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+}
+
+async function renderAdminNavList() {
+    const listEl = document.getElementById('adminNavList');
+    const selectEl = document.getElementById('adminNavParentSelect');
+    if (!listEl || !selectEl) return;
+    listEl.innerHTML = '<div class="admin-db-empty">Loading...</div>';
+
+    const items = await fetchAdminNavItems();
+    window.__customNavItems = items;
+    selectEl.innerHTML = buildNavParentSelectOptions(items);
+
+    if (!items.length) {
+        listEl.innerHTML = '<div class="admin-db-empty">Ekhono kono custom navigation item add kora hoyni. Upore form theke notun item add koro.</div>';
+        return;
+    }
+
+    const manifestLabel = {};
+    STATIC_NAV_MANIFEST.forEach(m => { manifestLabel[m.id] = m.label.replace(/^—+\s*/, ''); });
+
+    listEl.innerHTML = items.map(item => {
+        let parentLabel = 'Top Level (main menu)';
+        if (item.parent_manifest_id) parentLabel = manifestLabel[item.parent_manifest_id] || item.parent_manifest_id;
+        else if (item.parent_id) {
+            const p = items.find(x => x.id === item.parent_id);
+            parentLabel = p ? p.label : ('#' + item.parent_id);
+        }
+        const siblings = getNavSiblings(items, item);
+        const posIndex = siblings.findIndex(x => x.id === item.id);
+        return `
+            <div class="admin-db-card">
+                <div class="admin-db-info">
+                    <div class="admin-db-title">${escapeHtml(item.label)}</div>
+                    <div class="admin-db-meta">Parent: ${escapeHtml(parentLabel)}${item.category_slug ? ' · slug: ' + escapeHtml(item.category_slug) : ' · (container/toggle only, click hobe na)'}</div>
+                </div>
+                <div class="admin-db-actions">
+                    <button type="button" class="admin-banner-move-btn" data-nav-move-id="${item.id}" data-dir="up" ${posIndex <= 0 ? 'disabled' : ''} title="Move earlier">▲</button>
+                    <button type="button" class="admin-banner-move-btn" data-nav-move-id="${item.id}" data-dir="down" ${posIndex >= siblings.length - 1 ? 'disabled' : ''} title="Move later">▼</button>
+                    <button type="button" class="admin-db-delete-btn" data-nav-delete-id="${item.id}">Delete</button>
+                </div>
+            </div>`;
+    }).join('');
+
+    listEl.querySelectorAll('[data-nav-move-id]').forEach(btn => {
+        btn.addEventListener('click', () => moveAdminNavItem(parseInt(btn.getAttribute('data-nav-move-id'), 10), btn.getAttribute('data-dir')));
+    });
+    listEl.querySelectorAll('[data-nav-delete-id]').forEach(btn => {
+        btn.addEventListener('click', () => deleteAdminNavItem(parseInt(btn.getAttribute('data-nav-delete-id'), 10)));
+    });
+}
+
+async function addAdminNavItem() {
+    const parentSelect = document.getElementById('adminNavParentSelect');
+    const labelInput = document.getElementById('adminNavLabelInput');
+    const slugInput = document.getElementById('adminNavSlugInput');
+    const bannerInput = document.getElementById('adminNavBannerInput');
+    if (!parentSelect || !labelInput) return;
+
+    const label = labelInput.value.trim();
+    if (!label) { showToast('❌ Label lekha lagbe', 'error'); return; }
+
+    const parentVal = parentSelect.value;
+    let parent_id = null, parent_manifest_id = null;
+    if (parentVal.startsWith('db:')) parent_id = parseInt(parentVal.slice(3), 10);
+    else if (parentVal) parent_manifest_id = parentVal;
+
+    const items = window.__customNavItems || [];
+    const siblings = items.filter(x => (x.parent_id ?? null) === parent_id && (x.parent_manifest_id || null) === parent_manifest_id);
+    const maxOrder = siblings.reduce((max, x) => Math.max(max, x.order_index ?? -1), -1);
+
+    const addBtn = document.getElementById('adminNavAddBtn');
+    if (addBtn) { addBtn.disabled = true; addBtn.textContent = 'Adding...'; }
+
+    try {
+        const { error } = await supabaseClient.from('nav_items').insert({
+            parent_id,
+            parent_manifest_id,
+            label,
+            category_slug: slugInput ? (slugInput.value.trim() || null) : null,
+            data_banner: bannerInput ? (bannerInput.value.trim() || null) : null,
+            order_index: maxOrder + 1
+        });
+        if (error) throw error;
+
+        labelInput.value = '';
+        if (slugInput) slugInput.value = '';
+        if (bannerInput) bannerInput.value = '';
+        showToast('✅ Navigation item add hoyeche');
+        await renderAdminNavList();
+        renderCustomNavItems();
+    } catch (err) {
+        console.error('addAdminNavItem error:', err);
+        showToast('❌ Add failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    } finally {
+        if (addBtn) { addBtn.disabled = false; addBtn.textContent = '➕ Add Item'; }
+    }
+}
+
+async function deleteAdminNavItem(id) {
+    const confirmed = await showConfirmModal('Ei navigation item ta delete korte chao? Nicher shob sub-item o delete hoye jabe.', { confirmText: 'Delete', danger: true });
+    if (!confirmed) return;
+    try {
+        const { error } = await supabaseClient.from('nav_items').delete().eq('id', id);
+        if (error) throw error;
+        showToast('✅ Deleted');
+        await renderAdminNavList();
+        renderCustomNavItems();
+    } catch (err) {
+        console.error('deleteAdminNavItem error:', err);
+        showToast('❌ Delete failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    }
+}
+
+async function moveAdminNavItem(id, direction) {
+    const items = window.__customNavItems || [];
+    const item = items.find(x => x.id === id);
+    if (!item) return;
+    const siblings = getNavSiblings(items, item);
+    const idx = siblings.findIndex(x => x.id === id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const other = siblings[swapIdx];
+    try {
+        const a = item.order_index ?? 0, b = other.order_index ?? 0;
+        const [{ error: e1 }, { error: e2 }] = await Promise.all([
+            supabaseClient.from('nav_items').update({ order_index: b }).eq('id', item.id),
+            supabaseClient.from('nav_items').update({ order_index: a }).eq('id', other.id)
+        ]);
+        if (e1 || e2) throw (e1 || e2);
+        await renderAdminNavList();
+        renderCustomNavItems();
+    } catch (err) {
+        console.error('moveAdminNavItem error:', err);
+        showToast('❌ Move failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    }
+}
+
+
 
 function getFeaturedSortedMovies() {
     const source = Array.isArray(allMovies) ? allMovies : [];
@@ -5210,6 +5707,7 @@ function showConfirmModal(message, options) {
         overlay.className = 'custom-confirm-overlay';
         overlay.innerHTML = `
             <div class="custom-confirm-box">
+                <button type="button" class="custom-confirm-x-btn" aria-label="Close">×</button>
                 <div class="custom-confirm-message">${message}</div>
                 <div class="custom-confirm-actions">
                     <button type="button" class="custom-confirm-cancel-btn">${cancelText}</button>
@@ -5226,6 +5724,7 @@ function showConfirmModal(message, options) {
 
         overlay.querySelector('.custom-confirm-ok-btn').addEventListener('click', () => cleanup(true));
         overlay.querySelector('.custom-confirm-cancel-btn').addEventListener('click', () => cleanup(false));
+        overlay.querySelector('.custom-confirm-x-btn').addEventListener('click', () => cleanup(false));
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) cleanup(false);
         });
@@ -5246,16 +5745,33 @@ function showToast(message, type) {
     }
     const toast = document.createElement('div');
     toast.className = 'toast-item' + (type === 'error' ? ' toast-error' : '');
-    toast.textContent = message;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-msg';
+    msgSpan.textContent = message;
+    toast.appendChild(msgSpan);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'toast-close-btn';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '×';
+    toast.appendChild(closeBtn);
+
     wrap.appendChild(toast);
 
-    requestAnimationFrame(() => toast.classList.add('show'));
-
-    setTimeout(() => {
+    let autoHideTimer;
+    const dismiss = () => {
+        clearTimeout(autoHideTimer);
         toast.classList.remove('show');
         toast.addEventListener('transitionend', () => toast.remove(), { once: true });
         setTimeout(() => toast.remove(), 500);
-    }, 2500);
+    };
+    closeBtn.addEventListener('click', dismiss);
+
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    autoHideTimer = setTimeout(dismiss, 2500);
 }
 
 function showNoticeModal(message, options) {
@@ -5267,6 +5783,7 @@ function showNoticeModal(message, options) {
         overlay.className = 'custom-confirm-overlay';
         overlay.innerHTML = `
             <div class="custom-confirm-box">
+                <button type="button" class="custom-confirm-x-btn" aria-label="Close">×</button>
                 <div class="custom-confirm-message">${message}</div>
                 <div class="custom-confirm-actions">
                     <button type="button" class="custom-confirm-ok-btn">${confirmText}</button>
@@ -5281,6 +5798,7 @@ function showNoticeModal(message, options) {
         };
 
         overlay.querySelector('.custom-confirm-ok-btn').addEventListener('click', cleanup);
+        overlay.querySelector('.custom-confirm-x-btn').addEventListener('click', cleanup);
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) cleanup();
         });

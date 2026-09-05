@@ -40,6 +40,7 @@
     
     <div class="search-container">
         <input type="text" id="searchInput" placeholder="What are you looking for?" autocomplete="off">
+        <button type="button" id="searchClearBtn" class="search-clear-btn" aria-label="Clear search" title="Clear" style="display:none;">✕</button>
         <button type="button" id="searchBtn">🔍</button>
         <div class="search-suggestions" id="searchSuggestions"></div>
     </div>
@@ -65,7 +66,7 @@
     <ul>
         <li><a href="#home" class="nav-link active" data-target="all" id="homeMenuLink">HOME</a></li>
         <li class="has-dropdown">
-            <a href="#" class="dropdown-toggle">MOVIES ▾</a>
+            <a href="#" class="dropdown-toggle" id="navMoviesToggle">MOVIES ▾</a>
             <ul class="dropdown-menu">
                 <li class="has-dropdown sub-dropdown">
                     <a href="#english-movies" class="nav-link" data-target="english" data-banner="English, German, Spanish... Movies">English Movies</a>
@@ -81,7 +82,7 @@
             </ul>
         </li>
         <li class="has-dropdown">
-            <a href="#" class="dropdown-toggle">WEB SERIES ▾</a>
+            <a href="#" class="dropdown-toggle" id="navWebSeriesToggle">WEB SERIES ▾</a>
             <ul class="dropdown-menu">
                 <li class="has-dropdown sub-dropdown">
                     <a href="#english-series" class="nav-link" data-target="english-series" data-banner="English, German, Spanish... Series">English Series</a>
@@ -97,7 +98,7 @@
             </ul>
         </li>
         <li class="has-dropdown">
-            <a href="#" class="dropdown-toggle">OTT SHOWS ▾</a>
+            <a href="#" class="dropdown-toggle" id="navOttToggle">OTT SHOWS ▾</a>
             <ul class="dropdown-menu">
                 <li><a href="#netflix" class="nav-link" data-target="netflix">Netflix</a></li>
                 <li><a href="#prime-video" class="nav-link" data-target="prime-video" data-banner="Amazon Prime Video">Amazon Prime</a></li>
@@ -410,6 +411,7 @@
                 <button type="button" class="admin-nav-btn" id="adminNavBtnAdd" onclick="switchAdminTab('add')">➕ <span>Add / Edit Content</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnManage" onclick="switchAdminTab('manage')">🗂 <span>Database</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎞️ <span>Hero Banner</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnNavigation" onclick="switchAdminTab('navigation')">🧭 <span>Navigation</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnRequests" onclick="switchAdminTab('requests')">📥 <span>Request Here</span><span class="admin-nav-badge" id="adminRequestsCount" style="display:none;"></span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnMessages" onclick="switchAdminTab('messages')">✉️ <span>Messages</span><span class="admin-nav-badge" id="adminMessagesCount" style="display:none;"></span></button>
@@ -597,6 +599,19 @@
                         <input type="text" id="adminBannerSearchInput" placeholder="🔍 Search content to feature in banner...">
                     </div>
                     <div class="admin-database-list" id="adminBannerList"></div>
+                </div>
+
+                <!-- NAVIGATION MENU TAB (header MOVIES / WEB SERIES / OTT SHOWS dropdown & sub-dropdown editor) -->
+                <div class="admin-tab-content" id="adminTabNavigation" style="display:none;">
+                    <div class="admin-nav-note">Header-এর dropdown menu-তে notun item add/delete/reorder korte parben. "Parent" hisebe age theke thaka je kono item, ba notun kore add kora item-o select kora jay (sub-dropdown ba nested item banate).</div>
+                    <div class="admin-nav-form">
+                        <select id="adminNavParentSelect"></select>
+                        <input type="text" id="adminNavLabelInput" placeholder="Label (e.g. French Movies)">
+                        <input type="text" id="adminNavSlugInput" placeholder="Category slug (data-target, e.g. french) — blank = shudhu container/toggle">
+                        <input type="text" id="adminNavBannerInput" placeholder="Custom banner text (optional)">
+                        <button type="button" class="admin-banner-save-btn" id="adminNavAddBtn" onclick="addAdminNavItem()">➕ Add Item</button>
+                    </div>
+                    <div class="admin-database-list" id="adminNavList"></div>
                 </div>
 
                 <!-- COMMENTS TAB -->
