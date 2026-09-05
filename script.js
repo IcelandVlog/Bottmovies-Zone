@@ -1656,7 +1656,19 @@ function playModalTrailer(el) {
     if (!box) return;
     const ytId = box.getAttribute('data-ytid');
     if (!ytId) return;
-    box.innerHTML = `<div class="trailer-video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
+    const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0`;
+    const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`;
+    // Ei site-e COOP/COEP header active thake (ffmpeg.wasm media-scan feature-er jonno
+    // proyojon), r shei COEP-r karone third-party YouTube iframe-take browser default-e
+    // block kore dei ("refused to connect" dekhায়) - eta youtube-r shomossha na.
+    // "credentialless" attribute dile Chrome/Edge-e eta abar kaj kore (COEP bypass hoy
+    // ei ekta frame-er jonno), kintu Firefox/Safari-te ei attribute support nei - tai
+    // shei browser-gulor jonno ekta "Watch on YouTube" fallback link o rakha holo, jate
+    // iframe block hole o user video-ta dekhte pare.
+    box.innerHTML = `<div class="trailer-video-wrap">
+        <iframe src="${embedUrl}" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen credentialless></iframe>
+        <a class="trailer-fallback-link" href="${watchUrl}" target="_blank" rel="noopener noreferrer">Trailer load hocche na? YouTube-e dekhun ↗</a>
+    </div>`;
 }
 
 // ==================== SEARCH & FUZZY MATCH ====================
