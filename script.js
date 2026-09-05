@@ -223,10 +223,16 @@ async function fetchMoviesFromSupabase() {
 // কখনো খালি থাকে না। শুধু Home ("all") ক্যাটাগরিতে দেখা যায়, অন্য ক্যাটাগরিতে গেলে
 // হাইড হয়ে যায় এবং autoplay টাইমার বন্ধ হয়ে যায় (অযথা network call বন্ধ রাখতে)।
 let heroSlidesData = [];
-let heroCurrentIndex = 0;
+let heroCurrentIndex = 0; // real/logical slide index (0..N-1) - drives the dots
+let heroPos = 1;          // actual position inside the extended DOM track (clone-of-last, slide0..slideN-1, clone-of-first)
 let heroAutoplayTimer = null;
+let heroWrapTimeout = null;
 let heroInitialized = false;
 const heroBackdropCache = new Map();
+
+function clearHeroWrapTimeout() {
+    if (heroWrapTimeout) { clearTimeout(heroWrapTimeout); heroWrapTimeout = null; }
+}
 
 function getFeaturedMoviesForHero() {
     if (!Array.isArray(allMovies) || allMovies.length === 0) return [];
@@ -325,6 +331,7 @@ function renderHeroSlides() {
     if (!heroSection || !track || !dotsWrap) return;
 
     stopHeroAutoplay();
+    clearHeroWrapTimeout();
     heroSlidesData = getFeaturedMoviesForHero();
 
     if (heroSlidesData.length === 0) {
@@ -335,17 +342,24 @@ function renderHeroSlides() {
     }
 
     heroCurrentIndex = 0;
+    heroPos = 1; // position 0 রাখা থাকে "শেষ slide"-এর clone-এর জন্য, তাই আসল slide0 শুরু হয় position 1 থেকে
     track.innerHTML = '';
     dotsWrap.innerHTML = '';
 
-    heroSlidesData.forEach((movie, i) => {
+    const N = heroSlidesData.length;
+
+    // idSuffix না দিলে আসল slide (id="heroBg-0" ইত্যাদি), দিলে সেটা শুধু ভিজ্যুয়াল clone (seamless loop-এর জন্য)
+    function buildSlideEl(movie, i, idSuffix) {
         const catLabel = getHeroCategoryLabel(movie);
         const fullTitle = movie.title || '';
         const cleanTitle = fullTitle.replace(/\s*\([\d\-]+\)\s*$/, '').trim() || fullTitle;
+        const isClone = idSuffix != null;
+        const domId = isClone ? idSuffix : i;
         const slide = document.createElement('div');
         slide.className = 'hero-slide';
+        if (isClone) slide.setAttribute('aria-hidden', 'true');
         slide.innerHTML = `
-            <div class="hero-slide-bg" id="heroBg-${i}" style="background-image:url('${movie.poster || POSTER_PLACEHOLDER_LOADING}')"></div>
+            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${movie.poster || POSTER_PLACEHOLDER_LOADING}')"></div>
             <div class="hero-slide-shade"></div>
             <div class="hero-slide-top">
                 <span class="hero-badge hero-badge-featured">Featured</span>
@@ -356,15 +370,22 @@ function renderHeroSlides() {
                 <p class="hero-slide-subtitle">${fullTitle}</p>
                 <div class="hero-slide-meta-row">
                     <span class="hero-meta-hd">HD</span>
-                    <span class="hero-meta-date" id="heroDate-${i}">${movie.year ? movie.year : getYearFromTitle(fullTitle)}</span>
+                    <span class="hero-meta-date" id="heroDate-${domId}">${movie.year ? movie.year : getYearFromTitle(fullTitle)}</span>
                 </div>
-                <button type="button" class="hero-watch-btn" id="heroWatchBtn-${i}">▶ Watch Now</button>
+                <button type="button" class="hero-watch-btn" id="heroWatchBtn-${domId}" ${isClone ? 'tabindex="-1"' : ''}>▶ Watch Now</button>
             </div>
         `;
-        track.appendChild(slide);
-
-        const watchBtn = slide.querySelector(`#heroWatchBtn-${i}`);
+        const watchBtn = slide.querySelector(`#heroWatchBtn-${domId}`);
         if (watchBtn) watchBtn.addEventListener('click', () => openMovieModal(heroSlidesData[i]));
+        return slide;
+    }
+
+    // ১. শুরুতে শেষ real slide-এর একটা clone বসানো হয় (prev করে প্রথম থেকে শেষে seamless যাওয়ার জন্য)
+    track.appendChild(buildSlideEl(heroSlidesData[N - 1], N - 1, 'cloneLast'));
+
+    // ২. তারপর আসল সব slide + dot
+    heroSlidesData.forEach((movie, i) => {
+        track.appendChild(buildSlideEl(movie, i));
 
         const dot = document.createElement('button');
         dot.type = 'button';
@@ -374,20 +395,30 @@ function renderHeroSlides() {
         dotsWrap.appendChild(dot);
     });
 
+    // ৩. শেষে প্রথম real slide-এর একটা clone বসানো হয় (next করে শেষ থেকে প্রথমে seamless যাওয়ার জন্য - মূল bug fix)
+    track.appendChild(buildSlideEl(heroSlidesData[0], 0, 'cloneFirst'));
+
     heroSection.style.display = '';
     updateHeroTrackPosition(false);
     startHeroAutoplay();
 
     // real backdrop + release date গুলো background এ lazy লোড হয় (poster দিয়ে instant দেখা যায়)
+    // clone slide-গুলোতেও (cloneFirst/cloneLast) একই ছবি বসিয়ে দেওয়া হয়, নাহলে seamless loop-এর সময়
+    // clone-টা পুরনো poster placeholder দেখাবে আর আসল slide নতুন backdrop - মিসম্যাচ চোখে পড়বে
     heroSlidesData.forEach((movie, i) => {
         fetchHeroBackdrop(movie).then(data => {
-            const bgEl = document.getElementById(`heroBg-${i}`);
-            if (bgEl && data && data.backdrop) bgEl.style.backgroundImage = `url('${data.backdrop}')`;
-            const dateEl = document.getElementById(`heroDate-${i}`);
-            if (dateEl) {
-                const label = formatHeroDateLabel(movie, data && data.releaseDate);
-                dateEl.textContent = label ? `${label}` : '';
-            }
+            const targetIds = [i];
+            if (i === 0) targetIds.push('cloneFirst');
+            if (i === N - 1) targetIds.push('cloneLast');
+            targetIds.forEach(id => {
+                const bgEl = document.getElementById(`heroBg-${id}`);
+                if (bgEl && data && data.backdrop) bgEl.style.backgroundImage = `url('${data.backdrop}')`;
+                const dateEl = document.getElementById(`heroDate-${id}`);
+                if (dateEl) {
+                    const label = formatHeroDateLabel(movie, data && data.releaseDate);
+                    dateEl.textContent = label ? `${label}` : '';
+                }
+            });
         });
     });
 }
@@ -396,18 +427,63 @@ function updateHeroTrackPosition(animate = true) {
     const track = document.getElementById('heroTrack');
     if (!track) return;
     track.style.transition = animate ? 'transform 0.6s cubic-bezier(.4,0,.2,1)' : 'none';
-    track.style.transform = `translateX(-${heroCurrentIndex * 100}%)`;
+    track.style.transform = `translate3d(-${heroPos * 100}%, 0, 0)`;
     document.querySelectorAll('#heroDots .hero-dot').forEach((d, i) => d.classList.toggle('active', i === heroCurrentIndex));
 }
 
+// dot ক্লিক করলে সরাসরি সেই slide-এ (নিজের real position-এ) চলে যায়
 function goToHeroSlide(i) {
     if (!heroSlidesData.length) return;
+    clearHeroWrapTimeout();
     heroCurrentIndex = ((i % heroSlidesData.length) + heroSlidesData.length) % heroSlidesData.length;
+    heroPos = heroCurrentIndex + 1;
     updateHeroTrackPosition(true);
     startHeroAutoplay();
 }
-function heroGoNext() { goToHeroSlide(heroCurrentIndex + 1); }
-function heroGoPrev() { goToHeroSlide(heroCurrentIndex - 1); }
+
+// শেষ slide থেকে next করলে বাকি সবগুলোর মতোই একটা ধাপ smoothly slide করে clone-first এ যায়,
+// clone-টা দেখতে হুবহু আসল প্রথম slide-এর (img1) মতোই, তাই transition শেষ হতেই কোনো animation ছাড়া
+// (snap) আসল slide0-এ বসিয়ে দেওয়া হয় - দর্শকের চোখে img1 একই থেকে যায়, কোনো ধাক্কা/jump দেখা যায় না
+function heroGoNext() {
+    if (!heroSlidesData.length) return;
+    clearHeroWrapTimeout();
+    const N = heroSlidesData.length;
+    if (heroCurrentIndex === N - 1) {
+        heroPos = N + 1; // clone-first এর position
+        heroCurrentIndex = 0;
+        updateHeroTrackPosition(true);
+        heroWrapTimeout = setTimeout(() => {
+            heroPos = 1; // আসল slide0
+            updateHeroTrackPosition(false); // no animation - clone আর আসল slide0 দেখতে same
+        }, 620);
+    } else {
+        heroCurrentIndex += 1;
+        heroPos += 1;
+        updateHeroTrackPosition(true);
+    }
+    startHeroAutoplay();
+}
+
+// একইভাবে প্রথম slide থেকে prev করলে clone-last দিয়ে seamless ভাবে শেষ slide-এ যায়
+function heroGoPrev() {
+    if (!heroSlidesData.length) return;
+    clearHeroWrapTimeout();
+    const N = heroSlidesData.length;
+    if (heroCurrentIndex === 0) {
+        heroPos = 0; // clone-last এর position
+        heroCurrentIndex = N - 1;
+        updateHeroTrackPosition(true);
+        heroWrapTimeout = setTimeout(() => {
+            heroPos = N; // আসল শেষ slide
+            updateHeroTrackPosition(false);
+        }, 620);
+    } else {
+        heroCurrentIndex -= 1;
+        heroPos -= 1;
+        updateHeroTrackPosition(true);
+    }
+    startHeroAutoplay();
+}
 
 function startHeroAutoplay() {
     stopHeroAutoplay();
@@ -433,25 +509,42 @@ function setupHeroBannerControls() {
     heroSection.addEventListener('mouseenter', stopHeroAutoplay);
     heroSection.addEventListener('mouseleave', startHeroAutoplay);
 
-    let touchStartX = 0, touchDeltaX = 0, isTouching = false;
+    let touchStartX = 0, touchDeltaX = 0, isTouching = false, touchSectionWidth = 0;
+    let dragRafId = null;
     const track = document.getElementById('heroTrack');
+
+    // touchmove প্রতি ফ্রেমে বহুবার ফায়ার করতে পারে - প্রতিবার সরাসরি style লেখার
+    // বদলে requestAnimationFrame দিয়ে ব্যাচ করা হয়, আর offsetWidth (layout read) একবারই
+    // touchstart এ মাপা হয় - প্রতি touchmove এ measure করলে forced-reflow হয়ে বাড়তি lag হয়
+    function applyDragTransform(deltaX, sectionWidth) {
+        if (dragRafId) return;
+        dragRafId = requestAnimationFrame(() => {
+            dragRafId = null;
+            if (!track) return;
+            const percent = (deltaX / sectionWidth) * 100;
+            track.style.transform = `translate3d(calc(-${heroPos * 100}% + ${percent}%), 0, 0)`;
+        });
+    }
 
     heroSection.addEventListener('touchstart', (e) => {
         isTouching = true; touchDeltaX = 0;
         touchStartX = e.touches[0].clientX;
+        touchSectionWidth = heroSection.offsetWidth;
         stopHeroAutoplay();
-        if (track) track.style.transition = 'none';
+        clearHeroWrapTimeout();
+        if (track) { track.style.transition = 'none'; track.style.willChange = 'transform'; }
     }, { passive: true });
     heroSection.addEventListener('touchmove', (e) => {
         if (!isTouching || !track) return;
         touchDeltaX = e.touches[0].clientX - touchStartX;
         // আঙুলের সাথে সাথে সাথে সাথে slide-টা লাইভ drag হবে (শুধু threshold পার হলে jump না)
-        const percent = (touchDeltaX / heroSection.offsetWidth) * 100;
-        track.style.transform = `translateX(calc(-${heroCurrentIndex * 100}% + ${percent}%))`;
+        applyDragTransform(touchDeltaX, touchSectionWidth);
     }, { passive: true });
     heroSection.addEventListener('touchend', () => {
         if (!isTouching) return;
         isTouching = false;
+        if (dragRafId) { cancelAnimationFrame(dragRafId); dragRafId = null; }
+        if (track) track.style.willChange = '';
         if (Math.abs(touchDeltaX) > 40) {
             touchDeltaX < 0 ? heroGoNext() : heroGoPrev();
         } else {
@@ -463,24 +556,27 @@ function setupHeroBannerControls() {
 
     // ---- মাউস/ট্র্যাকপ্যাড দিয়েও drag করা যাবে (বড় ডিভাইস/ল্যাপটপ) ----
     const heroViewportEl = heroSection.querySelector('.hero-viewport');
-    let mouseStartX = 0, mouseDeltaX = 0, isMouseDragging = false;
+    let mouseStartX = 0, mouseDeltaX = 0, isMouseDragging = false, mouseSectionWidth = 0;
     heroSection.addEventListener('mousedown', (e) => {
         isMouseDragging = true; mouseDeltaX = 0;
         mouseStartX = e.clientX;
+        mouseSectionWidth = heroSection.offsetWidth;
         stopHeroAutoplay();
-        if (track) track.style.transition = 'none';
+        clearHeroWrapTimeout();
+        if (track) { track.style.transition = 'none'; track.style.willChange = 'transform'; }
         if (heroViewportEl) heroViewportEl.style.cursor = 'grabbing';
         e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
         if (!isMouseDragging || !track) return;
         mouseDeltaX = e.clientX - mouseStartX;
-        const percent = (mouseDeltaX / heroSection.offsetWidth) * 100;
-        track.style.transform = `translateX(calc(-${heroCurrentIndex * 100}% + ${percent}%))`;
+        applyDragTransform(mouseDeltaX, mouseSectionWidth);
     });
     window.addEventListener('mouseup', () => {
         if (!isMouseDragging) return;
         isMouseDragging = false;
+        if (dragRafId) { cancelAnimationFrame(dragRafId); dragRafId = null; }
+        if (track) track.style.willChange = '';
         if (heroViewportEl) heroViewportEl.style.cursor = '';
         if (Math.abs(mouseDeltaX) > 40) {
             mouseDeltaX < 0 ? heroGoNext() : heroGoPrev();
@@ -1100,7 +1196,7 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
-            <img src="${POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
+            <img src="${POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" loading="lazy" decoding="async" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;

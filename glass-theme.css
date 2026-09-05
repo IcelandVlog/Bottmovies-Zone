@@ -265,7 +265,8 @@ html.light-mode .chat-branding strong { color: #1a202c; }
     .card-rating-badge-overlay, .comments-section, .comment-input-box,
     .comment-emoji-picker, .comment-reaction-picker, .comment-reaction-pill,
     .comment-auth-box, .custom-confirm-box, .comments-sort-tabs, .step-card,
-    .badge-quality, .btn-tmdb-action, .btn-google-action {
+    .badge-quality, .btn-tmdb-action, .btn-google-action,
+    .hero-badge, .hero-watch-btn, .hero-nav-btn {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
@@ -285,6 +286,14 @@ html.light-mode .chat-branding strong { color: #1a202c; }
     html.light-mode .movie-summary-card { background: rgba(247,248,250,0.92) !important; }
     html.light-mode .comments-section { background-color: rgba(255,255,255,0.92) !important; }
     html.light-mode .main-header { background-color: rgba(255,255,255,0.92) !important; }
+
+    /* hero banner-এর badge/watch-button/nav-arrow গুলোও blur ছাড়াই readable রাখা -
+       drag করে slide করার সময় এই blur-গুলোই ছিল "hat diye slide korle bede jay"
+       সমস্যার মূল কারণ: track drag হওয়ার প্রতি ফ্রেমে এই ছোট blur-elementগুলোকে
+       পিছনের সরে যাওয়া ছবি নতুন করে blur করে দেখাতে হচ্ছিল */
+    .hero-badge { background-color: rgba(10, 11, 14, 0.85) !important; }
+    .hero-watch-btn { background: rgba(217, 72, 15, 0.55) !important; }
+    .hero-nav-btn { background-color: rgba(10, 11, 14, 0.55) !important; }
 
     /* the "Request Here" / message widget box was left too see-through
        once blur was dropped on mobile — it only had a 0.5-0.55 alpha
