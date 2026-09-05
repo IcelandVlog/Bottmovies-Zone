@@ -48,7 +48,11 @@ function pickTmdbTrailerKey(detailData) {
     const results = detailData && detailData.videos && Array.isArray(detailData.videos.results)
         ? detailData.videos.results
         : [];
-    const onYoutube = results.filter(v => v && v.site === 'YouTube' && v.key);
+    return pickBestTrailerFromResults(results);
+}
+
+function pickBestTrailerFromResults(results) {
+    const onYoutube = (results || []).filter(v => v && v.site === 'YouTube' && v.key);
     if (!onYoutube.length) return null;
 
     const byType = (type) =>
@@ -57,6 +61,41 @@ function pickTmdbTrailerKey(detailData) {
 
     const pick = byType('Trailer') || byType('Teaser') || onYoutube[0];
     return pick ? pick.key : null;
+}
+
+// Series-er khetre show-er "overall" trailer na dekhiye shobcheye latest/notun
+// season-er trailer dekhano hoy - ar notun season TMDB-e add hole (number_of_seasons
+// baarle) automatic-i shei notun season-er trailer dekhabe, karon cache key-tei
+// season number dhora thake (nichey dekho).
+const seasonTrailerCache = new Map();
+async function getLatestSeasonTrailerKey(tvId, seasonNumber) {
+    if (!TMDB_API_KEY || tvId == null || seasonNumber == null) return null;
+    const cacheKey = `tv:${tvId}:s${seasonNumber}`;
+    if (seasonTrailerCache.has(cacheKey)) return seasonTrailerCache.get(cacheKey);
+
+    const promise = (async () => {
+        try {
+            const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${tvId}/season/${seasonNumber}/videos?api_key=${TMDB_API_KEY}`, {}, 6000);
+            if (!res.ok) return null;
+            const data = await res.json();
+            return pickBestTrailerFromResults(data.results);
+        } catch (e) {
+            console.error('TMDB season videos error:', e);
+            return null;
+        }
+    })();
+
+    seasonTrailerCache.set(cacheKey, promise);
+    return promise;
+}
+
+function getLatestRealSeasonNumber(detailData) {
+    if (!detailData || !Array.isArray(detailData.seasons) || !detailData.seasons.length) return null;
+    // season_number 0 shadharonoto "Specials" - shei-ta baad diye asol shobcheye
+    // notun season-take dhora hoy.
+    const real = detailData.seasons.filter(s => s && typeof s.season_number === 'number' && s.season_number > 0);
+    const pool = real.length ? real : detailData.seasons;
+    return pool.reduce((max, s) => (s.season_number > max ? s.season_number : max), pool[0].season_number);
 }
 
 // TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e সরাসরি search kore
@@ -1088,14 +1127,24 @@ async function fetchFullTMDBDetailsUncached(movie) {
         
         const finalImdbId = cleanImdbId || (detailData.external_ids && detailData.external_ids.imdb_id) || null;
 
-        // Trailer - age TMDB-r nijer "videos" data theke check kora hoy (free, quota lage
-        // na, ar beshirvag jonopriyo title-ei official trailer thake). Shudhu TMDB-e kichu
-        // na paoya gele - tobe-i YouTube Search API-e jawa hoy (quota-costly last resort),
-        // jate free quota-r ekta boro part bachano jay ar 429 "quota exceeded" kom hoy.
+        // Trailer - series/TV show hole shobsomoy shobcheye latest (notun) season-er
+        // trailer dekhano hoy (overall show trailer na), r notun season TMDB-e add
+        // hole automatic-i shei notun season-er trailer-e switch hobe. Priority:
+        // 1) latest season-er TMDB video, 2) show-er overall TMDB video, 3) YouTube
+        // search (quota-costly, tai last resort - eta-o season mention kore search kore).
         const ytTitle = detailData.title || detailData.name || movie.title;
-        let trailerKey = pickTmdbTrailerKey(detailData);
+        const latestSeasonNumber = mediaType === 'tv' ? getLatestRealSeasonNumber(detailData) : null;
+
+        let trailerKey = null;
+        if (mediaType === 'tv' && latestSeasonNumber != null) {
+            trailerKey = await getLatestSeasonTrailerKey(matchId, latestSeasonNumber);
+        }
         if (!trailerKey) {
-            trailerKey = await searchYoutubeTrailer(ytTitle, year !== "N/A" ? year : null);
+            trailerKey = pickTmdbTrailerKey(detailData);
+        }
+        if (!trailerKey) {
+            const searchTitle = latestSeasonNumber != null ? `${ytTitle} Season ${latestSeasonNumber}` : ytTitle;
+            trailerKey = await searchYoutubeTrailer(searchTitle, year !== "N/A" ? year : null);
         }
 
         return {
