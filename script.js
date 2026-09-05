@@ -350,7 +350,7 @@ function renderHeroSlides() {
                 ${catLabel ? `<span class="hero-badge hero-badge-cat">${catLabel}</span>` : ''}
             </div>
             <div class="hero-slide-info">
-                <h2 class="hero-slide-title">${cleanTitle}</h2>
+                <h2 class="hero-slide-title" id="heroTitle-${domId}">${cleanTitle}</h2>
                 <p class="hero-slide-subtitle">${fullTitle}</p>
                 <div class="hero-slide-meta-row">
                     <span class="hero-meta-hd">HD</span>
@@ -361,6 +361,10 @@ function renderHeroSlides() {
         `;
         const watchBtn = slide.querySelector(`#heroWatchBtn-${domId}`);
         if (watchBtn) watchBtn.addEventListener('click', () => openMovieModal(heroSlidesData[i]));
+
+        const titleEl = slide.querySelector(`#heroTitle-${domId}`);
+        if (titleEl) titleEl.addEventListener('click', () => openMovieModal(heroSlidesData[i]));
+
         return slide;
     }
 

@@ -2606,6 +2606,13 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    width: fit-content;
+    max-width: 100%;
+}
+.hero-slide-title:hover {
+    color: #d9480f;
 }
 .hero-slide-subtitle {
     font-size: 14px;
@@ -2655,8 +2662,8 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
     height: 40px;
     max-width: none;
     margin-top: 4px;
-    background: rgba(217, 72, 15, 0.25);
-    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(217, 72, 15, 0.35);
+    border: 1px solid rgba(255,255,255,0.3);
     color: #fff;
     font-weight: 700;
     font-size: 11.5px;
@@ -2665,10 +2672,10 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
     cursor: pointer;
     font-family: inherit;
     box-shadow: none;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(3px);
     transition: filter 0.15s ease, transform 0.15s ease, background 0.15s ease;
 }
-.hero-watch-btn:hover { background: rgba(217, 72, 15, 0.4); transform: translateY(-1px); }
+.hero-watch-btn:hover { background: rgba(217, 72, 15, 0.5); transform: translateY(-1px); }
 .hero-nav-btn {
     position: absolute;
     top: 50%;
