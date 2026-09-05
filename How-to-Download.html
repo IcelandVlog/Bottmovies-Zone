@@ -6,7 +6,6 @@
 <title>How to Download - BOTTMOVIES</title>
 <link rel="shortcut icon" href="https://raw.githubusercontent.com/IcelandVlog/B.OTP/refs/heads/main/logo1.png" type="image/x-icon"/>
 <script>
-  // থিম আগে থেকে সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
   (function(){
       try {
           if (localStorage.getItem('bottmovies_theme') === 'light') {
@@ -709,7 +708,6 @@
        ========================================= */
     const THEME_STORAGE_KEY = 'bottmovies_theme';
 
-    // বাটনে সবসময় ক্লিক করলে যেই মোডে যাবে সেই মোডের আইকন দেখানো হয়
     const THEME_ICON_SUN = `
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="12" cy="12" r="5" fill="#fbbf24"/>
@@ -756,8 +754,6 @@
     /* =========================================
        CHAT TOGGLE & MESSAGE LOGIC
        ========================================= */
-    // একই Supabase project যেটা script.js / index.html-এর "Messages" admin
-    // ট্যাব ব্যবহার করে, যাতে এই পেজ থেকে পাঠানো মেসেজও সেখানে দেখা যায়।
     const CHAT_SUPABASE_URL = 'https://borglnmrvjafodkqhhhv.supabase.co';
     const CHAT_SUPABASE_KEY = 'sb_publishable_Q3WcdMEHLJO7SkO3Sd7BDQ_Ohu8xAp9';
     const chatSupabaseClient = (typeof supabase !== 'undefined')

@@ -4,14 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bottmovies Zone</title>
-<!-- GitHub Pages custom HTTP header set করতে দেয় না, তাই SharedArrayBuffer/cross-origin-isolation
-     চালু করার একমাত্র উপায় এই service worker (coi-serviceworker v0.1.7)। আগের version-এ
-     credentialless mode না থাকায় বাইরের poster link ব্লক হয়ে "No Poster" bug হচ্ছিল -
-     এই updated version default-ই credentialless mode ব্যবহার করে (বাইরের poster/CDN ব্লক করে না)
-     এবং শুধু প্রথমবার (registration না হওয়া পর্যন্ত) reload করে, বারবার reload করে না। -->
 <script src="coi-serviceworker.js"></script>
 <script>
-  // থিম সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
   (function(){
       try {
           var savedTheme = localStorage.getItem('bottmovies_theme');
@@ -25,10 +19,6 @@
 <link rel="shortcut icon" href="favicon.png" type="image/x-icon"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<!-- এডমিন প্যানেলের ভিডিও/ZIP স্ক্যান ফিচারের জন্য (audio/subtitle auto-detect), ব্রাউজারেই লোকালি চলে।
-     এটা কাজ করার জন্য page-টা cross-origin-isolated হতে হবে - সেটা vercel.json-এ
-     Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy header দিয়ে করা হয়েছে
-     (credentialless mode ব্যবহার করা হয়েছে যাতে বাইরের poster link/CDN কিছুই ব্লক না হয়)। -->
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script type="text/javascript">
   (function(){
@@ -39,7 +29,6 @@
 </script>
 </head>
 
-<!-- ডিফল্ট ক্যাটাগরি all রাখা হয়েছে -->
 <body data-category="all">
 
 <header class="main-header">
@@ -64,7 +53,6 @@
             <span class="auth-user-email" id="authUserEmail"></span>
             <button type="button" class="btn-auth btn-auth-dashboard" id="btnAuthDashboard" onclick="openDashboard()">Dashboard</button>
         </div>
-        <!-- ছোট device-এ উপরের text button গুলো hide হয়ে শুধু এই text button-টা দেখাবে (CSS media query) -->
         <button type="button" class="btn-auth-icon-mobile" id="authIconMobile" onclick="handleMobileAuthIconClick()" title="Account" aria-label="Account">
             <span id="authIconMobileLabel">Login</span>
         </button>
@@ -240,9 +228,6 @@
     </div>
 </div>
 
-<!-- ==================== USER DASHBOARD (non-admin members) ====================
-     Admin Panel এর মতোই sidebar + tab লেআউট, কিন্তু সাধারণ member এর জন্য:
-     Profile (view/edit + profile picture), Favorites/Watchlist, My Requests, Security (Change Password) -->
 <div class="admin-overlay" id="userDashboardOverlay">
 <div class="admin-panel admin-panel-dash">
     <div class="admin-dash-layout">
@@ -367,10 +352,6 @@
 </div>
 </div>
 
-<!-- ==================== AVATAR CROPPER (Facebook-style zoom/pan/crop) ====================
-     userAvatarFileInput এ ফাইল সিলেক্ট করলে সরাসরি আপলোড না হয়ে আগে এই মোডাল খোলে -
-     zoom slider দিয়ে বড়/ছোট আর ছবি drag করে position ঠিক করা যায়, তারপর Save চাপলে
-     গোল আকারে crop হয়ে আপলোড হয়। -->
 <div class="avatar-crop-overlay" id="avatarCropOverlay">
     <div class="avatar-crop-card">
         <div class="avatar-crop-header">
@@ -394,10 +375,6 @@
     </div>
 </div>
 
-<!-- ==================== ADMIN PANEL (Hidden Access) ====================
-     StreamHG-style sidebar dashboard. সব ডাটা আসল/লাইভ (নিজেদের ডাটাবেজ থেকে) -
-     কোনো fake earning/premium সংখ্যা নেই, শুধু সাইটের real stats (Movies/Series,
-     Categories, Comments, Registered Users, Recycle Bin, Broken Link Reports)। -->
 <div class="admin-overlay" id="adminOverlay">
 <div class="admin-panel admin-panel-dash">
     <div class="admin-dash-layout">
@@ -591,13 +568,13 @@
                 </div>
 
                 <!-- HERO BANNER TAB (select which movies/series show on the homepage auto-slide banner) -->
-                <div class="admin-tab-content" id="adminTabBanner" style="display:none;">
+                <!-- <div class="admin-tab-content" id="adminTabBanner" style="display:none;">
                     <div class="admin-banner-note">Toggle "Show in Banner" for the titles you want in the homepage hero slider, then click Save — the slide order number is assigned automatically (no manual/duplicate numbers). Use ▲ / ▼ on a featured item to change its position in the slider. Custom Image is optional — leave blank to auto-load a widescreen backdrop from TMDB.</div>
                     <div class="admin-manage-search">
                         <input type="text" id="adminBannerSearchInput" placeholder="🔍 Search content to feature in banner...">
                     </div>
                     <div class="admin-database-list" id="adminBannerList"></div>
-                </div>
+                </div> -->
 
                 <!-- COMMENTS TAB -->
                 <div class="admin-tab-content" id="adminTabComments" style="display:none;">

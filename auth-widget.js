@@ -1,11 +1,4 @@
-/* ==================== SHARED AUTH STATUS WIDGET ====================
-   dmca.html, report-broken-links.html, How-to-Download.html - এই static
-   পেজগুলোর মধ্যে movie-management কোনো লজিক নেই, তাই সেগুলোতে পুরো
-   Sign In / Sign Up ফর্ম বা Admin Panel বসানো হয়নি। কিন্তু main site-এ
-   Sign In করা থাকলে (session localStorage-এ persist হয় - সব পেজেই সেটা
-   দেখা যায়), তাই এই ছোট floating pill-টা দেখায় কে login করা আছে এবং
-   এক ক্লিকে index.html-এর Dashboard-এ ফিরিয়ে নিয়ে যায়।
-   একই Supabase project ব্যবহার করা হয়েছে যেটা script.js-এ আছে। */
+
 (function () {
     const SUPABASE_URL = 'https://borglnmrvjafodkqhhhv.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_Q3WcdMEHLJO7SkO3Sd7BDQ_Ohu8xAp9';

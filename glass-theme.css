@@ -287,10 +287,6 @@ html.light-mode .chat-branding strong { color: #1a202c; }
     html.light-mode .comments-section { background-color: rgba(255,255,255,0.92) !important; }
     html.light-mode .main-header { background-color: rgba(255,255,255,0.92) !important; }
 
-    /* hero banner-এর badge/watch-button/nav-arrow গুলোও blur ছাড়াই readable রাখা -
-       drag করে slide করার সময় এই blur-গুলোই ছিল "hat diye slide korle bede jay"
-       সমস্যার মূল কারণ: track drag হওয়ার প্রতি ফ্রেমে এই ছোট blur-elementগুলোকে
-       পিছনের সরে যাওয়া ছবি নতুন করে blur করে দেখাতে হচ্ছিল */
     .hero-badge { background-color: rgba(10, 11, 14, 0.85) !important; }
     .hero-watch-btn { background: rgba(217, 72, 15, 0.55) !important; }
     .hero-nav-btn { background-color: rgba(10, 11, 14, 0.55) !important; }

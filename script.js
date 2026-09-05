@@ -2,13 +2,9 @@ const OMDB_API_KEY = "d246cca2";
 const TMDB_API_KEY = "ffa63099e82a2b25d082dcd0c040c8fb"; 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
-// একই মুভির TMDB/OMDb ডিটেইলস বারবার fetch না করে ক্যাশ করে রাখার জন্য -
-// দেখুন getFullTMDBDetails() / getOMDbDetails() এর কমেন্ট
 const tmdbDetailsCache = new Map();
 const omdbDetailsCache = new Map();
 
-// দ্রুত একটার পর একটা কল হওয়া আটকায় (যেমন search বক্সে টাইপ করার সময়
-// প্রতিটা key press) - শেষ কলটার `wait` মিলিসেকেন্ড পরে আসল ফাংশনটা চলে
 function debounce(fn, wait) {
     let t;
     return function (...args) {
@@ -48,7 +44,7 @@ function normalizeCategorySlug(slug) {
 }
 
 var allMovies = []; 
-var moviesDataLoaded = false; // Supabase থেকে movies data একবার সফলভাবে লোড হয়ে গেলে true হয়ে যায়
+var moviesDataLoaded = false;
 var allDeletedMovies = [];
 var allLinkAlerts = [];
 const TRASH_RETENTION_DAYS = 30;
@@ -189,9 +185,6 @@ async function fetchMoviesFromSupabase() {
             }
             switchCategory(initialCategory, initialPage);
 
-            // page refresh এ যদি Admin Panel আগে থেকেই খোলা থাকে (URL এ ?dashboard=1),
-            // তাহলে movies data লোড হওয়ার আগেই ঐ ট্যাবের কন্টেন্ট রেন্ডার হয়ে "No content found" /
-            // stats 0 দেখাচ্ছিল — data লোড শেষ হওয়ার পর যেই ট্যাব খোলা আছে সেটাই আবার রিফ্রেশ করে দাও
             const adminOverlayEl = document.getElementById('adminOverlay');
             if (adminOverlayEl && adminOverlayEl.style.display !== 'none') {
                 if (currentAdminTab === 'dashboard') {
@@ -208,7 +201,7 @@ async function fetchMoviesFromSupabase() {
             }
         } else {
             console.warn('No movies found in database.');
-            moviesDataLoaded = true; // এই কল সফল হয়েছে, শুধু ডাটাবেজ খালি — তাই এখন থেকে "No content found" ঠিক দেখানো যাবে
+            moviesDataLoaded = true; 
         }
     } catch (err) {
         console.error('Unexpected error loading database:', err);
@@ -216,12 +209,7 @@ async function fetchMoviesFromSupabase() {
 }
 
 // ==================== HOME HERO BANNER FUNCTIONS ====================
-// হোমপেজের উপরে "Featured" ক্যারুসেল/স্লাইডার। Admin চাইলে movies টেবিলে
-// `featured` (boolean) + `featured_order` (integer) + `featured_image` (text, optional)
-// কলাম বসিয়ে নির্দিষ্ট কিছু movie বেছে নিতে পারে (SUPABASE_SETUP.sql দেখুন)। কিছু
-// বেছে না নিলে সবচেয়ে সাম্প্রতিক কয়েকটা movie/series এমনিতেই দেখানো হয় - ব্যানার
-// কখনো খালি থাকে না। শুধু Home ("all") ক্যাটাগরিতে দেখা যায়, অন্য ক্যাটাগরিতে গেলে
-// হাইড হয়ে যায় এবং autoplay টাইমার বন্ধ হয়ে যায় (অযথা network call বন্ধ রাখতে)।
+
 let heroSlidesData = [];
 let heroCurrentIndex = 0; // real/logical slide index (0..N-1) - drives the dots
 let heroPos = 1;          // actual position inside the extended DOM track (clone-of-last, slide0..slideN-1, clone-of-first)
@@ -243,7 +231,6 @@ function getFeaturedMoviesForHero() {
 
     if (manuallyFeatured.length > 0) return manuallyFeatured.slice(0, 8);
 
-    // Admin কিছু বেছে না নিলে - সবচেয়ে সাম্প্রতিক ৬টা content fallback হিসেবে দেখানো হয়
     return allMovies.slice(0, 6);
 }
 
@@ -269,8 +256,6 @@ function formatHeroDateLabel(movie, isoDate) {
     return getYearFromTitle(movie.title);
 }
 
-// প্রতিটা slide-এর জন্য widescreen "backdrop" ছবি আলাদাভাবে fetch হয় (grid এর পোর্ট্রেট
-// poster থেকে সম্পূর্ণ আলাদা ক্যাশ - getFullTMDBDetails/getOMDbDetails এ হাত দেওয়া হয়নি)
 async function fetchHeroBackdrop(movie) {
     const cacheKey = movie && (movie.id != null ? `id:${movie.id}` : `title:${(movie.searchName || movie.title || '').toLowerCase()}`);
     if (cacheKey && heroBackdropCache.has(cacheKey)) return heroBackdropCache.get(cacheKey);
@@ -342,13 +327,12 @@ function renderHeroSlides() {
     }
 
     heroCurrentIndex = 0;
-    heroPos = 1; // position 0 রাখা থাকে "শেষ slide"-এর clone-এর জন্য, তাই আসল slide0 শুরু হয় position 1 থেকে
+    heroPos = 1; 
     track.innerHTML = '';
     dotsWrap.innerHTML = '';
 
     const N = heroSlidesData.length;
 
-    // idSuffix না দিলে আসল slide (id="heroBg-0" ইত্যাদি), দিলে সেটা শুধু ভিজ্যুয়াল clone (seamless loop-এর জন্য)
     function buildSlideEl(movie, i, idSuffix) {
         const catLabel = getHeroCategoryLabel(movie);
         const fullTitle = movie.title || '';
@@ -380,10 +364,8 @@ function renderHeroSlides() {
         return slide;
     }
 
-    // ১. শুরুতে শেষ real slide-এর একটা clone বসানো হয় (prev করে প্রথম থেকে শেষে seamless যাওয়ার জন্য)
     track.appendChild(buildSlideEl(heroSlidesData[N - 1], N - 1, 'cloneLast'));
 
-    // ২. তারপর আসল সব slide + dot
     heroSlidesData.forEach((movie, i) => {
         track.appendChild(buildSlideEl(movie, i));
 
@@ -395,16 +377,12 @@ function renderHeroSlides() {
         dotsWrap.appendChild(dot);
     });
 
-    // ৩. শেষে প্রথম real slide-এর একটা clone বসানো হয় (next করে শেষ থেকে প্রথমে seamless যাওয়ার জন্য - মূল bug fix)
     track.appendChild(buildSlideEl(heroSlidesData[0], 0, 'cloneFirst'));
 
     heroSection.style.display = '';
     updateHeroTrackPosition(false);
     startHeroAutoplay();
 
-    // real backdrop + release date গুলো background এ lazy লোড হয় (poster দিয়ে instant দেখা যায়)
-    // clone slide-গুলোতেও (cloneFirst/cloneLast) একই ছবি বসিয়ে দেওয়া হয়, নাহলে seamless loop-এর সময়
-    // clone-টা পুরনো poster placeholder দেখাবে আর আসল slide নতুন backdrop - মিসম্যাচ চোখে পড়বে
     heroSlidesData.forEach((movie, i) => {
         fetchHeroBackdrop(movie).then(data => {
             const targetIds = [i];
@@ -431,7 +409,6 @@ function updateHeroTrackPosition(animate = true) {
     document.querySelectorAll('#heroDots .hero-dot').forEach((d, i) => d.classList.toggle('active', i === heroCurrentIndex));
 }
 
-// dot ক্লিক করলে সরাসরি সেই slide-এ (নিজের real position-এ) চলে যায়
 function goToHeroSlide(i) {
     if (!heroSlidesData.length) return;
     clearHeroWrapTimeout();
@@ -441,9 +418,6 @@ function goToHeroSlide(i) {
     startHeroAutoplay();
 }
 
-// শেষ slide থেকে next করলে বাকি সবগুলোর মতোই একটা ধাপ smoothly slide করে clone-first এ যায়,
-// clone-টা দেখতে হুবহু আসল প্রথম slide-এর (img1) মতোই, তাই transition শেষ হতেই কোনো animation ছাড়া
-// (snap) আসল slide0-এ বসিয়ে দেওয়া হয় - দর্শকের চোখে img1 একই থেকে যায়, কোনো ধাক্কা/jump দেখা যায় না
 function heroGoNext() {
     if (!heroSlidesData.length) return;
     clearHeroWrapTimeout();
@@ -453,7 +427,7 @@ function heroGoNext() {
         heroCurrentIndex = 0;
         updateHeroTrackPosition(true);
         heroWrapTimeout = setTimeout(() => {
-            heroPos = 1; // আসল slide0
+            heroPos = 1; 
             updateHeroTrackPosition(false); // no animation - clone আর আসল slide0 দেখতে same
         }, 620);
     } else {
@@ -464,7 +438,6 @@ function heroGoNext() {
     startHeroAutoplay();
 }
 
-// একইভাবে প্রথম slide থেকে prev করলে clone-last দিয়ে seamless ভাবে শেষ slide-এ যায়
 function heroGoPrev() {
     if (!heroSlidesData.length) return;
     clearHeroWrapTimeout();
@@ -513,9 +486,6 @@ function setupHeroBannerControls() {
     let dragRafId = null;
     const track = document.getElementById('heroTrack');
 
-    // touchmove প্রতি ফ্রেমে বহুবার ফায়ার করতে পারে - প্রতিবার সরাসরি style লেখার
-    // বদলে requestAnimationFrame দিয়ে ব্যাচ করা হয়, আর offsetWidth (layout read) একবারই
-    // touchstart এ মাপা হয় - প্রতি touchmove এ measure করলে forced-reflow হয়ে বাড়তি lag হয়
     function applyDragTransform(deltaX, sectionWidth) {
         if (dragRafId) return;
         dragRafId = requestAnimationFrame(() => {
@@ -537,7 +507,6 @@ function setupHeroBannerControls() {
     heroSection.addEventListener('touchmove', (e) => {
         if (!isTouching || !track) return;
         touchDeltaX = e.touches[0].clientX - touchStartX;
-        // আঙুলের সাথে সাথে সাথে সাথে slide-টা লাইভ drag হবে (শুধু threshold পার হলে jump না)
         applyDragTransform(touchDeltaX, touchSectionWidth);
     }, { passive: true });
     heroSection.addEventListener('touchend', () => {
@@ -548,13 +517,12 @@ function setupHeroBannerControls() {
         if (Math.abs(touchDeltaX) > 40) {
             touchDeltaX < 0 ? heroGoNext() : heroGoPrev();
         } else {
-            updateHeroTrackPosition(true); // যথেষ্ট swipe না হলে smoothly আগের slide-এ ফিরে যাবে
+            updateHeroTrackPosition(true); 
             startHeroAutoplay();
         }
         touchDeltaX = 0;
     });
 
-    // ---- মাউস/ট্র্যাকপ্যাড দিয়েও drag করা যাবে (বড় ডিভাইস/ল্যাপটপ) ----
     const heroViewportEl = heroSection.querySelector('.hero-viewport');
     let mouseStartX = 0, mouseDeltaX = 0, isMouseDragging = false, mouseSectionWidth = 0;
     heroSection.addEventListener('mousedown', (e) => {
@@ -588,7 +556,6 @@ function setupHeroBannerControls() {
     });
 }
 
-// Home ("all") ছাড়া অন্য কোনো ক্যাটাগরিতে গেলে ব্যানার হাইড হয়ে যায় ও autoplay বন্ধ হয়
 function updateHeroVisibilityForCategory(category) {
     const heroSection = document.getElementById('heroBanner');
     if (!heroSection) return;
@@ -622,12 +589,6 @@ async function fetchWithTimeout(url, options = {}, timeout = 2500) {
     }
 }
 
-// একসাথে অনেকগুলো মুভির TMDB/OMDb fetch একবারে পাঠালে ব্রাউজারের
-// per-domain connection limit (~৬টা) এ আটকে যায়, আর fetchWithTimeout এর
-// টাইমার request queue তে বসে থাকা অবস্থাতেই কাউন্ট হতে থাকে - ফলে
-// প্রথম কয়েকটা বাদে বাকি সবগুলো AbortError দিয়ে ফেইল করে (poster কালো/ফাঁকা
-// থেকে যায়)। এই হেল্পার দিয়ে একবারে সর্বোচ্চ `limit` সংখ্যক আইটেম প্রসেস
-// করা হয়, বাকিগুলো একটা শেষ হলে পরেরটা শুরু হয় - কানেকশন লিমিটের মধ্যে থেকে।
 async function runWithConcurrencyLimit(items, limit, worker) {
     let cursor = 0;
     const workerCount = Math.min(limit, items.length);
@@ -748,8 +709,6 @@ function copyDownloadLink(linkId, btnElement) {
     if (linkElement && linkElement.href) {
         incrementMovieViews(currentModalMovie); // লিংক কপি করলে ভিউ কাউন্ট বাড়বে
 
-        // ডাউনলোড বাটনের মতোই, লিংক কপি করলেও সেটা Download History তে যোগ হবে
-        // (ইউজার লিংকটা কপি করে নিজে ব্রাউজার/ডাউনলোডার দিয়ে ডাউনলোড করবে ধরে নিয়ে)
         const headerEl = linkElement.closest('.season-box-item')?.querySelector('.season-box-header');
         const linkLabel = headerEl?.dataset.label || '';
         logDownloadHistory(currentModalMovie, linkLabel);
@@ -1024,9 +983,6 @@ function sendMissingMovieEmail(movieName) {
 
 // ==================== RENDERING & PAGINATION ====================
 
-// প্রতি লাইনে (row) আসলে কয়টা কন্টেন্ট বসছে সেটা .movie-grid এর
-// computed grid-template-columns থেকে গুনে বের করে - CSS ব্রেকপয়েন্ট
-// পাল্টালে ম্যানুয়ালি সিঙ্ক করার দরকার হয় না।
 function getGridColumnsCount() {
     const grid = document.getElementById('movieGrid');
     if (!grid) return 5;
@@ -1036,14 +992,7 @@ function getGridColumnsCount() {
     return cols || 5;
 }
 
-// ফোনে ব্রাউজারের "Request Desktop Site" চালু থাকলে ভিউপোর্ট width বড় দেখানো হয়
-// (তাই ৫-কলাম গ্রিড বসে যায়, নিচের max-width মিডিয়া কোয়েরিগুলো আর ধরে না) কিন্তু
-// ফোনের আসল স্ক্রিন তো তখনও লম্বা (portrait) - zoom-out করে পুরো পেজ দেখানোর কারণে
-// effective viewport height অনেক বেশি হয়ে যায়। normal desktop monitor-এর জন্য ঠিক
-// করা "৫ কলাম = ২ row = ১০টা" নিয়মে তখন পেজের নিচের অনেকটা অংশ ফাঁকা থেকে যায় -
-// screen.width/height ব্রাউজার viewport স্পুফ করলেও বদলায় না (আসল ডিভাইসের
-// রেজোলিউশনই দেখায়), তাই touch + ছোট আসল স্ক্রিন + ৫-কলাম গ্রিড এই কম্বিনেশন
-// দেখলে বোঝা যায় এটা আসলে ফোনেই জোর করে "desktop site" চালু করা হয়েছে।
+
 function isForcedDesktopOnPhone(cols) {
     if (cols !== 5) return false;
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -1052,13 +1001,7 @@ function isForcedDesktopOnPhone(cols) {
     return realScreenNarrow;
 }
 
-// নিয়ম: যেকোনো ডিভাইসে ১ লাইনে সর্বোচ্চ ৫টা কন্টেন্ট।
-// ১ লাইনে ৩ বা ৪টা কন্টেন্ট থাকলে প্রতি পেজে ১২টা কন্টেন্ট,
-// বাকি সব ক্ষেত্রে (২ বা ৫টা) প্রতি পেজে ১০টা কন্টেন্ট।
-// ব্যতিক্রম: ফোনে জোর করে "desktop site" চালু থাকলে (isForcedDesktopOnPhone) সেই
-// ফাঁকা জায়গার সমস্যা এড়াতে row সংখ্যা visible viewport-এর height/width অনুপাত
-// মেপে বাড়ানো হয়, যাতে zoom-out করা লম্বা ভার্চুয়াল পেজটা যথেষ্ট কন্টেন্ট দিয়ে ভরে
-// যায় - স্বাভাবিক ডেস্কটপ/মোবাইলে (এই কন্ডিশন false থাকলে) আচরণ আগের মতোই থাকে।
+
 function getMoviesPerPage() {
     let cols = getGridColumnsCount();
     if (cols > 5) cols = 5;
@@ -1066,8 +1009,8 @@ function getMoviesPerPage() {
     if (isForcedDesktopOnPhone(cols)) {
         const vw = window.innerWidth || document.documentElement.clientWidth || 1;
         const vh = window.innerHeight || document.documentElement.clientHeight || 1;
-        const aspect = vh / vw; // সাধারণ ডেস্কটপে এটা মোটামুটি ০.৫-০.৭, ফোনে ভুয়া ডেস্কটপ মোডে অনেক বেশি (লম্বা)
-        const rows = Math.max(2, Math.round(2 * aspect)) + 1; // +১ এক্সট্রা লাইন, যাতে নিচে সামান্য ফাঁকা থাকলেও পুরোপুরি ভরাট মনে হয়
+        const aspect = vh / vw; 
+        const rows = Math.max(2, Math.round(2 * aspect)) + 1;
         return cols * rows;
     }
 
@@ -1155,9 +1098,6 @@ function renderMoviesByPage(movies, page) {
     grid.innerHTML = '';
     currentPage = page;
 
-    // Refresh দিলেও যে page (1, 2, 3...) এ ছিলাম সেখানেই থাকার জন্য URL এর hash এ
-    // category নামের ঠিক পরে ?page= বসিয়ে রাখা হয় (যেমন #anime?page=2)
-    // (dashboard/auth মোডাল URL এ খোলা থাকলে সেটাতে হাত দেওয়া হয় না)
     const pageUrlParams = new URLSearchParams(window.location.search);
     if (!pageUrlParams.has('dashboard') && !pageUrlParams.has('auth')) {
         const rawHash = window.location.hash.replace('#', '');
@@ -1212,9 +1152,6 @@ function renderMoviesByPage(movies, page) {
         grid.appendChild(card);
     });
 
-    // সব কার্ড DOM এ বসানো হয়ে গেছে - এখন পোস্টার/রেটিং fetch করা হচ্ছে,
-    // কিন্তু একবারে সবগুলো না পাঠিয়ে ব্যাচে ব্যাচে (দেখুন runWithConcurrencyLimit
-    // এর কমেন্ট - কেন এটা দরকার)।
     runWithConcurrencyLimit(paginatedMovies, 4, async (movie, index) => {
         const imgEl = document.getElementById(`card-poster-${index}`);
         const ratingEl = document.getElementById(`card-rating-${index}`);
@@ -1302,7 +1239,6 @@ async function openMovieModal(movie) {
     let imdbUrl = fetchedImdbId ? `https://www.imdb.com/title/${fetchedImdbId}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(title)}`;
     const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(title)}`;
 
-    // ভিউ কাউন্ট এবং আপলোড টাইম
     const viewsCount = Number(movie.views) || 0;
     const uploadedAt = movie.created_at || movie.createdAt || null;
     const uploadedAtLabel = formatTimeAgo(uploadedAt);
@@ -1748,8 +1684,6 @@ function switchCategory(category, initialPage) {
     }
     if (noticeBanner) noticeBanner.style.display = 'block';
 
-    // Home ("all") এ থাকলে URL এ #all লেখা থাকবে না - পরিষ্কার URL এর জন্য
-    // (hash এ "category?page=N" থাকতে পারে, তুলনা করার জন্য শুধু category অংশটুকু বের করা হচ্ছে)
     const currentHashCategory = window.location.hash.replace('#', '').split('?')[0];
     const targetHash = category === 'all' ? '' : `#${category}`;
     if (window.location.protocol === 'file:') {
@@ -2033,9 +1967,6 @@ function chatWidgetFormHTML() {
 
 const THEME_STORAGE_KEY = 'bottmovies_theme';
 
-// আইকন লজিক: বাটনে সবসময় যেই মোডে ক্লিক করলে যাবে সেই মোডের আইকন দেখানো হয়।
-// - এখন Light mode চলছে -> বাটনে Dark mode এর আইকন (চাঁদ, img2 এর মত) দেখাবে
-// - এখন Dark mode চলছে  -> বাটনে Light mode এর আইকন (সূর্য, img1 এর মত) দেখাবে
 const THEME_ICON_SUN = `
 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="5" fill="#fbbf24"/>
@@ -2063,7 +1994,6 @@ function getCurrentThemeMode() {
 function applyThemeToggleIcon() {
     const iconWrap = document.getElementById('themeToggleIcon');
     if (!iconWrap) return;
-    // বর্তমানে যেই মোড চলছে সেটার বদলে, ক্লিক করলে যেই মোডে যাবে সেই আইকনটা দেখানো হচ্ছে
     iconWrap.innerHTML = getCurrentThemeMode() === 'light' ? THEME_ICON_MOON : THEME_ICON_SUN;
 }
 
@@ -6427,9 +6357,6 @@ document.addEventListener('click', (e) => {
     }
 
     function init() {
-        // প্রতিবার page load/refresh-এ fresh IP detect করা হয় (VPN দিয়ে test করার সময় যেন
-        // পুরনো cached দেশ আটকে না থাকে)। কিছু free GeoIP provider - একটা fail/block হলে
-        // পরেরটা try করা হয়।
         const providers = [
             { url: 'https://get.geojs.io/v1/ip/country.json', extract: function (d) { return d && d.country; } },
             { url: 'https://ipwho.is/', extract: function (d) { return d && d.country_code; } },

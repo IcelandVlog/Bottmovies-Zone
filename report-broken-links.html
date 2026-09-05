@@ -6,7 +6,6 @@
 <title>Report Broken Links - BOTTMOVIES</title>
 <link rel="shortcut icon" href="https://raw.githubusercontent.com/IcelandVlog/B.OTP/refs/heads/main/logo1.png" type="image/x-icon"/>
 <script>
-  // থিম আগে থেকে সেভ করা থাকলে পেজ আঁকার আগেই এপ্লাই করে দেয় (flash এড়াতে)
   (function(){
       try {
           if (localStorage.getItem('bottmovies_theme') === 'light') {
@@ -156,10 +155,6 @@
         margin-bottom: 40px;
     }
 
-    /* ==================== LIVE "REPORT" COMMENT THREAD ====================
-       Same site-wide theme variables as the rest of this page. No login,
-       no email - just a name + comment text, saved to Supabase.
-       See link_report_comments_schema.sql for the one-time DB setup. */
     .rc-section { margin-top: 10px; }
     .rc-section-head {
         display: flex;
@@ -906,8 +901,6 @@
     /* =========================================
        CHAT TOGGLE & MESSAGE LOGIC
        ========================================= */
-    // একই Supabase project যেটা script.js / index.html-এর "Messages" admin
-    // ট্যাব ব্যবহার করে, যাতে এই পেজ থেকে পাঠানো মেসেজও সেখানে দেখা যায়।
     const CHAT_SUPABASE_URL = 'https://borglnmrvjafodkqhhhv.supabase.co';
     const CHAT_SUPABASE_KEY = 'sb_publishable_Q3WcdMEHLJO7SkO3Sd7BDQ_Ohu8xAp9';
     const chatSupabaseClient = (typeof supabase !== 'undefined')
