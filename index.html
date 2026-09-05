@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bottmovies Zone</title>
+
 <script src="coi-serviceworker.js"></script>
 <script>
   (function(){
@@ -19,6 +20,7 @@
 <link rel="shortcut icon" href="favicon.png" type="image/x-icon"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script type="text/javascript">
   (function(){
@@ -209,7 +211,6 @@
                     </div>
                 </div>
 
-                <!-- Captcha: প্রতিবার নতুন র‍্যান্ডম সংখ্যা দেখায়, নিচের বক্সে সেই সংখ্যা হুবহু বসাতে হবে -->
                 <div class="auth-captcha-row">
                     <div class="auth-captcha-code" id="authCaptchaCode" onclick="generateAuthCaptcha()" title="Click to change code"></div>
                     <button type="button" class="auth-captcha-refresh" onclick="generateAuthCaptcha()" title="Change code" aria-label="Refresh code">⟳</button>
@@ -351,6 +352,7 @@
     </div>
 </div>
 </div>
+
 
 <div class="avatar-crop-overlay" id="avatarCropOverlay">
     <div class="avatar-crop-card">
@@ -568,13 +570,13 @@
                 </div>
 
                 <!-- HERO BANNER TAB (select which movies/series show on the homepage auto-slide banner) -->
-                <!-- <div class="admin-tab-content" id="adminTabBanner" style="display:none;">
-                    <div class="admin-banner-note">Toggle "Show in Banner" for the titles you want in the homepage hero slider, then click Save — the slide order number is assigned automatically (no manual/duplicate numbers). Use ▲ / ▼ on a featured item to change its position in the slider. Custom Image is optional — leave blank to auto-load a widescreen backdrop from TMDB.</div>
+                <div class="admin-tab-content" id="adminTabBanner" style="display:none;">
+                    <!-- <div class="admin-banner-note">Toggle "Show in Banner" for the titles you want in the homepage hero slider, then click Save — the slide order number is assigned automatically (no manual/duplicate numbers). Use ▲ / ▼ on a featured item to change its position in the slider. Custom Image is optional — leave blank to auto-load a widescreen backdrop from TMDB.</div> -->
                     <div class="admin-manage-search">
                         <input type="text" id="adminBannerSearchInput" placeholder="🔍 Search content to feature in banner...">
                     </div>
                     <div class="admin-database-list" id="adminBannerList"></div>
-                </div> -->
+                </div>
 
                 <!-- COMMENTS TAB -->
                 <div class="admin-tab-content" id="adminTabComments" style="display:none;">
