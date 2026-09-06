@@ -114,6 +114,27 @@ function getManualSeasonTrailer(movie, seasonNumber) {
     return { key: ytId, thumb: entry.thumb || `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` };
 }
 
+// TMDB call fail/slow/timeout hoile (ba TMDB-er latest season number movie.seasonTrailers-e
+// deya kono season-er shathe match na khele) admin-er manually deya season trailer jeno
+// tobuo miss na hoy - shei jonno ei universal fallback: age "preferredSeason" (TMDB theke
+// paoa) try kora hoy, na thakle/match na khele movie.seasonTrailers-er modhye shobcheye
+// boro (latest) season number-er entry-take use kora hoy.
+function resolveManualSeasonTrailerFallback(movie, isTV, preferredSeason) {
+    if (!isTV || !movie || !Array.isArray(movie.seasonTrailers) || !movie.seasonTrailers.length) return null;
+    if (preferredSeason != null) {
+        const direct = getManualSeasonTrailer(movie, preferredSeason);
+        if (direct) return { key: direct.key, thumb: direct.thumb, season: preferredSeason };
+    }
+    let bestSeason = null;
+    movie.seasonTrailers.forEach(st => {
+        const num = Number(st && st.season);
+        if (Number.isFinite(num) && (bestSeason == null || num > bestSeason)) bestSeason = num;
+    });
+    if (bestSeason == null) return null;
+    const fallback = getManualSeasonTrailer(movie, bestSeason);
+    return fallback ? { key: fallback.key, thumb: fallback.thumb, season: bestSeason } : null;
+}
+
 // TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e সরাসরি search kore
 // shobcheye relevant + notun official trailer-take niye ashe. Client-side exposed key,
 // tai Google Cloud Console-e "Websites" restriction diye site-r domain-e lock kora ache.
@@ -1842,6 +1863,16 @@ fastServersList.forEach((fs, fIdx) => {
     const forceTimeout = setTimeout(() => {
         if (!isRendered) {
             isRendered = true;
+            // TMDB response 1.5s-er modhye na ashle amra ei fallback render-e chole jai -
+            // kintu tar age-o admin-er manually deya season trailer thakle seta lagiye
+            // newa hoy, na hole TMDB slow/fail hoile trailer box-i miss hoye jeto.
+            const fb = resolveManualSeasonTrailerFallback(movie, isTV, null);
+            if (fb) {
+                trailerKey = fb.key;
+                trailerThumbOverride = fb.thumb;
+                trailerSelectedSeason = fb.season;
+                trailerTvId = movie.tmdbId || null;
+            }
             renderModalContent("N/A");
         }
     }, 1500);
@@ -1905,6 +1936,20 @@ fastServersList.forEach((fs, fIdx) => {
             // -------------------------------------------------------
         }
 
+        // TMDB shofol hoile-o (upore) kono karone (latestSeasonNumber match na khawa,
+        // TMDB-e videos na thaka, ইত্যাদি) trailerKey ekhono set na hole - shesh
+        // upay hishebe admin-er manually deya season trailer (thakle) lagiye newa hoy,
+        // jate manually add kora trailer/teaser kokhono chupchap miss na hoy.
+        if (isTV && !trailerKey) {
+            const fb = resolveManualSeasonTrailerFallback(movie, isTV, trailerSelectedSeason);
+            if (fb) {
+                trailerKey = fb.key;
+                trailerThumbOverride = fb.thumb;
+                trailerSelectedSeason = fb.season;
+                trailerTvId = trailerTvId || (tmdb && tmdb.id) || movie.tmdbId || null;
+            }
+        }
+
         if (omdb) {
                 if (omdb.awards && omdb.awards !== "N/A") awards = omdb.awards;
                 // TMDB-e match na paile OMDb (IMDb ID diye) er poster use koro
@@ -1926,6 +1971,13 @@ fastServersList.forEach((fs, fIdx) => {
         if (!isRendered) {
             isRendered = true;
             clearTimeout(forceTimeout);
+            const fb = resolveManualSeasonTrailerFallback(movie, isTV, trailerSelectedSeason);
+            if (fb) {
+                trailerKey = fb.key;
+                trailerThumbOverride = fb.thumb;
+                trailerSelectedSeason = fb.season;
+                trailerTvId = trailerTvId || movie.tmdbId || null;
+            }
             renderModalContent("N/A");
         }
     }
