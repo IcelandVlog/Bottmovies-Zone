@@ -1215,12 +1215,45 @@ async function fetchFullTMDBDetailsUncached(movie) {
         }
 
         if (!matchId && (movie.title || movie.searchName)) {
-            const cleanQuery = (movie.searchName || movie.title).replace(/\s*\([\d\-]+\)/g, '').trim();
+            const rawTitle = (movie.searchName || movie.title || '');
+            // Title-e "(2017-20)" / "(2017-2020)" / "(2024)" type year hint thakle
+            // seta age ber kore rakha hocche - eta search query theke bad deya
+            // hoy (TMDB search year shoho query-te thakle onek shomoy kom result
+            // dey), kintu niche result bachai korar shomoy ei year-take use kore
+            // shothik entry-ta khoja hoy (age eta ekdom fele deya hoto, fole
+            // "Dark", "Cross"-er moto common naam-er khetre TMDB-r first result-i
+            // niye newa hoto - seta prai shomoyi onno kono ontirikto movie/show
+            // hoye jeto, karon kono year/popularity check-i chilo na).
+            const yearHintMatch = rawTitle.match(/\((\d{4})(?:[\-–](\d{2,4}))?\)/);
+            const yearHint = yearHintMatch ? yearHintMatch[1] : null;
+            const cleanQuery = rawTitle.replace(/\s*\([\d\-–]+\)/g, '').trim();
             const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 6000);
             if (searchRes.ok) {
                 const searchData = await searchRes.json();
-                if (searchData && searchData.results && searchData.results.length > 0) {
-                    const match = searchData.results.find(item => item.media_type === 'movie' || item.media_type === 'tv') || searchData.results[0];
+                const candidates = (searchData && Array.isArray(searchData.results) ? searchData.results : [])
+                    .filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+                if (candidates.length > 0) {
+                    const normalize = (s) => String(s || '').toLowerCase().trim();
+                    const cleanQueryNorm = normalize(cleanQuery);
+                    const match = candidates
+                        .map(item => {
+                            const itemTitle = item.media_type === 'tv' ? item.name : item.title;
+                            const itemDate = item.media_type === 'tv' ? item.first_air_date : item.release_date;
+                            const itemYear = itemDate ? itemDate.slice(0, 4) : null;
+                            let matchScore = 0;
+                            // Year hint (title-e deya thakle) match korle boro priority -
+                            // eta-i "Dark (2024-er onno kichu)" vs "Dark (2017 আসল)"
+                            // gulor moddhe thik-ta ber korte shobcheye kaj kore.
+                            if (yearHint && itemYear === yearHint) matchScore += 100;
+                            // Exact title match (case-insensitive) shomoyi priority pabe -
+                            // partial/substring match-er cheye eta onek beshi reliable.
+                            if (normalize(itemTitle) === cleanQueryNorm) matchScore += 20;
+                            // Shesh-e TMDB-r nijer popularity diye tie-break kora hoy, jate
+                            // shoman score-er modhye shobcheye পরিচিত/সঠিক entry-ta jite jay.
+                            matchScore += Math.min(item.popularity || 0, 50) / 50 * 10;
+                            return { item, matchScore };
+                        })
+                        .sort((a, b) => b.matchScore - a.matchScore)[0].item;
                     matchId = match.id;
                     mediaType = match.media_type === 'tv' ? 'tv' : 'movie';
                 }
