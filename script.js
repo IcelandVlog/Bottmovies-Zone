@@ -1195,10 +1195,9 @@ async function getFullTMDBDetails(movie) {
 
 // Movie/series-r shathe shothik TMDB entry (id + media type) khoja hoy ei
 // ekta shared function diye - age eta fetchFullTMDBDetailsUncached()-er
-// vitor-e duplicate kora chilo. Ekhon original title backfill (search
-// feature-er jonno, notun "original title diye search" feature) o eituku
-// reuse kore, jate matching logic dui jaygay alada rakhte na hoy (ekta
-// jaygay fix korle onnojon-o auto update pay).
+// vitor-e duplicate kora chilo (poster/rating/etc TMDB theke ana-r jonno
+// ekhono ei function-i use hoy - "original title" search feature ekhon
+// IMDb (OMDb)-er upor base kore, tai eta ar shei feature-e use hoy na).
 async function resolveTmdbMatch(movie) {
     if (!TMDB_API_KEY) return null;
     let mediaType = movie.tmdbType || 'movie';
@@ -1268,12 +1267,13 @@ async function resolveTmdbMatch(movie) {
     return matchId ? { matchId, mediaType } : null;
 }
 
-// TMDB-e movie/series-er "Original Title" (jemon "Money Heist"-er original
-// title "La casa de papel") niye ashe - ei value-ta admin save korar shomoy
-// database-e (originalTitle column) shongroho kore rakha hoy, jate search
-// korar shomoy shudhu English/localized title na, original title diyeo
-// result khuje paoya jay (live TMDB call chara-i, karon shob movie-r jonno
-// proti search-e TMDB call kora slow ar quota-costly hoye jeto).
+// TMDB-e movie/series-er "Original Title" (jemon "Guardian: The Lonely and
+// Great God"-er original title "쓸쓸하고 찬란하神-도깨비") niye ashe. Eta-i
+// aslo "original title" (native/original-language title) data-r shobcheye
+// reliable source - IMDb/OMDb-er "Title" field-e emon kono aksha thake na,
+// OMDb khali IMDb-e dekhano (aksharai English/localized) title-i dey, tai
+// OMDb-r upor shudhu bhorosha korle Korean/non-English content-er original
+// title-gula miss hoye jay (jemonta ei feature-e age dhora poreche).
 async function fetchTmdbOriginalTitle(movie) {
     if (!TMDB_API_KEY) return null;
     try {
@@ -1284,10 +1284,6 @@ async function fetchTmdbOriginalTitle(movie) {
         const detailData = await detailRes.json();
         const originalTitle = detailData.original_title || detailData.original_name || null;
         const currentTitle = detailData.title || detailData.name || null;
-        // Original title-ta jodi display title-er shathe hubohu (case-insensitive)
-        // mile jay (jemon English-e toiri onek movie-r khetre hoy), tahole ota
-        // alada kore save kora hocche na - karon shetake search-e alada kono
-        // value dey na, khali database-e ekstra duplicate data jome thakbe.
         if (originalTitle && currentTitle && originalTitle.trim().toLowerCase() === currentTitle.trim().toLowerCase()) {
             return null;
         }
@@ -1298,13 +1294,50 @@ async function fetchTmdbOriginalTitle(movie) {
     }
 }
 
+// IMDb (OMDb API diye) theke movie/series-er official Title ana hoy. Eta
+// mostly TMDB-e match na paoya content-er jonno fallback hisebe use hoy -
+// karon OMDb shudhu IMDb-e dekhano (English/localized) title-i dey, native
+// original-language title na, tai eta diye ekla "original title diye
+// search" feature-ta shothikvabe kaj kore na.
+async function fetchImdbOriginalTitle(movie) {
+    try {
+        const omdb = await getOMDbDetails(movie);
+        if (!omdb || !omdb.title) return null;
+        const imdbTitle = omdb.title;
+        const currentTitle = (movie.title || movie.searchName || '');
+        if (currentTitle && imdbTitle.trim().toLowerCase() === currentTitle.trim().toLowerCase()) {
+            return null;
+        }
+        return imdbTitle;
+    } catch (e) {
+        console.error('fetchImdbOriginalTitle error:', e);
+        return null;
+    }
+}
+
+// "Original title diye search" feature-er jonno actual title fetch kora
+// hoy ekhane - age eta khali IMDb (OMDb) theke ashto, kintu OMDb-r "Title"
+// field asholei non-English content-er native/original title dey na (jemon
+// Korean drama "Guardian: The Lonely and Great God"-er original title
+// "Sseulsseulhago Chanranhasin: Dokkaebi" IMDb/OMDb theke pawa jay na - IMDb
+// khali English display title-i dekhay). Tai ekhon TMDB-r "Original Title"
+// field-take primary source hisebe rakha hoyeche (eta-i asholei native/
+// original-language title thik moto dey), ar IMDb (OMDb) shudhu fallback
+// hisebe use hocche - jei content-er jonno TMDB-e kono match paoya jayni,
+// shei khetre IMDb-er title-take original title hisebe rakha hocche.
+async function fetchOriginalTitle(movie) {
+    const tmdbOriginal = await fetchTmdbOriginalTitle(movie).catch(() => null);
+    if (tmdbOriginal) return tmdbOriginal;
+    return await fetchImdbOriginalTitle(movie).catch(() => null);
+}
+
 // Notun feature: "Original Title diye search" চালু howar age theke jei
 // content-gula database-e add kora ache, segulor originalTitle field khali
-// - eta admin panel theke ekbar run korle shob content-er jonno TMDB theke
-// original title fetch kore database-e save kore dey, jate purono kono
-// content-o baad na pore ei feature theke. TMDB rate-limit-e giye theke
-// jate quota shesh na hoy, tai ekta chhoto delay diye ekta ekta kore call
-// kora hocche (parallel na kore).
+// - eta admin panel theke ekbar run korle shob content-er jonno original
+// title (TMDB primary, IMDb fallback) fetch kore database-e save kore dey,
+// jate purono kono content-o baad na pore ei feature theke. API rate-limit-e
+// giye jate quota shesh na hoy, tai ekta chhoto delay diye ekta ekta kore
+// call kora hocche (parallel na kore).
 async function backfillOriginalTitles() {
     const btn = document.getElementById('adminBackfillBtn');
     const statusEl = document.getElementById('adminBackfillStatus');
@@ -1323,7 +1356,7 @@ async function backfillOriginalTitles() {
         done++;
         statusEl.textContent = `Checking ${done}/${pending.length} — "${movie.title || movie.searchName || ''}"...`;
         try {
-            const originalTitle = await fetchTmdbOriginalTitle(movie);
+            const originalTitle = await fetchOriginalTitle(movie);
             if (originalTitle) {
                 const { error } = await supabaseClient.from('movies').update({ originalTitle }).eq('id', movie.id);
                 if (error) throw error;
@@ -2358,9 +2391,11 @@ function getSmartMatches(query) {
                 fuzzyMatchScore(query, movie.title),
                 fuzzyMatchScore(query, movie.searchName),
                 fuzzyMatchScore(query, movie.languages),
-                // Original title (jemon "Money Heist"-er "La casa de papel") diye search
-                // korleo eikhane match hoye jabe - eta admin save korar shomoy TMDB theke
-                // fetch kore database-e (originalTitle column) rakha thake.
+                // Original title (jemon "Money Heist"-er "La casa de papel", ba
+                // "Guardian"-er "Sseulsseulhago Chanranhasin: Dokkaebi") diye search
+                // korleo eikhane match hoye jabe - eta admin save korar shomoy TMDB
+                // (primary) ba IMDb/OMDb (fallback) theke fetch kore database-e
+                // (originalTitle column) rakha thake.
                 fuzzyMatchScore(query, movie.originalTitle)
             );
             return { movie, score };
@@ -5941,13 +5976,14 @@ async function submitAdminContent() {
             throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
         }
 
-        // Original title (jemon "Money Heist"-er "La casa de papel") TMDB theke
-        // fetch kore rakha hocche, jate পরে user shei original title diye search
-        // korleo ei content-take khuje paye - protibar search-e live TMDB call
-        // korle slow hoye jeto ar quota-o boyeshi lagto, tai eta ekbar save-er
-        // shomoy-i kore database-e rekhe deya hocche.
+        // Original title (TMDB primary, IMDb/OMDb fallback - dekho
+        // fetchOriginalTitle()-er comment) fetch kore rakha hocche, jate
+        // পরে user shei original title diye search korleo ei content-take
+        // khuje paye - protibar search-e live API call korle slow hoye
+        // jeto, tai eta ekbar save-er shomoy-i kore database-e rekhe deya
+        // hocche.
         submitBtn.textContent = 'Fetching original title...';
-        const originalTitle = await fetchTmdbOriginalTitle({
+        const originalTitle = await fetchOriginalTitle({
             title,
             searchName,
             imdbId,
