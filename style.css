@@ -1755,6 +1755,38 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
     padding: 8px 4px;
 }
 
+/* Trailer / Teaser admin tab (per-title manual trailer editor, next to Database) */
+.admin-trailer-card { flex-wrap: wrap; }
+.admin-trailer-season-rows { margin-top: 10px; width: 100%; }
+.admin-trailer-add-season-btn { margin-top: 2px; }
+.admin-trailer-movie-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    background-color: #111622;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 8px;
+    margin-top: 10px;
+    width: 100%;
+}
+.admin-trailer-movie-row input {
+    background-color: #0b0e14;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    color: #e2e8f0;
+    outline: none;
+}
+.admin-trailer-movie-row input:focus { border-color: #2563eb; }
+html.light-mode .admin-trailer-movie-row { background-color: #f7f8fa; border-color: #e5e8ee; }
+html.light-mode .admin-trailer-movie-row input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
+
+@media (max-width: 480px) {
+    .admin-trailer-movie-row { grid-template-columns: 1fr; }
+}
+
 
 .admin-form-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
 .admin-form-msg.success {

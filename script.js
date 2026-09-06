@@ -4408,6 +4408,7 @@ const ADMIN_TAB_TITLES = {
     dashboard: 'Dashboard',
     add: 'Add / Edit Content',
     manage: 'Database',
+    trailer: 'Trailer / Teaser',
     banner: 'Hero Banner',
     navigation: 'Navigation Menu',
     comments: 'Comments',
@@ -4418,7 +4419,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -4438,6 +4439,9 @@ function switchAdminTab(tab) {
     } else if (validTab === 'manage') {
         const searchInput = document.getElementById('adminSearchInput');
         renderAdminDatabaseList(searchInput ? searchInput.value.trim() : '');
+    } else if (validTab === 'trailer') {
+        const searchInput = document.getElementById('adminTrailerSearchInput');
+        renderAdminTrailerList(searchInput ? searchInput.value.trim() : '');
     } else if (validTab === 'banner') {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -4604,6 +4608,13 @@ function setupAdminPanel() {
     if (adminSearchInput) {
         adminSearchInput.addEventListener('input', function() {
             renderAdminDatabaseList(this.value.trim());
+        });
+    }
+
+    const adminTrailerSearchInput = document.getElementById('adminTrailerSearchInput');
+    if (adminTrailerSearchInput) {
+        adminTrailerSearchInput.addEventListener('input', function() {
+            renderAdminTrailerList(this.value.trim());
         });
     }
 
@@ -6232,6 +6243,177 @@ function getFeaturedSortedMovies() {
     return source
         .filter(m => m.featured === true)
         .sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999));
+}
+
+// ---------- Trailer / Teaser tab (Database-er pashe alada tab - je kono movie/series-er
+// jonno trailer/teaser YouTube link manually add/edit kora jay, puro Add/Edit Content
+// form na khule-i. Series-er khetre proti-season alada trailer, movie-r khetre ekta
+// shingle trailer link+thumbnail.) ----------
+
+function renderAdminTrailerList(filter) {
+    const container = document.getElementById('adminTrailerList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const q = (filter || '').toLowerCase().trim();
+    const source = Array.isArray(allMovies) ? allMovies : [];
+    const filtered = q ? source.filter(m => {
+        const t = (m.title || '').toLowerCase();
+        const sn = (m.searchName || '').toLowerCase();
+        return t.includes(q) || sn.includes(q);
+    }) : source;
+
+    if (filtered.length === 0) {
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">No content found.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
+        return;
+    }
+
+    filtered.forEach(movie => {
+        const isTv = movie.tmdbType === 'tv';
+        const card = document.createElement('div');
+        card.className = 'admin-db-card admin-trailer-card';
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(movie.title || 'Untitled')}</div>
+                <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'}</div>
+                ${isTv ? `
+                <div class="admin-trailer-season-rows"></div>
+                <button type="button" class="admin-add-row-btn admin-trailer-add-season-btn">+ Add Season Trailer</button>
+                ` : `
+                <div class="admin-trailer-movie-row">
+                    <input type="text" class="admin-trailer-movie-link" placeholder="YouTube Trailer/Teaser link or video ID" value="${escapeAttr(movie.trailerLink || '')}">
+                    <input type="text" class="admin-trailer-movie-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(movie.trailerThumb || '')}">
+                </div>
+                `}
+            </div>
+            <div class="admin-db-actions">
+                <button type="button" class="admin-mini-btn admin-trailer-save-btn">Save</button>
+            </div>
+        `;
+
+        if (isTv) {
+            const rowsContainer = card.querySelector('.admin-trailer-season-rows');
+            const existing = Array.isArray(movie.seasonTrailers) ? movie.seasonTrailers : [];
+            if (existing.length > 0) {
+                existing.forEach(st => addAdminTrailerSeasonRow(rowsContainer, st));
+            } else {
+                addAdminTrailerSeasonRow(rowsContainer);
+            }
+            const addBtn = card.querySelector('.admin-trailer-add-season-btn');
+            addBtn.addEventListener('click', () => addAdminTrailerSeasonRow(rowsContainer));
+        }
+
+        card.querySelector('.admin-trailer-save-btn').addEventListener('click', (e) => {
+            saveAdminTrailerSettings(movie, card, e.currentTarget);
+        });
+
+        container.appendChild(card);
+
+        if (!movie.poster) {
+            const imgEl = card.querySelector('.admin-db-thumb');
+            fetchTmdbPosterQuick(movie).then(url => {
+                if (url && imgEl && imgEl.isConnected) imgEl.src = url;
+            });
+        }
+    });
+}
+
+// Ekta card-er bhitore notun ekta Season Trailer row jog kore (Add/Edit form-er
+// addSeasonTrailerRow()-er moto UI, kintu ei tab-e ekshathe onek card thakte pare
+// bole global #adminSeasonTrailersList-er bodole nijer container-e kaj kore).
+function addAdminTrailerSeasonRow(container, data) {
+    if (!container) return;
+    data = data || {};
+    const nextSeasonGuess = data.season || (container.children.length + 1);
+    const row = document.createElement('div');
+    row.className = 'admin-link-row admin-season-trailer-row';
+    row.innerHTML = `
+        <input type="number" min="1" class="admin-season-trailer-num" placeholder="Season" value="${escapeAttr(nextSeasonGuess)}">
+        <input type="text" class="admin-season-trailer-link" placeholder="YouTube link or video ID" value="${escapeAttr(data.link)}">
+        <input type="text" class="admin-season-trailer-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}">
+        <button type="button" class="admin-row-remove-btn">✕</button>
+    `;
+    row.querySelector('.admin-row-remove-btn').addEventListener('click', () => row.remove());
+    container.appendChild(row);
+}
+
+// Card-er bhitorer season-trailer row gula theke data collect kore - Add/Edit
+// form-er collectSeasonTrailers()-er moto-i validation (bhul/khali link thakle
+// clear error dekhabe, chupchap kono row skip korbe na).
+function collectAdminTrailerSeasonRows(card) {
+    const rows = card.querySelectorAll('.admin-trailer-season-rows .admin-season-trailer-row');
+    const result = [];
+    rows.forEach(row => {
+        const seasonRaw = row.querySelector('.admin-season-trailer-num').value.trim();
+        const link = row.querySelector('.admin-season-trailer-link').value.trim();
+        const thumb = row.querySelector('.admin-season-trailer-thumb').value.trim();
+
+        // Season number ar link dutai khali - ei row-ta khali/unused, chupchap skip.
+        if (!seasonRaw && !link) return;
+
+        const seasonNum = parseInt(seasonRaw, 10);
+        if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
+            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link "${link || '(khali)'}" er jonno eta lagbe.`);
+        }
+        if (!link) {
+            throw new Error(`Season ${seasonNum}-er jonno YouTube link dao, na hole ei row-ta "✕" diye muche felo.`);
+        }
+        if (!extractYoutubeVideoId(link)) {
+            throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro.`);
+        }
+
+        result.push({ season: seasonNum, link, thumb: thumb || null });
+    });
+    return result;
+}
+
+// Save button-e click korle - series hole shob season-trailer row collect kore
+// "seasonTrailers" column-e, movie hole shingle "trailerLink"/"trailerThumb"
+// column-e shorashori update kore dey (puro Add/Edit form na khule-i).
+async function saveAdminTrailerSettings(movie, card, btn) {
+    if (!movie || !movie.id) return;
+    const isTv = movie.tmdbType === 'tv';
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        let payload;
+        let parsedSeasonTrailers = null;
+        if (isTv) {
+            parsedSeasonTrailers = collectAdminTrailerSeasonRows(card);
+            payload = { seasonTrailers: JSON.stringify(parsedSeasonTrailers) };
+        } else {
+            const linkRaw = card.querySelector('.admin-trailer-movie-link').value.trim() || null;
+            const thumbRaw = card.querySelector('.admin-trailer-movie-thumb').value.trim() || null;
+            if (linkRaw && !extractYoutubeVideoId(linkRaw)) {
+                throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
+            }
+            payload = { trailerLink: linkRaw, trailerThumb: thumbRaw };
+        }
+
+        const { error } = await supabaseClient.from('movies').update(payload).eq('id', movie.id);
+        if (error) throw error;
+
+        // Local cache (allMovies)-o update kore dao, jate tab abar render korle
+        // ba movie-r modal khullei notun data shathe shathe dekha jay.
+        if (isTv) {
+            movie.seasonTrailers = parsedSeasonTrailers;
+        } else {
+            movie.trailerLink = payload.trailerLink;
+            movie.trailerThumb = payload.trailerThumb;
+        }
+
+        showToast('✅ Trailer saved for "' + (movie.title || 'this item') + '"');
+    } catch (err) {
+        console.error('Save trailer error:', err);
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save';
+    }
 }
 
 function renderAdminBannerList(filter) {
