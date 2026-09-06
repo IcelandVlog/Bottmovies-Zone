@@ -134,6 +134,7 @@
         <button type="button" class="hero-nav-btn hero-nav-prev" id="heroPrevBtn" aria-label="Previous slide">‹</button>
         <button type="button" class="hero-nav-btn hero-nav-next" id="heroNextBtn" aria-label="Next slide">›</button>
         <div class="hero-dots" id="heroDots"></div>
+        <div class="hero-slide-counter" id="heroSlideCounter" style="display:none;"></div>
     </div>
 </section>
 
@@ -566,12 +567,12 @@
                         <div id="adminPosterPreviewWrap" style="display:none;"><img id="adminPosterPreview" class="admin-poster-preview"></div>
                     </div>
 
-                    <div class="admin-field">
+                    <div class="admin-field" id="adminTrailerLinkField">
                         <label>Trailer Link <span class="admin-hint">(optional — YouTube link or video ID, only needed when auto trailer isn't found for this title)</span></label>
                         <input type="text" id="adminTrailerLink" placeholder="https://www.youtube.com/watch?v=... or youtu.be/... or just the video ID">
                     </div>
 
-                    <div class="admin-field">
+                    <div class="admin-field" id="adminTrailerThumbField">
                         <label>Trailer Thumbnail <span class="admin-hint">(optional — link or upload, leave empty to auto-use the YouTube trailer's own thumbnail)</span></label>
                         <div class="admin-toggle-group" id="adminTrailerThumbModeGroup">
                             <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setTrailerThumbMode('link')">🔗 Link</button>
@@ -580,6 +581,12 @@
                         <input type="text" id="adminTrailerThumb" placeholder="https://... custom trailer thumbnail image link" style="margin-top:8px;">
                         <input type="file" id="adminTrailerThumbFile" accept="image/*" style="display:none; margin-top:8px;">
                         <div id="adminTrailerThumbPreviewWrap" style="display:none;"><img id="adminTrailerThumbPreview" class="admin-poster-preview"></div>
+                    </div>
+
+                    <div class="admin-field" id="adminSeasonTrailersField" style="display:none;">
+                        <label>Season Trailers <span class="admin-hint">(optional — series-er প্রতিটা season-এর জন্য আলাদা trailer link দিতে পারেন; কোনো season খালি রাখলে সেই season select করলে auto trailer (TMDB/YouTube) খোঁজা হবে)</span></label>
+                        <div id="adminSeasonTrailersList"></div>
+                        <button type="button" class="admin-add-row-btn" onclick="addSeasonTrailerRow()">+ Add Season Trailer</button>
                     </div>
 
 

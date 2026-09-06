@@ -1743,6 +1743,15 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
 }
 .admin-season-links .admin-link-row { grid-template-columns: 1fr 90px auto; }
 
+.admin-season-trailer-row {
+    grid-template-columns: 70px 1fr 1fr auto;
+}
+.admin-season-trailer-row input.admin-season-trailer-num {
+    text-align: center;
+    padding: 8px 4px;
+}
+
+
 .admin-form-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
 .admin-form-msg.success {
     padding: 10px 14px;
@@ -3051,6 +3060,20 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
     border-radius: 4px;
     background: linear-gradient(90deg, #ff7a18, #ffb238);
 }
+.hero-slide-counter {
+    position: absolute;
+    bottom: 28px;
+    right: 14px;
+    z-index: 4;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.35);
+    padding: 3px 8px;
+    border-radius: 10px;
+    pointer-events: none;
+}
 
 @media (max-width: 900px) {
     .hero-slide-info { max-width: 78%; }
@@ -3068,6 +3091,7 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
     .hero-nav-btn { display: none; }
     .hero-watch-btn { padding: 5px 10px; font-size: 10.5px; }
     .hero-dots { right: 16px; bottom: 16px; }
+    .hero-slide-counter { bottom: 42px; right: 16px; font-size: 10px; }
 }
 
 html.light-mode .hero-badge { background-color: rgba(255,255,255,0.85); color: #23262f; border-color: rgba(0,0,0,0.08); }

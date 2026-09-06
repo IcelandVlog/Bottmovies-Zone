@@ -98,6 +98,18 @@ function getLatestRealSeasonNumber(detailData) {
     return pool.reduce((max, s) => (s.season_number > max ? s.season_number : max), pool[0].season_number);
 }
 
+// Admin panel theke series-er kono ekta specific season-er jonno manually
+// trailer link/thumbnail deya thakle (movie.seasonTrailers), seta returns kore.
+// Na thakle null - tokhon caller auto (TMDB/YouTube) trailer khujbe.
+function getManualSeasonTrailer(movie, seasonNumber) {
+    if (!movie || seasonNumber == null || !Array.isArray(movie.seasonTrailers) || !movie.seasonTrailers.length) return null;
+    const entry = movie.seasonTrailers.find(st => st && Number(st.season) === Number(seasonNumber));
+    if (!entry || !entry.link) return null;
+    const ytId = extractYoutubeVideoId(entry.link);
+    if (!ytId) return null;
+    return { key: ytId, thumb: entry.thumb || `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` };
+}
+
 // TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e সরাসরি search kore
 // shobcheye relevant + notun official trailer-take niye ashe. Client-side exposed key,
 // tai Google Cloud Console-e "Websites" restriction diye site-r domain-e lock kora ache.
@@ -333,6 +345,7 @@ async function fetchMoviesFromSupabase() {
                 const parsed = { ...m };
                 parsed.downloadBlocks = parseBlocksField(parsed.downloadBlocks);
                 parsed.fastServers = parseBlocksField(parsed.fastServers);
+                parsed.seasonTrailers = parseBlocksField(parsed.seasonTrailers);
                 parsed.category = parseCategoryField(parsed.category);
                 return parsed;
             });
@@ -409,6 +422,7 @@ let heroAutoplayTimer = null;
 let heroWrapTimeout = null;
 let heroInitialized = false;
 const heroBackdropCache = new Map();
+let heroDotGroupStarts = []; // maps dot index -> starting slide index for that dot's group
 
 function clearHeroWrapTimeout() {
     if (heroWrapTimeout) { clearTimeout(heroWrapTimeout); heroWrapTimeout = null; }
@@ -421,9 +435,9 @@ function getFeaturedMoviesForHero() {
         .filter(m => m.featured === true)
         .sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999));
 
-    if (manuallyFeatured.length > 0) return manuallyFeatured.slice(0, 8);
+    if (manuallyFeatured.length > 0) return manuallyFeatured;
 
-    return allMovies.slice(0, 6);
+    return allMovies;
 }
 
 function getHeroCategoryLabel(movie) {
@@ -580,16 +594,37 @@ function renderHeroSlides() {
 
     heroSlidesData.forEach((movie, i) => {
         track.appendChild(buildSlideEl(movie, i));
-
-        const dot = document.createElement('button');
-        dot.type = 'button';
-        dot.className = 'hero-dot' + (i === 0 ? ' active' : '');
-        dot.setAttribute('aria-label', `Slide ${i + 1}`);
-        dot.addEventListener('click', () => goToHeroSlide(i));
-        dotsWrap.appendChild(dot);
     });
 
     track.appendChild(buildSlideEl(heroSlidesData[0], 0, 'cloneFirst'));
+
+    // Dots are capped at MAX_HERO_DOTS regardless of how many slides exist.
+    // When there are more slides than dots, each dot represents a group of
+    // slides spread evenly across the total, and the active dot is derived
+    // from whichever group the current slide falls into.
+    const MAX_HERO_DOTS = 8;
+    const dotCount = Math.min(N, MAX_HERO_DOTS);
+    heroDotGroupStarts = Array.from({ length: dotCount }, (_, d) => Math.floor((d * N) / dotCount));
+
+    for (let d = 0; d < dotCount; d++) {
+        const startIndex = heroDotGroupStarts[d];
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'hero-dot' + (d === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', `Slide group ${d + 1}`);
+        dot.addEventListener('click', () => goToHeroSlide(startIndex));
+        dotsWrap.appendChild(dot);
+    }
+
+    const counterEl = document.getElementById('heroSlideCounter');
+    if (counterEl) {
+        if (N > MAX_HERO_DOTS) {
+            counterEl.style.display = '';
+            counterEl.textContent = `1 / ${N}`;
+        } else {
+            counterEl.style.display = 'none';
+        }
+    }
 
     heroSection.style.display = '';
     updateHeroTrackPosition(false);
@@ -618,7 +653,20 @@ function updateHeroTrackPosition(animate = true) {
     if (!track) return;
     track.style.transition = animate ? 'transform 0.6s cubic-bezier(.4,0,.2,1)' : 'none';
     track.style.transform = `translate3d(-${heroPos * 100}%, 0, 0)`;
-    document.querySelectorAll('#heroDots .hero-dot').forEach((d, i) => d.classList.toggle('active', i === heroCurrentIndex));
+
+    // Determine which dot's group the current slide belongs to (last group
+    // whose start index is <= heroCurrentIndex).
+    let activeDotIndex = 0;
+    for (let d = 0; d < heroDotGroupStarts.length; d++) {
+        if (heroDotGroupStarts[d] <= heroCurrentIndex) activeDotIndex = d;
+        else break;
+    }
+    document.querySelectorAll('#heroDots .hero-dot').forEach((d, i) => d.classList.toggle('active', i === activeDotIndex));
+
+    const counterEl = document.getElementById('heroSlideCounter');
+    if (counterEl && counterEl.style.display !== 'none') {
+        counterEl.textContent = `${heroCurrentIndex + 1} / ${heroSlidesData.length}`;
+    }
 }
 
 function goToHeroSlide(i) {
@@ -928,6 +976,16 @@ function closeMovieModal() {
     document.getElementById('movieModalOverlay').style.display = 'none';
     document.body.classList.remove('modal-open');
     commentsCurrentMovieId = null;
+    stopModalTrailerPlayback();
+}
+
+// Modal-e trailer video (YouTube iframe) play hocche emon obosthay modal
+// close korle - shudhu overlay hide korle iframe DOM-e thekei jay ar
+// background-e audio/video baja-i thake. Tai iframe-take remove kore deya
+// hoy, jate background-e r kono shobdo/video chalu na thake.
+function stopModalTrailerPlayback() {
+    const videoWrap = document.querySelector('#trailerBox .trailer-video-wrap');
+    if (videoWrap) videoWrap.remove();
 }
 
 function copyDownloadLink(linkId, btnElement) {
@@ -1136,7 +1194,12 @@ async function fetchFullTMDBDetailsUncached(movie) {
         const latestSeasonNumber = mediaType === 'tv' ? getLatestRealSeasonNumber(detailData) : null;
 
         let trailerKey = null;
-        if (mediaType === 'tv' && latestSeasonNumber != null) {
+        let manualTrailerThumb = null;
+        const manualLatestSeasonTrailer = mediaType === 'tv' ? getManualSeasonTrailer(movie, latestSeasonNumber) : null;
+        if (manualLatestSeasonTrailer) {
+            trailerKey = manualLatestSeasonTrailer.key;
+            manualTrailerThumb = manualLatestSeasonTrailer.thumb;
+        } else if (mediaType === 'tv' && latestSeasonNumber != null) {
             trailerKey = await getLatestSeasonTrailerKey(matchId, latestSeasonNumber);
         }
         if (!trailerKey) {
@@ -1168,6 +1231,7 @@ async function fetchFullTMDBDetailsUncached(movie) {
             budget: detailData.budget || 0,
             revenue: detailData.revenue || 0,
             trailerKey: trailerKey,
+            trailerThumb: manualTrailerThumb,
             latestSeasonNumber: latestSeasonNumber
         };
     } catch(e) {
@@ -1474,16 +1538,21 @@ async function openMovieModal(movie) {
     let fetchedImdbId = extractImdbId(movie.imdbId) || null;
     let smartRating = "N/A";
     let awards = "N/A";
+
+    const isTV = movie.tmdbType === 'tv';
+
     // Admin panel theke manually YouTube link/ID disol thakle seta-i shobar age priority
     // pabe - TMDB/YouTube auto-search shudhu tokhon-i chole jokhon eta deya nei ba
-    // eta theke video ID ber kora jayni.
+    // eta theke video ID ber kora jayni. Series-er khetre (isTV) proti-season manual
+    // trailer (movie.seasonTrailers) thakle segula ei legacy shingle-link-er cheye
+    // age priority pabe - shei check porer dike (tmdb resolve howar por) kora hoy.
     const manualTrailerId = extractYoutubeVideoId(movie.trailerLink);
     let trailerKey = manualTrailerId || null;
+    let trailerThumbOverride = null; // manual per-season trailer thumbnail (series only)
     let trailerTvId = null;
     let trailerSeasonCount = null;
     let trailerSelectedSeason = null;
 
-    const isTV = movie.tmdbType === 'tv';
     let durationOrSeasonPill = movie.runtime || "N/A";
 
     if (isTV) {
@@ -1618,7 +1687,7 @@ fastServersList.forEach((fs, fIdx) => {
         const revenueRow = hasVal(revenueFormatted) ? `<div class="meta-inline-item" id="modalRevenueDiv"><strong>REVENUE</strong> ${revenueFormatted}</div>` : '';
         const budgetRevenueGroup = (budgetRow || revenueRow) ? `<div class="meta-inline-group">${budgetRow}${revenueRow}</div>` : '';
 
-        const trailerThumbUrl = movie.trailerThumb || (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg` : '');
+        const trailerThumbUrl = trailerThumbOverride || movie.trailerThumb || (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg` : '');
 
         // Series-er khetre ekta Season dropdown dekhano hoy, jate user chaile onno
         // (age-r) season-er trailer-o dekhte pare - default-e latest season select kora thake.
@@ -1769,6 +1838,7 @@ fastServersList.forEach((fs, fIdx) => {
             if (tmdb.revenue) revenueFormatted = formatCurrency(tmdb.revenue);
             if (tmdb.id) tmdbUrl = `https://www.themoviedb.org/${tmdb.mediaType}/${tmdb.id}`;
             if (!manualTrailerId && tmdb.trailerKey) trailerKey = tmdb.trailerKey;
+            if (!manualTrailerId && tmdb.trailerThumb) trailerThumbOverride = tmdb.trailerThumb;
             if (!fetchedImdbId && tmdb.imdbId) {
                 fetchedImdbId = tmdb.imdbId;
                 imdbUrl = `https://www.imdb.com/title/${fetchedImdbId}/`;
@@ -1786,6 +1856,16 @@ fastServersList.forEach((fs, fIdx) => {
                 }
                 if (tmdb.id) trailerTvId = tmdb.id;
                 if (tmdb.latestSeasonNumber) trailerSelectedSeason = tmdb.latestSeasonNumber;
+
+                // Series-er khetre admin panel theke ei nirdishto (latest) season-er
+                // jonno manually trailer deya thakle, seta shob kichur cheye age
+                // priority pabe - legacy shingle trailerLink ba TMDB/YouTube auto
+                // trailer-o override kore dey.
+                const manualSeasonTrailer = getManualSeasonTrailer(movie, trailerSelectedSeason);
+                if (manualSeasonTrailer) {
+                    trailerKey = manualSeasonTrailer.key;
+                    trailerThumbOverride = manualSeasonTrailer.thumb;
+                }
             } else {
                 if (tmdb.runtime && tmdb.runtime !== "N/A") {
                     durationOrSeasonPill = convertRuntimeToHours(tmdb.runtime);
@@ -1869,6 +1949,8 @@ function toggleAccordion(id) {
 function playModalTrailer(el) {
     const box = el.closest('.trailer-box');
     if (!box) return;
+    const bodyEl = box.querySelector('#trailerBoxBody');
+    if (!bodyEl) return;
     const ytId = box.getAttribute('data-ytid');
     if (!ytId) return;
     const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0`;
@@ -1883,7 +1965,10 @@ function playModalTrailer(el) {
     const thumbUrl = box.getAttribute('data-thumb') || `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`;
     // background-e thumbnail rekhe dewa holo, tai iframe block/blank thakle o box-ta
     // kokhono khali/kalo dekhabe na - thumbnail-i poster hishebe thakbe.
-    box.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}')">
+    // NOTE: shudhu #trailerBoxBody-r content replace kora hoy (pura .trailer-box na),
+    // karon .trailer-box-er bhetore trailerSeasonSelectorHTML (Season dropdown)-o thake -
+    // pura box replace korle shei dropdown-o muche jeto.
+    bodyEl.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}')">
         <iframe src="${embedUrl}" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen credentialless></iframe>
     </div>`;
 }
@@ -1903,6 +1988,23 @@ async function changeModalTrailerSeason(selectEl) {
 
     selectEl.disabled = true;
     bodyEl.innerHTML = `<div class="trailer-empty-msg">Loading Season ${seasonNumber} trailer...</div>`;
+
+    // Admin panel theke ei season-er jonno manually trailer deya thakle, seta-i
+    // shobar age use kora hoy - TMDB-e API call korar dorkar-i pore na.
+    const manualSeasonTrailer = getManualSeasonTrailer(currentModalMovie, seasonNumber);
+    if (manualSeasonTrailer) {
+        box.setAttribute('data-ytid', manualSeasonTrailer.key);
+        box.setAttribute('data-thumb', manualSeasonTrailer.thumb);
+        bodyEl.innerHTML = `
+            <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
+                <img class="trailer-thumb-img" src="${manualSeasonTrailer.thumb}" alt="Season ${seasonNumber} Trailer" loading="lazy">
+                <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
+            </div>
+            <div class="trailer-label">Watch Trailer</div>
+        `;
+        selectEl.disabled = false;
+        return;
+    }
 
     try {
         const newKey = await getLatestSeasonTrailerKey(tvId, seasonNumber);
@@ -5033,6 +5135,13 @@ function selectTmdbType(value) {
     const seasonsField = document.getElementById('adminSeasonsField');
     if (movieField) movieField.style.display = value === 'movie' ? 'flex' : 'none';
     if (seasonsField) seasonsField.style.display = value === 'tv' ? 'flex' : 'none';
+
+    const trailerLinkField = document.getElementById('adminTrailerLinkField');
+    const trailerThumbField = document.getElementById('adminTrailerThumbField');
+    const seasonTrailersField = document.getElementById('adminSeasonTrailersField');
+    if (trailerLinkField) trailerLinkField.style.display = value === 'movie' ? 'flex' : 'none';
+    if (trailerThumbField) trailerThumbField.style.display = value === 'movie' ? 'flex' : 'none';
+    if (seasonTrailersField) seasonTrailersField.style.display = value === 'tv' ? 'flex' : 'none';
 }
 
 function setPosterMode(mode) {
@@ -5132,10 +5241,22 @@ function selectTmdbType(value) {
     if (movieField) movieField.style.display = value === 'movie' ? 'flex' : 'none';
     if (seasonsField) seasonsField.style.display = value === 'tv' ? 'flex' : 'none';
 
+    const trailerLinkField = document.getElementById('adminTrailerLinkField');
+    const trailerThumbField = document.getElementById('adminTrailerThumbField');
+    const seasonTrailersField = document.getElementById('adminSeasonTrailersField');
+    if (trailerLinkField) trailerLinkField.style.display = value === 'movie' ? 'flex' : 'none';
+    if (trailerThumbField) trailerThumbField.style.display = value === 'movie' ? 'flex' : 'none';
+    if (seasonTrailersField) seasonTrailersField.style.display = value === 'tv' ? 'flex' : 'none';
+
     if (value === 'movie') {
         const list = document.getElementById('adminMovieLinksList');
         if (list && list.children.length === 0) {
             addMovieLinkRow();
+        }
+    } else if (value === 'tv') {
+        const trailerList = document.getElementById('adminSeasonTrailersList');
+        if (trailerList && trailerList.children.length === 0) {
+            addSeasonTrailerRow();
         }
     }
 }
@@ -5182,6 +5303,41 @@ function addSeasonLinkRow(container, data) {
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
     container.appendChild(row);
+}
+
+// ---------- Season trailer rows (TV) ----------
+// Series-er khetre proti season-er jonno alada manually trailer link/thumbnail
+// deoar jonno ei row-gula. Kono season-er row na thakle (ba khali thakle) shei
+// season select korle auto TMDB/YouTube trailer khoja hobe - eta purano
+// single Trailer Link field-er moto na, eta season-wise.
+function addSeasonTrailerRow(data) {
+    data = data || {};
+    const list = document.getElementById('adminSeasonTrailersList');
+    if (!list) return;
+    const nextSeasonGuess = data.season || (list.children.length + 1);
+    const row = document.createElement('div');
+    row.className = 'admin-link-row admin-season-trailer-row';
+    row.innerHTML = `
+        <input type="number" min="1" class="admin-season-trailer-num" placeholder="Season" value="${escapeAttr(nextSeasonGuess)}">
+        <input type="text" class="admin-season-trailer-link" placeholder="YouTube link or video ID" value="${escapeAttr(data.link)}">
+        <input type="text" class="admin-season-trailer-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}">
+        <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-season-trailer-row').remove()">✕</button>
+    `;
+    list.appendChild(row);
+}
+
+function collectSeasonTrailers() {
+    const rows = document.querySelectorAll('#adminSeasonTrailersList .admin-season-trailer-row');
+    const result = [];
+    rows.forEach(row => {
+        const seasonNum = parseInt(row.querySelector('.admin-season-trailer-num').value, 10);
+        const link = row.querySelector('.admin-season-trailer-link').value.trim();
+        if (!link || Number.isNaN(seasonNum) || seasonNum < 1) return;
+        if (!extractYoutubeVideoId(link)) return; // invalid link/ID - silently skip
+        const thumb = row.querySelector('.admin-season-trailer-thumb').value.trim();
+        result.push({ season: seasonNum, link, thumb: thumb || null });
+    });
+    return result;
 }
 
 function escapeAttr(str) {
@@ -5329,6 +5485,7 @@ function resetAdminForm() {
 
     document.getElementById('adminMovieLinksList').innerHTML = '';
     document.getElementById('adminSeasonsList').innerHTML = '';
+    document.getElementById('adminSeasonTrailersList').innerHTML = '';
     addMovieLinkRow();
 
     document.getElementById('adminSubmitBtn').textContent = 'Add Content';
@@ -5371,6 +5528,16 @@ function loadMovieIntoAdminForm(movie) {
 
     document.getElementById('adminMovieLinksList').innerHTML = '';
     document.getElementById('adminSeasonsList').innerHTML = '';
+    document.getElementById('adminSeasonTrailersList').innerHTML = '';
+
+    if (movie.tmdbType === 'tv') {
+        const seasonTrailers = Array.isArray(movie.seasonTrailers) ? movie.seasonTrailers : [];
+        if (seasonTrailers.length > 0) {
+            seasonTrailers.forEach(st => addSeasonTrailerRow(st));
+        } else {
+            addSeasonTrailerRow();
+        }
+    }
 
     const blocks = Array.isArray(movie.downloadBlocks) ? movie.downloadBlocks : [];
     if (movie.tmdbType === 'tv') {
@@ -5474,6 +5641,12 @@ async function submitAdminContent() {
             throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
         }
 
+        // Movie-r jonno ekta shingle global trailer thake (trailerLink/trailerThumb).
+        // Series (tv)-er jonno eta khali rekhe deya hoy - shei khetre proti season-er
+        // jonno alada trailer "Season Trailers" (seasonTrailers) list theke aashe.
+        const isTvType = adminTmdbType === 'tv';
+        const seasonTrailers = isTvType ? collectSeasonTrailers() : [];
+
         const downloadBlocks = (adminTmdbType === 'tv') ? collectSeasons() : collectMovieLinks();
 
         const payload = {
@@ -5486,8 +5659,9 @@ async function submitAdminContent() {
             languages: audio,
             Subtitles: subtitles,
             poster: posterUrl,
-            trailerLink: trailerLinkRaw,
-            trailerThumb: trailerThumbUrl,
+            trailerLink: isTvType ? null : trailerLinkRaw,
+            trailerThumb: isTvType ? null : trailerThumbUrl,
+            seasonTrailers: isTvType ? JSON.stringify(seasonTrailers) : null,
             downloadBlocks: JSON.stringify(downloadBlocks)
         };
 
