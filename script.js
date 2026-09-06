@@ -1193,75 +1193,163 @@ async function getFullTMDBDetails(movie) {
     return promise;
 }
 
+// Movie/series-r shathe shothik TMDB entry (id + media type) khoja hoy ei
+// ekta shared function diye - age eta fetchFullTMDBDetailsUncached()-er
+// vitor-e duplicate kora chilo. Ekhon original title backfill (search
+// feature-er jonno, notun "original title diye search" feature) o eituku
+// reuse kore, jate matching logic dui jaygay alada rakhte na hoy (ekta
+// jaygay fix korle onnojon-o auto update pay).
+async function resolveTmdbMatch(movie) {
+    if (!TMDB_API_KEY) return null;
+    let mediaType = movie.tmdbType || 'movie';
+    let matchId = movie.tmdbId || null;
+    const cleanImdbId = extractImdbId(movie.imdbId);
+
+    if (!matchId && cleanImdbId) {
+        const findRes = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${cleanImdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`, {}, 6000);
+        if (findRes.ok) {
+            const findData = await findRes.json();
+            if (findData.movie_results && findData.movie_results.length > 0) {
+                matchId = findData.movie_results[0].id;
+                mediaType = 'movie';
+            } else if (findData.tv_results && findData.tv_results.length > 0) {
+                matchId = findData.tv_results[0].id;
+                mediaType = 'tv';
+            }
+        }
+    }
+
+    if (!matchId && (movie.title || movie.searchName)) {
+        const rawTitle = (movie.searchName || movie.title || '');
+        // Title-e "(2017-20)" / "(2017-2020)" / "(2024)" type year hint thakle
+        // seta age ber kore rakha hocche - eta search query theke bad deya
+        // hoy (TMDB search year shoho query-te thakle onek shomoy kom result
+        // dey), kintu niche result bachai korar shomoy ei year-take use kore
+        // shothik entry-ta khoja hoy (age eta ekdom fele deya hoto, fole
+        // "Dark", "Cross"-er moto common naam-er khetre TMDB-r first result-i
+        // niye newa hoto - seta prai shomoyi onno kono ontirikto movie/show
+        // hoye jeto, karon kono year/popularity check-i chilo na).
+        const yearHintMatch = rawTitle.match(/\((\d{4})(?:[\-–](\d{2,4}))?\)/);
+        const yearHint = yearHintMatch ? yearHintMatch[1] : null;
+        const cleanQuery = rawTitle.replace(/\s*\([\d\-–]+\)/g, '').trim();
+        const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 6000);
+        if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const candidates = (searchData && Array.isArray(searchData.results) ? searchData.results : [])
+                .filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+            if (candidates.length > 0) {
+                const normalize = (s) => String(s || '').toLowerCase().trim();
+                const cleanQueryNorm = normalize(cleanQuery);
+                const match = candidates
+                    .map(item => {
+                        const itemTitle = item.media_type === 'tv' ? item.name : item.title;
+                        const itemDate = item.media_type === 'tv' ? item.first_air_date : item.release_date;
+                        const itemYear = itemDate ? itemDate.slice(0, 4) : null;
+                        let matchScore = 0;
+                        // Year hint (title-e deya thakle) match korle boro priority -
+                        // eta-i "Dark (2024-er onno kichu)" vs "Dark (2017 আসল)"
+                        // gulor moddhe thik-ta ber korte shobcheye kaj kore.
+                        if (yearHint && itemYear === yearHint) matchScore += 100;
+                        // Exact title match (case-insensitive) shomoyi priority pabe -
+                        // partial/substring match-er cheye eta onek beshi reliable.
+                        if (normalize(itemTitle) === cleanQueryNorm) matchScore += 20;
+                        // Shesh-e TMDB-r nijer popularity diye tie-break kora hoy, jate
+                        // shoman score-er modhye shobcheye পরিচিত/সঠিক entry-ta jite jay.
+                        matchScore += Math.min(item.popularity || 0, 50) / 50 * 10;
+                        return { item, matchScore };
+                    })
+                    .sort((a, b) => b.matchScore - a.matchScore)[0].item;
+                matchId = match.id;
+                mediaType = match.media_type === 'tv' ? 'tv' : 'movie';
+            }
+        }
+    }
+
+    return matchId ? { matchId, mediaType } : null;
+}
+
+// TMDB-e movie/series-er "Original Title" (jemon "Money Heist"-er original
+// title "La casa de papel") niye ashe - ei value-ta admin save korar shomoy
+// database-e (originalTitle column) shongroho kore rakha hoy, jate search
+// korar shomoy shudhu English/localized title na, original title diyeo
+// result khuje paoya jay (live TMDB call chara-i, karon shob movie-r jonno
+// proti search-e TMDB call kora slow ar quota-costly hoye jeto).
+async function fetchTmdbOriginalTitle(movie) {
+    if (!TMDB_API_KEY) return null;
+    try {
+        const resolved = await resolveTmdbMatch(movie);
+        if (!resolved) return null;
+        const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${resolved.mediaType}/${resolved.matchId}?api_key=${TMDB_API_KEY}`, {}, 6000);
+        if (!detailRes.ok) return null;
+        const detailData = await detailRes.json();
+        const originalTitle = detailData.original_title || detailData.original_name || null;
+        const currentTitle = detailData.title || detailData.name || null;
+        // Original title-ta jodi display title-er shathe hubohu (case-insensitive)
+        // mile jay (jemon English-e toiri onek movie-r khetre hoy), tahole ota
+        // alada kore save kora hocche na - karon shetake search-e alada kono
+        // value dey na, khali database-e ekstra duplicate data jome thakbe.
+        if (originalTitle && currentTitle && originalTitle.trim().toLowerCase() === currentTitle.trim().toLowerCase()) {
+            return null;
+        }
+        return originalTitle;
+    } catch (e) {
+        console.error('fetchTmdbOriginalTitle error:', e);
+        return null;
+    }
+}
+
+// Notun feature: "Original Title diye search" চালু howar age theke jei
+// content-gula database-e add kora ache, segulor originalTitle field khali
+// - eta admin panel theke ekbar run korle shob content-er jonno TMDB theke
+// original title fetch kore database-e save kore dey, jate purono kono
+// content-o baad na pore ei feature theke. TMDB rate-limit-e giye theke
+// jate quota shesh na hoy, tai ekta chhoto delay diye ekta ekta kore call
+// kora hocche (parallel na kore).
+async function backfillOriginalTitles() {
+    const btn = document.getElementById('adminBackfillBtn');
+    const statusEl = document.getElementById('adminBackfillStatus');
+    if (!btn || !statusEl) return;
+
+    const pending = (allMovies || []).filter(m => !m.deleted_at && !m.originalTitle);
+    if (pending.length === 0) {
+        statusEl.textContent = '✅ All content already has original titles checked.';
+        return;
+    }
+
+    btn.disabled = true;
+    let done = 0, updated = 0, failed = 0;
+
+    for (const movie of pending) {
+        done++;
+        statusEl.textContent = `Checking ${done}/${pending.length} — "${movie.title || movie.searchName || ''}"...`;
+        try {
+            const originalTitle = await fetchTmdbOriginalTitle(movie);
+            if (originalTitle) {
+                const { error } = await supabaseClient.from('movies').update({ originalTitle }).eq('id', movie.id);
+                if (error) throw error;
+                movie.originalTitle = originalTitle;
+                updated++;
+            }
+        } catch (e) {
+            console.error('backfillOriginalTitles error for', movie && movie.title, e);
+            failed++;
+        }
+        // TMDB API-r opor chaap kom rakhte proti call-er majhe ekta choto gap.
+        await new Promise(r => setTimeout(r, 250));
+    }
+
+    btn.disabled = false;
+    statusEl.textContent = `✅ Done. Checked ${done}, updated ${updated}${failed ? `, failed ${failed}` : ''}.`;
+}
+
 async function fetchFullTMDBDetailsUncached(movie) {
     if (!TMDB_API_KEY) return null;
     try {
-        let mediaType = movie.tmdbType || 'movie';
-        let matchId = movie.tmdbId || null;
+        const resolved = await resolveTmdbMatch(movie);
+        if (!resolved) return null;
+        const matchId = resolved.matchId;
+        const mediaType = resolved.mediaType;
         const cleanImdbId = extractImdbId(movie.imdbId);
-
-        if (!matchId && cleanImdbId) {
-            const findRes = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${cleanImdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`, {}, 6000);
-            if (findRes.ok) {
-                const findData = await findRes.json();
-                if (findData.movie_results && findData.movie_results.length > 0) {
-                    matchId = findData.movie_results[0].id;
-                    mediaType = 'movie';
-                } else if (findData.tv_results && findData.tv_results.length > 0) {
-                    matchId = findData.tv_results[0].id;
-                    mediaType = 'tv';
-                }
-            }
-        }
-
-        if (!matchId && (movie.title || movie.searchName)) {
-            const rawTitle = (movie.searchName || movie.title || '');
-            // Title-e "(2017-20)" / "(2017-2020)" / "(2024)" type year hint thakle
-            // seta age ber kore rakha hocche - eta search query theke bad deya
-            // hoy (TMDB search year shoho query-te thakle onek shomoy kom result
-            // dey), kintu niche result bachai korar shomoy ei year-take use kore
-            // shothik entry-ta khoja hoy (age eta ekdom fele deya hoto, fole
-            // "Dark", "Cross"-er moto common naam-er khetre TMDB-r first result-i
-            // niye newa hoto - seta prai shomoyi onno kono ontirikto movie/show
-            // hoye jeto, karon kono year/popularity check-i chilo na).
-            const yearHintMatch = rawTitle.match(/\((\d{4})(?:[\-–](\d{2,4}))?\)/);
-            const yearHint = yearHintMatch ? yearHintMatch[1] : null;
-            const cleanQuery = rawTitle.replace(/\s*\([\d\-–]+\)/g, '').trim();
-            const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 6000);
-            if (searchRes.ok) {
-                const searchData = await searchRes.json();
-                const candidates = (searchData && Array.isArray(searchData.results) ? searchData.results : [])
-                    .filter(item => item.media_type === 'movie' || item.media_type === 'tv');
-                if (candidates.length > 0) {
-                    const normalize = (s) => String(s || '').toLowerCase().trim();
-                    const cleanQueryNorm = normalize(cleanQuery);
-                    const match = candidates
-                        .map(item => {
-                            const itemTitle = item.media_type === 'tv' ? item.name : item.title;
-                            const itemDate = item.media_type === 'tv' ? item.first_air_date : item.release_date;
-                            const itemYear = itemDate ? itemDate.slice(0, 4) : null;
-                            let matchScore = 0;
-                            // Year hint (title-e deya thakle) match korle boro priority -
-                            // eta-i "Dark (2024-er onno kichu)" vs "Dark (2017 আসল)"
-                            // gulor moddhe thik-ta ber korte shobcheye kaj kore.
-                            if (yearHint && itemYear === yearHint) matchScore += 100;
-                            // Exact title match (case-insensitive) shomoyi priority pabe -
-                            // partial/substring match-er cheye eta onek beshi reliable.
-                            if (normalize(itemTitle) === cleanQueryNorm) matchScore += 20;
-                            // Shesh-e TMDB-r nijer popularity diye tie-break kora hoy, jate
-                            // shoman score-er modhye shobcheye পরিচিত/সঠিক entry-ta jite jay.
-                            matchScore += Math.min(item.popularity || 0, 50) / 50 * 10;
-                            return { item, matchScore };
-                        })
-                        .sort((a, b) => b.matchScore - a.matchScore)[0].item;
-                    matchId = match.id;
-                    mediaType = match.media_type === 'tv' ? 'tv' : 'movie';
-                }
-            }
-        }
-
-        if (!matchId) return null;
-
         const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids,release_dates,content_ratings,videos`, {}, 6000);
         if (!detailRes.ok) return null;
         const detailData = await detailRes.json();
@@ -1378,6 +1466,7 @@ async function fetchFullTMDBDetailsUncached(movie) {
             revenue: detailData.revenue || 0,
             trailerKey: trailerKey,
             trailerThumb: manualTrailerThumb,
+            originalTitle: (detailData.original_title || detailData.original_name || null),
             latestSeasonNumber: latestSeasonNumber
         };
     } catch(e) {
@@ -2268,7 +2357,11 @@ function getSmartMatches(query) {
             const score = Math.max(
                 fuzzyMatchScore(query, movie.title),
                 fuzzyMatchScore(query, movie.searchName),
-                fuzzyMatchScore(query, movie.languages)
+                fuzzyMatchScore(query, movie.languages),
+                // Original title (jemon "Money Heist"-er "La casa de papel") diye search
+                // korleo eikhane match hoye jabe - eta admin save korar shomoy TMDB theke
+                // fetch kore database-e (originalTitle column) rakha thake.
+                fuzzyMatchScore(query, movie.originalTitle)
             );
             return { movie, score };
         })
@@ -5848,6 +5941,21 @@ async function submitAdminContent() {
             throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
         }
 
+        // Original title (jemon "Money Heist"-er "La casa de papel") TMDB theke
+        // fetch kore rakha hocche, jate পরে user shei original title diye search
+        // korleo ei content-take khuje paye - protibar search-e live TMDB call
+        // korle slow hoye jeto ar quota-o boyeshi lagto, tai eta ekbar save-er
+        // shomoy-i kore database-e rekhe deya hocche.
+        submitBtn.textContent = 'Fetching original title...';
+        const originalTitle = await fetchTmdbOriginalTitle({
+            title,
+            searchName,
+            imdbId,
+            tmdbId,
+            tmdbType: adminTmdbType
+        }).catch(() => null);
+        submitBtn.textContent = 'Saving...';
+
         // Movie-r jonno ekta shingle global trailer thake (trailerLink/trailerThumb).
         // Series (tv)-er jonno eta khali rekhe deya hoy - shei khetre proti season-er
         // jonno alada trailer "Season Trailers" (seasonTrailers) list theke aashe.
@@ -5869,7 +5977,8 @@ async function submitAdminContent() {
             trailerLink: isTvType ? null : trailerLinkRaw,
             trailerThumb: isTvType ? null : trailerThumbUrl,
             seasonTrailers: isTvType ? JSON.stringify(seasonTrailers) : null,
-            downloadBlocks: JSON.stringify(downloadBlocks)
+            downloadBlocks: JSON.stringify(downloadBlocks),
+            originalTitle: originalTitle
         };
 
 

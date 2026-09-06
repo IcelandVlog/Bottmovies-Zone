@@ -1877,6 +1877,25 @@ html.light-mode .admin-trailer-movie-row input { background-color: #ffffff; bord
 }
 .admin-manage-search input:focus { border-color: #2563eb; }
 
+.admin-backfill-box { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.admin-backfill-btn {
+    width: 100%;
+    background-color: #1c202c;
+    border: 1px solid #3a4457;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.admin-backfill-btn:hover { background-color: #252a3a; border-color: #CC181E; }
+.admin-backfill-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.admin-backfill-status { font-size: 12px; color: #8b93a7; padding: 0 2px; }
+html.light-mode .admin-backfill-btn { background-color: #fff; border-color: #d7dbe4; color: #1a1c23; }
+html.light-mode .admin-backfill-status { color: #667085; }
+
 .admin-database-list { display: flex; flex-direction: column; gap: 10px; max-height: 65vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2a3348 transparent; }
 .admin-database-list::-webkit-scrollbar { width: 8px; }
 .admin-database-list::-webkit-scrollbar-track { background: transparent; }
