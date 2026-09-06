@@ -933,8 +933,8 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
 .season-box-item { background: #5b4f8a; border-radius: 8px; overflow: hidden; }
 
 /* এডমিন লিংক রো (ইনপুট বক্স লেআউট ফিক্স) */
-.admin-link-row,
-.admin-season-links .admin-link-row {
+.admin-link-row:not(.admin-season-trailer-row),
+.admin-season-links .admin-link-row:not(.admin-season-trailer-row) {
     display: grid;
     /* ১ম কলাম: লিংক (১fr - বড়), ২য় কলাম: সাইজ (১২০px - ছোট), ৩য় কলাম: বাটন (৩৬px) */
     grid-template-columns: 1fr 120px 36px !important;
@@ -965,9 +965,13 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
 
 /* মোবাইল স্ক্রিনের জন্য রেসপনসিভ এডজাস্টমেন্ট */
 @media (max-width: 480px) {
-    .admin-link-row,
-    .admin-season-links .admin-link-row {
+    .admin-link-row:not(.admin-season-trailer-row),
+    .admin-season-links .admin-link-row:not(.admin-season-trailer-row) {
         grid-template-columns: 1fr 95px 32px !important;
+        gap: 6px;
+    }
+    .admin-season-trailer-row {
+        grid-template-columns: 56px 1fr 1fr 30px !important;
         gap: 6px;
     }
 }
