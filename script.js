@@ -102,6 +102,24 @@ function getLatestRealSeasonNumber(detailData) {
     return pool.reduce((max, s) => (s.season_number > max ? s.season_number : max), pool[0].season_number);
 }
 
+// Trailer na paoya gele (kono season-er trailer TMDB/YouTube kothao na thakle)
+// age plain "No trailer found..." text dekhano hoto - ekhon eta-r bodole
+// clock-icon soho ekta "Coming Soon" designed empty-state dekhano hoy, jate
+// khali text-er bodole visually clear thake je trailer-ta pore add hobe.
+function buildTrailerComingSoonHTML(subText) {
+    return `
+    <div class="trailer-empty-msg">
+        <div class="trailer-empty-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
+                <path d="M12 7.3V12l3.1 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="trailer-empty-title">Coming Soon</div>
+        <div class="trailer-empty-sub">${escapeAttr(subText || 'Trailer will be added soon')}</div>
+    </div>`;
+}
+
 // Admin panel theke series-er kono ekta specific season-er jonno manually
 // trailer link/thumbnail deya thakle (movie.seasonTrailers), seta returns kore.
 // Na thakle null - tokhon caller auto (TMDB/YouTube) trailer khujbe.
@@ -1247,7 +1265,16 @@ async function fetchFullTMDBDetailsUncached(movie) {
 
         let trailerKey = null;
         let manualTrailerThumb = null;
-        const manualLatestSeasonTrailer = mediaType === 'tv' ? getManualSeasonTrailer(movie, latestSeasonNumber) : null;
+        // Age eta strict getManualSeasonTrailer(movie, latestSeasonNumber) call korto -
+        // fole TMDB-e kono series-er "notun" season announce/renew hoye placeholder
+        // (episode/trailer chara) add hoye gele latestSeasonNumber sheta dhore nito,
+        // ar admin-er deya aager season-er manual trailer match na kore bad pore jeto
+        // (tokhon auto/YouTube search-o notun season-er kono trailer na peye trailer-i
+        // dekhato na). resolveManualSeasonTrailerFallback() use kora hocche ekhon -
+        // eta age latestSeasonNumber-e direct match try kore, na mile admin-er deya
+        // seasonTrailers-er modhye shobcheye notun (highest) season-take fallback
+        // hishebe use kore - jate real trailer thakle seta shobsomoy dekhay.
+        const manualLatestSeasonTrailer = mediaType === 'tv' ? resolveManualSeasonTrailerFallback(movie, true, latestSeasonNumber) : null;
         if (manualLatestSeasonTrailer) {
             trailerKey = manualLatestSeasonTrailer.key;
             manualTrailerThumb = manualLatestSeasonTrailer.thumb;
@@ -1764,7 +1791,7 @@ fastServersList.forEach((fs, fIdx) => {
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
-        ` : (trailerSeasonSelectorHTML ? `<div class="trailer-empty-msg">No trailer found for this season.</div>` : '');
+        ` : (trailerSeasonSelectorHTML ? buildTrailerComingSoonHTML('Trailer for this season will be added soon') : '');
 
         const trailerHTML = (trailerKey || trailerSeasonSelectorHTML) ? `
         <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey || '')}" data-thumb="${escapeAttr(trailerThumbUrl)}">
@@ -2070,7 +2097,7 @@ async function changeModalTrailerSeason(selectEl) {
     if (!tvId || Number.isNaN(seasonNumber)) return;
 
     selectEl.disabled = true;
-    bodyEl.innerHTML = `<div class="trailer-empty-msg">Loading Season ${seasonNumber} trailer...</div>`;
+    bodyEl.innerHTML = `<div class="trailer-empty-msg trailer-loading-msg">Loading Season ${seasonNumber} trailer...</div>`;
 
     // Admin panel theke ei season-er jonno manually trailer deya thakle, seta-i
     // shobar age use kora hoy - TMDB-e API call korar dorkar-i pore na.
@@ -2093,7 +2120,7 @@ async function changeModalTrailerSeason(selectEl) {
         const newKey = await getLatestSeasonTrailerKey(tvId, seasonNumber);
         if (!newKey) {
             box.setAttribute('data-ytid', '');
-            bodyEl.innerHTML = `<div class="trailer-empty-msg">No trailer found for Season ${seasonNumber}.</div>`;
+            bodyEl.innerHTML = buildTrailerComingSoonHTML(`Season ${seasonNumber} trailer will be added soon`);
             return;
         }
         const thumbUrl = `https://img.youtube.com/vi/${encodeURIComponent(newKey)}/hqdefault.jpg`;
@@ -2108,7 +2135,7 @@ async function changeModalTrailerSeason(selectEl) {
         `;
     } catch (e) {
         console.error('changeModalTrailerSeason error:', e);
-        bodyEl.innerHTML = `<div class="trailer-empty-msg">Could not load trailer.</div>`;
+        bodyEl.innerHTML = buildTrailerComingSoonHTML('Could not load trailer, please try again later');
     } finally {
         selectEl.disabled = false;
     }

@@ -903,20 +903,56 @@ html.light-mode .trailer-label { color: #333a45; }
 .trailer-season-select:focus { outline: none; border-color: #CC181E; }
 .trailer-empty-msg {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     width: 100%;
     aspect-ratio: 16 / 9;
     border-radius: 8px;
-    background: #0e1017;
+    background: radial-gradient(ellipse at center, #171a24 0%, #0c0e15 100%);
+    border: 1px dashed #2a3040;
     color: #8b93a7;
     font-size: 13px;
     text-align: center;
     padding: 10px;
 }
+.trailer-empty-msg.trailer-loading-msg {
+    border-style: solid;
+    border-color: #282d3f;
+    background: #0e1017;
+}
+.trailer-empty-icon {
+    width: 46px;
+    height: 46px;
+    min-height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(204, 24, 30, 0.12);
+    color: #FF8A00;
+    margin-bottom: 6px;
+}
+.trailer-empty-title {
+    color: #e9ecf3;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
+.trailer-empty-sub {
+    color: #8b93a7;
+    font-size: 12.5px;
+    font-weight: 500;
+    max-width: 260px;
+    line-height: 1.4;
+}
 html.light-mode .trailer-season-row label { color: #333a45; }
 html.light-mode .trailer-season-select { background: #fff; color: #1a1c23; border-color: #d7dbe4; }
-html.light-mode .trailer-empty-msg { background: #eef0f4; color: #667085; }
+html.light-mode .trailer-empty-msg { background: radial-gradient(ellipse at center, #f7f8fa 0%, #eef0f4 100%); border-color: #d7dbe4; color: #667085; }
+html.light-mode .trailer-empty-msg.trailer-loading-msg { background: #eef0f4; border-style: solid; }
+html.light-mode .trailer-empty-title { color: #1a1c23; }
+html.light-mode .trailer-empty-sub { color: #667085; }
 
 .season-accordion-group {
     display: flex;
