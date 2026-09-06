@@ -5409,15 +5409,34 @@ function addSeasonTrailerRow(data) {
     list.appendChild(row);
 }
 
+// Season Trailer row-e kono bhul thakle (season number bhul, link khali, ba
+// link theke video ID ber kora na gele) age eta chupchap shei row-take skip
+// kore dito - fole admin bhabto save hoye gache, kintu ashole seta save-i
+// hoyni. Ekhon eta-i clear error dekhiye deya hoy (throw kore), jate submit
+// howar age-i bhul-ta dhora pore.
 function collectSeasonTrailers() {
     const rows = document.querySelectorAll('#adminSeasonTrailersList .admin-season-trailer-row');
     const result = [];
     rows.forEach(row => {
-        const seasonNum = parseInt(row.querySelector('.admin-season-trailer-num').value, 10);
+        const seasonRaw = row.querySelector('.admin-season-trailer-num').value.trim();
         const link = row.querySelector('.admin-season-trailer-link').value.trim();
-        if (!link || Number.isNaN(seasonNum) || seasonNum < 1) return;
-        if (!extractYoutubeVideoId(link)) return; // invalid link/ID - silently skip
         const thumb = row.querySelector('.admin-season-trailer-thumb').value.trim();
+
+        // Season number ar link dutai khali - eta ekta na-bhorা (blank/unused) row,
+        // eta chupchap skip kora hoy, kono error dekhano hobe na.
+        if (!seasonRaw && !link) return;
+
+        const seasonNum = parseInt(seasonRaw, 10);
+        if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
+            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link "${link || '(khali)'}" er jonno eta lagbe.`);
+        }
+        if (!link) {
+            throw new Error(`Season ${seasonNum}-er jonno YouTube link dao, na hole ei row-ta "✕" diye muche felo.`);
+        }
+        if (!extractYoutubeVideoId(link)) {
+            throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro (poro YouTube link ba khali 11-character video ID dite paro).`);
+        }
+
         result.push({ season: seasonNum, link, thumb: thumb || null });
     });
     return result;
