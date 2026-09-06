@@ -13,7 +13,11 @@ let lastYoutubeTrailerError = null;
 // every uncached call costs quota, so resolved trailer keys - including
 // "not found" results - are kept in localStorage across page loads/sessions.
 // This is the main fix for the "Quota exceeded ... search_list" 429 error.
-const YT_TRAILER_STORAGE_KEY = 'bmz_yt_trailer_cache_v1';
+// v1 -> v2: title-matching logic strict kora hoyeche (age onek khetre vul
+// trailer cache hoye giyechilo - naame mil na thakleo cache hoye jeto), tai
+// version bariye purono (somvoto vul) cache-gula automatically invalidate
+// kora hocche - shobar browser-e notun kore fresh/thik trailer khoja hobe.
+const YT_TRAILER_STORAGE_KEY = 'bmz_yt_trailer_cache_v2';
 const YT_TRAILER_FOUND_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 days for a found trailer
 const YT_TRAILER_MISS_TTL_MS = 24 * 60 * 60 * 1000;         // 1 day for "nothing found"
 
@@ -153,6 +157,26 @@ function resolveManualSeasonTrailerFallback(movie, isTV, preferredSeason) {
     return fallback ? { key: fallback.key, thumb: fallback.thumb, season: bestSeason } : null;
 }
 
+// Video title-e thaka "reaction/review/recap" type shobdo dekhle shei video-take
+// bad deya hoy - eigulote 'trailer' shobdo thaka sotteo eta আসল trailer na,
+// third-party commentary/reaction video (jeta age bad porto na, karon age
+// শুধু 'trailer'/'teaser' shobdo thakleই match hoye jeto).
+const YT_NEGATIVE_KEYWORDS = ['reaction', 'react', 'review', 'recap', 'explained', 'breakdown', 'analysis', 'easter egg', 'parody', 'fan made', 'fanmade', 'fan-made', 'concept trailer', 'concept teaser', 'deleted scene', 'mashup', 'compilation', 'edit)', '(edit', 'top 10', 'top 5'];
+
+// Movie/show-er title theke "the", "a", "of" ইত্যাদি common/stopword ar khub
+// choto (<=2 character) shobdo বাদ diye শুধু meaningful shobdogula ber kora
+// hoy - eigula diyeই YouTube video-r title-er shathe আসল mil ache kina
+// check kora hoy (age eta শুধু bonus score chilo, mandatory chilo na - fole
+// "trailer" shobdo thakleই jekono onno movie/show-er video-o match hoye jeto).
+const YT_TITLE_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'on', 'to', 'for', 'season']);
+function getSignificantTitleWords(title) {
+    return String(title || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !YT_TITLE_STOPWORDS.has(w));
+}
+
 // TMDB-e trailer na paoya gele (ba kono video-i na thakle) YouTube-e সরাসরি search kore
 // shobcheye relevant + notun official trailer-take niye ashe. Client-side exposed key,
 // tai Google Cloud Console-e "Websites" restriction diye site-r domain-e lock kora ache.
@@ -172,7 +196,7 @@ async function searchYoutubeTrailer(title, year) {
     const promise = (async () => {
         try {
             const query = `${title} ${year || ''} official trailer`.trim();
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&order=relevance&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=10&order=relevance&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
             const res = await fetchWithTimeout(url, {}, 6000);
             if (!res.ok) {
                 // Failure-r asol karon (403 referrer block, quotaExceeded, keyInvalid, ইত্যাদি)
@@ -202,20 +226,29 @@ async function searchYoutubeTrailer(title, year) {
             // teaser-er cheye beshi priority deya hoy, tারপর official/title-match diye
             // sheshbar tie-break kora hoy।
             const lowerTitle = title.toLowerCase();
+            const titleWords = getSignificantTitleWords(title);
             const scored = items
                 .filter(it => it.id && it.id.videoId)
                 .map(it => {
                     const vTitle = (it.snippet && it.snippet.title || '').toLowerCase();
                     const isTrailer = vTitle.includes('trailer');
                     const isTeaser = vTitle.includes('teaser');
+                    const hasNegative = YT_NEGATIVE_KEYWORDS.some(k => vTitle.includes(k));
+                    // Title-er meaningful shobdogula theke koyta video-r title-e ache seta
+                    // count kora hoy - kono ekta shobdo match na khele (titleWords thakle)
+                    // eta pura অপ্রাসঙ্গিক video, বাদ deya hobe. Ekta shobdo-r (jemon "Cross")
+                    // khetre shei ekta-i thik moto match korte hobe.
+                    const matchedWordsCount = titleWords.filter(w => vTitle.includes(w)).length;
+                    const titleMatches = titleWords.length === 0 || matchedWordsCount === titleWords.length || (titleWords.length > 2 && matchedWordsCount >= Math.ceil(titleWords.length * 0.7));
                     let score = 0;
                     if (isTrailer) score += 3;
                     else if (isTeaser) score += 2;
                     if (vTitle.includes(lowerTitle)) score += 1;
                     if (vTitle.includes('official')) score += 1;
-                    return { videoId: it.id.videoId, publishedAt: it.snippet && it.snippet.publishedAt, score, isTrailer, isTeaser };
+                    score += matchedWordsCount;
+                    return { videoId: it.id.videoId, publishedAt: it.snippet && it.snippet.publishedAt, score, isTrailer, isTeaser, hasNegative, titleMatches };
                 })
-                .filter(v => v.isTrailer || v.isTeaser)
+                .filter(v => (v.isTrailer || v.isTeaser) && !v.hasNegative && v.titleMatches)
                 .sort((a, b) => b.score - a.score || new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
 
             const result = scored.length ? scored[0].videoId : null;
@@ -231,6 +264,7 @@ async function searchYoutubeTrailer(title, year) {
     youtubeTrailerCache.set(cacheKey, promise);
     return promise;
 }
+
 
 
 function debounce(fn, wait) {
