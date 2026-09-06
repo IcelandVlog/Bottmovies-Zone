@@ -988,6 +988,26 @@ function stopModalTrailerPlayback() {
     if (videoWrap) videoWrap.remove();
 }
 
+// Kono kono khetre trailerKey resolve hoy (tai trailer-box render hoye jay),
+// kintu shei YouTube video-ta আসলে thake na (delete/private/invalid id) -
+// tokhon img.youtube.com thumbnail hishebe ekটা fixed 120x90 "no thumbnail"
+// placeholder pathay (normal thumbnail onek boro hoy, jemon hqdefault 480x360).
+// Eta check kore, ba thumbnail load-i na hole (network error), amra pura
+// .trailer-box-take hide kore dei - tai user ekta "load hocche na" emon
+// khali/bhanga trailer box r dekhbe na, box-ta simply thakbei na.
+function handleTrailerThumbLoad(imgEl) {
+    if (imgEl.naturalWidth === 120 && imgEl.naturalHeight === 90) {
+        hideBrokenTrailerBox(imgEl);
+    }
+}
+function handleTrailerThumbError(imgEl) {
+    hideBrokenTrailerBox(imgEl);
+}
+function hideBrokenTrailerBox(imgEl) {
+    const box = imgEl.closest('.trailer-box');
+    if (box) box.remove();
+}
+
 function copyDownloadLink(linkId, btnElement) {
     const linkElement = document.getElementById(linkId);
     if (linkElement && linkElement.href) {
@@ -1708,7 +1728,7 @@ fastServersList.forEach((fs, fIdx) => {
 
         const trailerBodyInnerHTML = trailerKey ? `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="${trailerThumbUrl}" alt="${escapeAttr(title)} Trailer" loading="lazy">
+                <img class="trailer-thumb-img" src="${trailerThumbUrl}" alt="${escapeAttr(title)} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
@@ -1997,7 +2017,7 @@ async function changeModalTrailerSeason(selectEl) {
         box.setAttribute('data-thumb', manualSeasonTrailer.thumb);
         bodyEl.innerHTML = `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="${manualSeasonTrailer.thumb}" alt="Season ${seasonNumber} Trailer" loading="lazy">
+                <img class="trailer-thumb-img" src="${manualSeasonTrailer.thumb}" alt="Season ${seasonNumber} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
@@ -2018,7 +2038,7 @@ async function changeModalTrailerSeason(selectEl) {
         box.setAttribute('data-thumb', thumbUrl);
         bodyEl.innerHTML = `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="${thumbUrl}" alt="Season ${seasonNumber} Trailer" loading="lazy">
+                <img class="trailer-thumb-img" src="${thumbUrl}" alt="Season ${seasonNumber} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
