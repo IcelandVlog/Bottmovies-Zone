@@ -59,7 +59,11 @@ function pickBestTrailerFromResults(results) {
         onYoutube.find(v => v.type === type && v.official) ||
         onYoutube.find(v => v.type === type);
 
-    const pick = byType('Trailer') || byType('Teaser') || onYoutube[0];
+    // Shudhu "Trailer" othoba "Teaser" type-i neya hobe - Clip/Featurette/
+    // Behind the Scenes/Bloopers ইত্যাদি onno kono video type fallback
+    // hishebe o neya hobe na. Kono Trailer/Teaser na thakle null return
+    // hobe (caller tokhon YouTube Search-e giye khujbe).
+    const pick = byType('Trailer') || byType('Teaser');
     return pick ? pick.key : null;
 }
 
@@ -153,19 +157,26 @@ async function searchYoutubeTrailer(title, year) {
                 return null;
             }
 
-            // Title-e "trailer" shobdo thakle ba channel-ta official/verified-er moto
-            // lagle age prefer kora hocche, na hole shobcheye upore-r (relevance-e first) result
+            // Video-r title-e "trailer" othoba "teaser" shobdo na thakle shei video-take
+            // ekdom বাদ deya hocche - clip/reaction/review/fan-made ba onno kono
+            // অপ্রাসঙ্গিক video kokhono fallback hishebe neya hobe na. Trailer-ke
+            // teaser-er cheye beshi priority deya hoy, tারপর official/title-match diye
+            // sheshbar tie-break kora hoy।
             const lowerTitle = title.toLowerCase();
             const scored = items
                 .filter(it => it.id && it.id.videoId)
                 .map(it => {
                     const vTitle = (it.snippet && it.snippet.title || '').toLowerCase();
+                    const isTrailer = vTitle.includes('trailer');
+                    const isTeaser = vTitle.includes('teaser');
                     let score = 0;
-                    if (vTitle.includes('trailer')) score += 2;
+                    if (isTrailer) score += 3;
+                    else if (isTeaser) score += 2;
                     if (vTitle.includes(lowerTitle)) score += 1;
                     if (vTitle.includes('official')) score += 1;
-                    return { videoId: it.id.videoId, publishedAt: it.snippet && it.snippet.publishedAt, score };
+                    return { videoId: it.id.videoId, publishedAt: it.snippet && it.snippet.publishedAt, score, isTrailer, isTeaser };
                 })
+                .filter(v => v.isTrailer || v.isTeaser)
                 .sort((a, b) => b.score - a.score || new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
 
             const result = scored.length ? scored[0].videoId : null;
