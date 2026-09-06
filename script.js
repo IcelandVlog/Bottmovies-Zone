@@ -1167,7 +1167,8 @@ async function fetchFullTMDBDetailsUncached(movie) {
             contentRating: contentRating,
             budget: detailData.budget || 0,
             revenue: detailData.revenue || 0,
-            trailerKey: trailerKey
+            trailerKey: trailerKey,
+            latestSeasonNumber: latestSeasonNumber
         };
     } catch(e) {
         console.error("TMDB Details Error or Timeout:", e);
@@ -1473,7 +1474,14 @@ async function openMovieModal(movie) {
     let fetchedImdbId = extractImdbId(movie.imdbId) || null;
     let smartRating = "N/A";
     let awards = "N/A";
-    let trailerKey = null;
+    // Admin panel theke manually YouTube link/ID disol thakle seta-i shobar age priority
+    // pabe - TMDB/YouTube auto-search shudhu tokhon-i chole jokhon eta deya nei ba
+    // eta theke video ID ber kora jayni.
+    const manualTrailerId = extractYoutubeVideoId(movie.trailerLink);
+    let trailerKey = manualTrailerId || null;
+    let trailerTvId = null;
+    let trailerSeasonCount = null;
+    let trailerSelectedSeason = null;
 
     const isTV = movie.tmdbType === 'tv';
     let durationOrSeasonPill = movie.runtime || "N/A";
@@ -1611,13 +1619,36 @@ fastServersList.forEach((fs, fIdx) => {
         const budgetRevenueGroup = (budgetRow || revenueRow) ? `<div class="meta-inline-group">${budgetRow}${revenueRow}</div>` : '';
 
         const trailerThumbUrl = movie.trailerThumb || (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg` : '');
-        const trailerHTML = trailerKey ? `
-        <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey)}" data-thumb="${escapeAttr(trailerThumbUrl)}">
+
+        // Series-er khetre ekta Season dropdown dekhano hoy, jate user chaile onno
+        // (age-r) season-er trailer-o dekhte pare - default-e latest season select kora thake.
+        let trailerSeasonSelectorHTML = '';
+        if (isTV && trailerTvId && trailerSeasonCount && trailerSeasonCount > 1) {
+            let seasonOptionsHTML = '';
+            for (let s = 1; s <= trailerSeasonCount; s++) {
+                seasonOptionsHTML += `<option value="${s}" ${s === (trailerSelectedSeason || trailerSeasonCount) ? 'selected' : ''}>Season ${s}</option>`;
+            }
+            trailerSeasonSelectorHTML = `
+            <div class="trailer-season-row">
+                <label for="trailerSeasonSelect">Trailer:</label>
+                <select id="trailerSeasonSelect" class="trailer-season-select" data-tvid="${trailerTvId}" onchange="changeModalTrailerSeason(this)">
+                    ${seasonOptionsHTML}
+                </select>
+            </div>`;
+        }
+
+        const trailerBodyInnerHTML = trailerKey ? `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
                 <img class="trailer-thumb-img" src="${trailerThumbUrl}" alt="${escapeAttr(title)} Trailer" loading="lazy">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
+        ` : (trailerSeasonSelectorHTML ? `<div class="trailer-empty-msg">No trailer found for this season.</div>` : '');
+
+        const trailerHTML = (trailerKey || trailerSeasonSelectorHTML) ? `
+        <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey || '')}" data-thumb="${escapeAttr(trailerThumbUrl)}">
+            ${trailerSeasonSelectorHTML}
+            <div id="trailerBoxBody">${trailerBodyInnerHTML}</div>
         </div>
         ` : '';
         // Note: trailer resolve na hole (TMDB-e video nei, YouTube quota shesh, etc.)
@@ -1737,7 +1768,7 @@ fastServersList.forEach((fs, fIdx) => {
             if (tmdb.budget) budgetFormatted = formatCurrency(tmdb.budget);
             if (tmdb.revenue) revenueFormatted = formatCurrency(tmdb.revenue);
             if (tmdb.id) tmdbUrl = `https://www.themoviedb.org/${tmdb.mediaType}/${tmdb.id}`;
-            if (tmdb.trailerKey) trailerKey = tmdb.trailerKey;
+            if (!manualTrailerId && tmdb.trailerKey) trailerKey = tmdb.trailerKey;
             if (!fetchedImdbId && tmdb.imdbId) {
                 fetchedImdbId = tmdb.imdbId;
                 imdbUrl = `https://www.imdb.com/title/${fetchedImdbId}/`;
@@ -1751,7 +1782,10 @@ fastServersList.forEach((fs, fIdx) => {
             if (tmdb.mediaType === 'tv' || isTV) {
                 if (tmdb.numberOfSeasons) {
                     durationOrSeasonPill = tmdb.numberOfSeasons > 1 ? `${tmdb.numberOfSeasons} Seasons` : `1 Season`;
+                    trailerSeasonCount = tmdb.numberOfSeasons;
                 }
+                if (tmdb.id) trailerTvId = tmdb.id;
+                if (tmdb.latestSeasonNumber) trailerSelectedSeason = tmdb.latestSeasonNumber;
             } else {
                 if (tmdb.runtime && tmdb.runtime !== "N/A") {
                     durationOrSeasonPill = convertRuntimeToHours(tmdb.runtime);
@@ -1838,14 +1872,12 @@ function playModalTrailer(el) {
     const ytId = box.getAttribute('data-ytid');
     if (!ytId) return;
     const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0`;
-    const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`;
     // Ei site-e COOP/COEP header active thake (ffmpeg.wasm media-scan feature-er jonno
     // proyojon), r shei COEP-r karone third-party YouTube iframe-take browser default-e
     // block kore dei ("refused to connect" dekhায়) - eta youtube-r shomossha na.
     // "credentialless" attribute dile Chrome/Edge-e eta abar kaj kore (COEP bypass hoy
     // ei ekta frame-er jonno), kintu Firefox/Safari-te ei attribute support nei - tai
-    // shei browser-gulor jonno ekta "Watch on YouTube" fallback link o rakha holo, jate
-    // iframe block hole o user video-ta dekhte pare.
+    // shei browser-e trailer nao chalte pare (iframe block hoye jete pare).
     // Admin panel theke manually thumbnail set kora thakle sheita age priority pabe,
     // na thakle auto YouTube thumbnail fallback hishebe use hobe.
     const thumbUrl = box.getAttribute('data-thumb') || `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`;
@@ -1853,8 +1885,48 @@ function playModalTrailer(el) {
     // kokhono khali/kalo dekhabe na - thumbnail-i poster hishebe thakbe.
     box.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}')">
         <iframe src="${embedUrl}" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen credentialless></iframe>
-        <a class="trailer-fallback-link" href="${watchUrl}" target="_blank" rel="noopener noreferrer">▶ YouTube-Open</a>
     </div>`;
+}
+
+// Season dropdown-e onno season select korle shei season-er trailer fetch kore
+// thumbnail/play button-take update kore dey (already play hocche emon video thakle
+// seta-o notun thumbnail diye replace hoye jay - abar click korle notun season-er
+// trailer-i play hobe).
+async function changeModalTrailerSeason(selectEl) {
+    const box = selectEl.closest('.trailer-box');
+    const bodyEl = box ? box.querySelector('#trailerBoxBody') : null;
+    if (!box || !bodyEl) return;
+
+    const tvId = selectEl.getAttribute('data-tvid');
+    const seasonNumber = parseInt(selectEl.value, 10);
+    if (!tvId || Number.isNaN(seasonNumber)) return;
+
+    selectEl.disabled = true;
+    bodyEl.innerHTML = `<div class="trailer-empty-msg">Loading Season ${seasonNumber} trailer...</div>`;
+
+    try {
+        const newKey = await getLatestSeasonTrailerKey(tvId, seasonNumber);
+        if (!newKey) {
+            box.setAttribute('data-ytid', '');
+            bodyEl.innerHTML = `<div class="trailer-empty-msg">No trailer found for Season ${seasonNumber}.</div>`;
+            return;
+        }
+        const thumbUrl = `https://img.youtube.com/vi/${encodeURIComponent(newKey)}/hqdefault.jpg`;
+        box.setAttribute('data-ytid', newKey);
+        box.setAttribute('data-thumb', thumbUrl);
+        bodyEl.innerHTML = `
+            <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
+                <img class="trailer-thumb-img" src="${thumbUrl}" alt="Season ${seasonNumber} Trailer" loading="lazy">
+                <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
+            </div>
+            <div class="trailer-label">Watch Trailer</div>
+        `;
+    } catch (e) {
+        console.error('changeModalTrailerSeason error:', e);
+        bodyEl.innerHTML = `<div class="trailer-empty-msg">Could not load trailer.</div>`;
+    } finally {
+        selectEl.disabled = false;
+    }
 }
 
 // ==================== SEARCH & FUZZY MATCH ====================
@@ -5150,6 +5222,26 @@ function extractTmdbIdFromInput(input) {
     return numMatch ? numMatch[0] : null;
 }
 
+// Admin je kono format-e trailer link disol paste korte pare (full youtube.com/watch?v=,
+// youtu.be/, /embed/, /shorts/ link, ba shudhu 11-character video ID) - shob format theke
+// asol YouTube video ID-ta ber kore ane. Kichu match na hole null return kore.
+function extractYoutubeVideoId(input) {
+    if (!input) return null;
+    const trimmed = String(input).trim();
+    if (!trimmed) return null;
+
+    const patterns = [
+        /(?:youtube\.com\/watch\?[^#]*\bv=|youtube\.com\/shorts\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+    ];
+    for (const re of patterns) {
+        const m = trimmed.match(re);
+        if (m) return m[1];
+    }
+    // Shudhu bare video ID dile (link na diye) - 11-character YouTube ID format
+    if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+    return null;
+}
+
 // ---------- Poster / Trailer Thumbnail upload (Supabase Storage) ----------
 // Same "posters" bucket reused for trailer thumbnails too, just with a different
 // filename prefix - so no extra Supabase bucket setup is needed for this feature.
@@ -5212,6 +5304,9 @@ function resetAdminForm() {
     updateAdminPosterPreview();
     setPosterMode('link');
 
+    const trailerLinkInput = document.getElementById('adminTrailerLink');
+    if (trailerLinkInput) trailerLinkInput.value = '';
+
     const trailerThumbInput = document.getElementById('adminTrailerThumb');
     if (trailerThumbInput) trailerThumbInput.value = '';
     const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
@@ -5265,6 +5360,9 @@ function loadMovieIntoAdminForm(movie) {
     setPosterMode('link');
     document.getElementById('adminPosterLink').value = movie.poster || '';
     updateAdminPosterPreview();
+
+    const trailerLinkInput = document.getElementById('adminTrailerLink');
+    if (trailerLinkInput) trailerLinkInput.value = movie.trailerLink || '';
 
     setTrailerThumbMode('link');
     const trailerThumbInput = document.getElementById('adminTrailerThumb');
@@ -5371,6 +5469,11 @@ async function submitAdminContent() {
             }
         }
 
+        const trailerLinkRaw = document.getElementById('adminTrailerLink').value.trim() || null;
+        if (trailerLinkRaw && !extractYoutubeVideoId(trailerLinkRaw)) {
+            throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
+        }
+
         const downloadBlocks = (adminTmdbType === 'tv') ? collectSeasons() : collectMovieLinks();
 
         const payload = {
@@ -5383,6 +5486,7 @@ async function submitAdminContent() {
             languages: audio,
             Subtitles: subtitles,
             poster: posterUrl,
+            trailerLink: trailerLinkRaw,
             trailerThumb: trailerThumbUrl,
             downloadBlocks: JSON.stringify(downloadBlocks)
         };

@@ -883,7 +883,52 @@ html.light-mode .search-container button.search-clear-btn:hover { color: #1d4ed8
 html.light-mode .trailer-box { background: #f7f8fa; border-color: #e5e8ee; }
 html.light-mode .trailer-label { color: #333a45; }
 
-.season-accordion-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.trailer-season-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.trailer-season-row label { color: #e2e8f0; font-size: 13px; font-weight: 700; }
+.trailer-season-select {
+    background: #1c202c;
+    color: #e2e8f0;
+    border: 1px solid #3a4457;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.trailer-season-select:focus { outline: none; border-color: #CC181E; }
+.trailer-empty-msg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    background: #0e1017;
+    color: #8b93a7;
+    font-size: 13px;
+    text-align: center;
+    padding: 10px;
+}
+html.light-mode .trailer-season-row label { color: #333a45; }
+html.light-mode .trailer-season-select { background: #fff; color: #1a1c23; border-color: #d7dbe4; }
+html.light-mode .trailer-empty-msg { background: #eef0f4; color: #667085; }
+
+.season-accordion-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: #151821;
+    border: 1px solid #282d3f;
+    border-radius: 10px;
+    padding: 18px 22px;
+}
+html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5e8ee; }
 
 .season-box-item { background: #5b4f8a; border-radius: 8px; overflow: hidden; }
 
@@ -983,6 +1028,7 @@ html.light-mode .trailer-label { color: #333a45; }
 
     .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .download-info-section { padding: 14px 16px; }
+    .season-accordion-group { padding: 14px 16px; }
 
     .modal-box { padding: 12px; }
     .movie-summary-card {
