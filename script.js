@@ -3318,7 +3318,7 @@ async function handleForgotPassword() {
             if (msgEl) { msgEl.textContent = error.message; msgEl.className = 'admin-form-msg error'; }
             return;
         }
-        if (msgEl) { msgEl.textContent = 'A password reset link has been sent to your email ✅'; msgEl.className = 'admin-form-msg success'; }
+        if (msgEl) { msgEl.textContent = 'A password reset link has been sent to your email ✅ (Signed up with Google? Just click "Continue with Google" below instead — no password needed.)'; msgEl.className = 'admin-form-msg success'; }
     } catch (e) {
         if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
     }
