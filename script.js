@@ -3537,6 +3537,31 @@ async function handleSignIn() {
     }
 }
 
+// Google দিয়ে Sign In/Sign Up - দুটো ফর্মের বাটনই এই একই ফাংশন কল করে।
+// Supabase নিজে থেকেই ঠিক করে: একই Google account দিয়ে আগে sign up করা থাকলে সরাসরি sign in হয়ে যাবে,
+// আগে না থাকলে নতুন account তৈরি করে সাথে সাথেই sign in করে দেবে।
+async function handleGoogleAuth() {
+    const activeTab = document.getElementById('authTabSignup') && document.getElementById('authTabSignup').style.display !== 'none' ? 'signup' : 'signin';
+    const msgEl = document.getElementById(activeTab === 'signup' ? 'authSignupMsg' : 'authSigninMsg');
+    const btn = document.getElementById(activeTab === 'signup' ? 'signupGoogleBtn' : 'signinGoogleBtn');
+    if (msgEl) { msgEl.textContent = ''; msgEl.className = 'admin-form-msg'; }
+    if (btn) btn.disabled = true;
+    try {
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.origin + window.location.pathname }
+        });
+        if (error) {
+            if (msgEl) { msgEl.textContent = error.message || 'Google sign-in failed. Please try again.'; msgEl.className = 'admin-form-msg error'; }
+            if (btn) btn.disabled = false;
+        }
+        // ভুল না হলে ব্রাউজার Google-এর পেজে redirect হয়ে যাবে, তাই এখানে আর কিছু করার দরকার নেই।
+    } catch (e) {
+        if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
+        if (btn) btn.disabled = false;
+    }
+}
+
 async function handleSignUp() {
     const fullName = (document.getElementById('signupName')?.value || '').trim();
     const username = (document.getElementById('signupUsername')?.value || '').trim().toLowerCase().replace(/\s+/g, '');
