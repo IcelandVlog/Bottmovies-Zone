@@ -136,6 +136,23 @@ function getManualSeasonTrailer(movie, seasonNumber) {
     return { key: ytId, thumb: entry.thumb || `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` };
 }
 
+// Admin manually koyta season-er trailer add koreche tar modhye shobcheye
+// boro season number-ta ber kore dey (jemon: Money Heist-e 5 number season
+// porjonto trailer add kora thakle 5 return korbe). Eta diye season
+// pill/dropdown-er count TMDB-er upor 100% depend na kore admin nijer deya
+// data-o respect kore - TMDB-e kono karone kom season dekhale (data mismatch,
+// wrong match, ইত্যাদি) o admin-er manually add kora shob season trailer
+// jeno miss na hoy.
+function getMaxManualSeasonNumber(movie) {
+    if (!movie || !Array.isArray(movie.seasonTrailers) || !movie.seasonTrailers.length) return 0;
+    let max = 0;
+    movie.seasonTrailers.forEach(st => {
+        const num = Number(st && st.season);
+        if (Number.isFinite(num) && num > max) max = num;
+    });
+    return max;
+}
+
 // TMDB call fail/slow/timeout hoile (ba TMDB-er latest season number movie.seasonTrailers-e
 // deya kono season-er shathe match na khele) admin-er manually deya season trailer jeno
 // tobuo miss na hoy - shei jonno ei universal fallback: age "preferredSeason" (TMDB theke
@@ -1818,13 +1835,16 @@ async function openMovieModal(movie) {
     let trailerKey = manualTrailerId || null;
     let trailerThumbOverride = null; // manual per-season trailer thumbnail (series only)
     let trailerTvId = null;
-    let trailerSeasonCount = null;
+    let trailerSeasonCount = getMaxManualSeasonNumber(movie) || null;
     let trailerSelectedSeason = null;
 
     let durationOrSeasonPill = movie.runtime || "N/A";
 
     if (isTV) {
-        let seasonsCount = (movie.downloadBlocks ? movie.downloadBlocks.length : 1);
+        let seasonsCount = Math.max(
+            (movie.downloadBlocks ? movie.downloadBlocks.length : 1),
+            getMaxManualSeasonNumber(movie)
+        );
         durationOrSeasonPill = seasonsCount > 1 ? `${seasonsCount} Seasons` : `${seasonsCount} Season`;
     }
 
@@ -2128,9 +2148,17 @@ fastServersList.forEach((fs, fIdx) => {
             if (tmdb.releaseDate && tmdb.releaseDate !== "N/A") releaseDate = tmdb.releaseDate;
 
             if (tmdb.mediaType === 'tv' || isTV) {
-                if (tmdb.numberOfSeasons) {
-                    durationOrSeasonPill = tmdb.numberOfSeasons > 1 ? `${tmdb.numberOfSeasons} Seasons` : `1 Season`;
-                    trailerSeasonCount = tmdb.numberOfSeasons;
+                // TMDB koto season dekhacche shetar shathe admin manually koto
+                // number porjonto season trailer add koreche - dutor modhye
+                // je-ta boro, shei-ta-i final season count hisebe dhora hoy.
+                // Na hole TMDB-e data mismatch/wrong match thakle (jemon Money
+                // Heist-er khetre hoyechilo, TMDB kom season dekhachilo) admin-er
+                // manually add kora shesh 1-2ta season-er trailer dropdown-e
+                // ashto na.
+                const finalSeasonCount = Math.max(tmdb.numberOfSeasons || 0, getMaxManualSeasonNumber(movie));
+                if (finalSeasonCount > 0) {
+                    durationOrSeasonPill = finalSeasonCount > 1 ? `${finalSeasonCount} Seasons` : `1 Season`;
+                    trailerSeasonCount = finalSeasonCount;
                 }
                 if (tmdb.id) trailerTvId = tmdb.id;
                 if (tmdb.latestSeasonNumber) trailerSelectedSeason = tmdb.latestSeasonNumber;
@@ -2173,12 +2201,6 @@ fastServersList.forEach((fs, fIdx) => {
             }
 
             smartRating = getSmartRating(tmdb, omdb);
-
-            // --- EXCEPTION FOR MONEY HEIST ---
-            if (title.toLowerCase().includes("money heist") || title.toLowerCase().includes("la casa de papel")) {
-                durationOrSeasonPill = "5 Seasons";
-            }
-            // ---------------------------------
 
             renderModalContent(smartRating);
         }
