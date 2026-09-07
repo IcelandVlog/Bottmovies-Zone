@@ -174,14 +174,16 @@
                     <input type="text" id="signinEmail" autocomplete="username">
                 </div>
                 <div class="auth-input-group auth-input-password">
-                    <label class="auth-input-label" for="signinPassword">Password:</label>
+                    <div class="auth-label-row">
+                        <label class="auth-input-label" for="signinPassword">Password:</label>
+                        <a href="javascript:void(0)" class="auth-forgot-link" onclick="openForgotPasswordFlow()">Forgot password?</a>
+                    </div>
                     <div class="auth-password-field">
                         <input type="password" id="signinPassword" autocomplete="current-password">
                         <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('signinPassword', this)" aria-label="Show password">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         </button>
                     </div>
-                    <a href="javascript:void(0)" class="auth-forgot-link" onclick="handleForgotPassword()">Forgot password?</a>
                 </div>
                 <div id="authSigninMsg" class="admin-form-msg"></div>
                 <button type="button" class="auth-submit-btn" id="signinSubmitBtn" onclick="handleSignIn()">Login</button>
@@ -193,6 +195,70 @@
                 </button>
 
                 <p class="auth-switch-row">Dont have an account? <a href="javascript:void(0)" onclick="switchAuthTab('signup')">Create account</a></p>
+            </div>
+
+            <!-- ---------- FORGOT PASSWORD PAGE (OTP based) ----------
+                 Step 1: user gives Username/Email -> we email a 6-digit code (Supabase Recovery OTP)
+                 Step 2: user enters that code -> verified against Supabase (auth.verifyOtp type=recovery)
+                 Step 3: user sets + confirms a new password -> auth.updateUser() actually changes it
+                 Step 4: done screen (user is now signed in with the new password) -->
+            <div class="auth-page" id="authTabForgot" style="display:none;">
+
+                <div class="fp-step" id="fpStepEmail">
+                    <p class="auth-page-lead">Reset your password</p>
+                    <div class="auth-input-group">
+                        <label class="auth-input-label" for="fpIdentifier">Username/Email:</label>
+                        <input type="text" id="fpIdentifier" autocomplete="username">
+                    </div>
+                    <div id="fpEmailMsg" class="admin-form-msg"></div>
+                    <button type="button" class="auth-submit-btn" id="fpSendCodeBtn" onclick="handleSendResetOtp()">Send Code</button>
+                    <p class="auth-switch-row"><a href="javascript:void(0)" onclick="closeForgotPasswordFlow()">← Back to Login</a></p>
+                </div>
+
+                <div class="fp-step" id="fpStepOtp" style="display:none;">
+                    <p class="auth-page-lead">Enter the code sent to <span id="fpOtpEmailLabel" style="color:#fff;"></span></p>
+                    <div class="auth-input-group">
+                        <label class="auth-input-label" for="fpOtpInput">6-digit code:</label>
+                        <input type="text" id="fpOtpInput" class="auth-otp-input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
+                    </div>
+                    <div id="fpOtpMsg" class="admin-form-msg"></div>
+                    <button type="button" class="auth-submit-btn" id="fpVerifyOtpBtn" onclick="handleVerifyResetOtp()">Verify Code</button>
+                    <p class="auth-switch-row">
+                        <a href="javascript:void(0)" id="fpResendLink" onclick="handleSendResetOtp(true)">Resend code</a>
+                        &nbsp;•&nbsp;
+                        <a href="javascript:void(0)" onclick="showForgotStep('email')">← Change email</a>
+                    </p>
+                </div>
+
+                <div class="fp-step" id="fpStepNewPassword" style="display:none;">
+                    <p class="auth-page-lead">Set a new password</p>
+                    <div class="auth-input-group auth-input-password">
+                        <label class="auth-input-label" for="fpNewPassword">New Password:</label>
+                        <div class="auth-password-field">
+                            <input type="password" id="fpNewPassword" placeholder="At least 6 characters" autocomplete="new-password">
+                            <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('fpNewPassword', this)" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="auth-input-group auth-input-password">
+                        <label class="auth-input-label" for="fpConfirmPassword">Repeat New Password:</label>
+                        <div class="auth-password-field">
+                            <input type="password" id="fpConfirmPassword" placeholder="Re-enter new password" autocomplete="new-password">
+                            <button type="button" class="auth-eye-btn" onclick="toggleAuthPasswordVisibility('fpConfirmPassword', this)" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="fpNewPasswordMsg" class="admin-form-msg"></div>
+                    <button type="button" class="auth-submit-btn" id="fpResetBtn" onclick="handleSubmitNewPassword()">Reset Password</button>
+                </div>
+
+                <div class="fp-step" id="fpStepDone" style="display:none;">
+                    <p class="auth-page-lead">✅ Your password has been reset successfully. You're now signed in.</p>
+                    <button type="button" class="auth-submit-btn" onclick="closeAuthModal()">Continue</button>
+                </div>
+
             </div>
 
             <!-- ---------- REGISTER PAGE ---------- -->

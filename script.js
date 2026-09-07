@@ -3220,6 +3220,7 @@ function closeAuthModal() {
     const overlay = document.getElementById('authOverlay');
     if (overlay) overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
+    cancelPendingRecoverySessionIfAny(); // ভুল করে/মাঝপথে মোডাল বন্ধ করে দিলে temporary recovery session sign-out করে দাও
     resetAuthForm(); // পেজ বন্ধ করার পর ফর্মে টাইপ করা কোনো লেখা যেন থেকে না যায়
     // URL থেকে ?auth সরিয়ে দাও, নাহলে পরের বার refresh দিলে আবার এই পেজ খুলে যাবে
     const params = new URLSearchParams(window.location.search);
@@ -3234,15 +3235,21 @@ function closeAuthModal() {
 // Login/Register মোডাল বন্ধ করলে দুটো ফর্মেরই সব input/message খালি করে দেয়,
 // যাতে আবার খুললে আগের টাইপ করা ইমেইল/পাসওয়ার্ড/এরর মেসেজ দেখা না যায়
 function resetAuthForm() {
-    ['signinEmail', 'signinPassword', 'signupUsername', 'signupEmail', 'signupPassword', 'signupPasswordConfirm', 'signupCaptchaInput'].forEach(id => {
+    ['signinEmail', 'signinPassword', 'signupUsername', 'signupEmail', 'signupPassword', 'signupPasswordConfirm', 'signupCaptchaInput', 'fpIdentifier', 'fpOtpInput', 'fpNewPassword', 'fpConfirmPassword'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    ['authSigninMsg', 'authSignupMsg', 'signupUsernameMsg'].forEach(id => {
+    ['authSigninMsg', 'authSignupMsg', 'signupUsernameMsg', 'fpEmailMsg', 'fpOtpMsg', 'fpNewPasswordMsg'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = '';
     });
     updateAuthPasswordStrength('');
+    clearInterval(fpResendTimer);
+    fpResolvedEmail = null;
+    const forgotTab = document.getElementById('authTabForgot');
+    if (forgotTab) forgotTab.style.display = 'none';
+    const tabsBar = document.querySelector('.auth-tabs');
+    if (tabsBar) tabsBar.style.display = 'flex';
 }
 function switchAuthTab(tab) {
     const signinTab = document.getElementById('authTabSignin');
@@ -3296,17 +3303,125 @@ function toggleAuthPasswordVisibility(fieldId, btn) {
     btn.innerHTML = showing ? AUTH_EYE_ICON_OPEN : AUTH_EYE_ICON_CLOSED;
 }
 
-// "Forgot Password?" - ইউজারের দেওয়া username/email এ Supabase দিয়ে reset link পাঠায়
-async function handleForgotPassword() {
-    const identifierInput = document.getElementById('signinEmail');
+// ==================== FORGOT PASSWORD (OTP based, no email link) ====================
+// আগে magic-link পাঠানো হতো, কিন্তু সেই লিংকে ক্লিক করলে সরাসরি হোমপেজে চলে যেত (কোনো
+// "set new password" পেজ ছিল না)। তাই পুরো ফ্লো-টা এখন OTP-ভিত্তিক করে দেওয়া হয়েছে:
+//   ধাপ ১: Username/Email দিলে Supabase একটা 6-digit code মেইল করে
+//   ধাপ ২: সেই code বসালে verifyOtp() দিয়ে যাচাই হয় (type: 'recovery')
+//   ধাপ ৩: verify সফল হলে নতুন password + repeat password ফিল্ড আসে, updateUser() দিয়ে
+//          আসল account password টাই সেট হয়ে যায় (Supabase auth এ)
+//
+// ⚠️ গুরুত্বপূর্ণ (কোডে করা যায় না, Supabase Dashboard থেকে করতে হবে):
+// Supabase Dashboard → Authentication → Email Templates → "Reset Password" টেমপ্লেটে
+// অবশ্যই {{ .Token }} ভেরিয়েবলটা বসাতে হবে (যেমন: "Your code is: {{ .Token }}"),
+// তা না হলে মেইলে কোনো OTP code-ই আসবে না — শুধু আগের মতো লিংক আসবে।
+
+let fpResolvedEmail = null;       // OTP পাঠানোর সময় resolve হওয়া আসল email
+let fpRecoverySessionActive = false; // verifyOtp সফল হওয়ার পর থেকে password update না হওয়া পর্যন্ত true
+let fpResendTimer = null;
+let fpResendSecondsLeft = 0;
+
+// পাসওয়ার্ড রিসেট মাঝপথে রেখে মোডাল বন্ধ করে দিলে/back করলে, verifyOtp দিয়ে খোলা
+// temporary session টা sign out করে দেয় (নিরাপত্তার জন্য - পাবলিক/শেয়ার করা ডিভাইসে যেন
+// অচেনা কেউ password change না করে সেই recovery session ব্যবহার করে থাকতে না পারে)
+async function cancelPendingRecoverySessionIfAny() {
+    if (fpRecoverySessionActive) {
+        fpRecoverySessionActive = false;
+        try { await supabaseClient.auth.signOut(); } catch (e) { /* ignore */ }
+    }
+}
+
+function showForgotStep(step) {
+    const stepIds = { email: 'fpStepEmail', otp: 'fpStepOtp', newpass: 'fpStepNewPassword', done: 'fpStepDone' };
+    Object.entries(stepIds).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (key === step) ? 'flex' : 'none';
+    });
+    if (step === 'otp') {
+        const otpInput = document.getElementById('fpOtpInput');
+        if (otpInput) { otpInput.value = ''; setTimeout(() => otpInput.focus(), 50); }
+    }
+}
+
+// "Forgot password?" লিংকে ক্লিক করলে Login ফর্ম থেকে এই ৩-ধাপের ফ্লো-তে চলে আসে
+function openForgotPasswordFlow() {
+    const signinEmailVal = (document.getElementById('signinEmail')?.value || '').trim();
+    const fpIdentifier = document.getElementById('fpIdentifier');
+    if (fpIdentifier) fpIdentifier.value = signinEmailVal;
+
+    fpResolvedEmail = null;
+    fpRecoverySessionActive = false;
+    clearInterval(fpResendTimer);
+
+    ['fpEmailMsg', 'fpOtpMsg', 'fpNewPasswordMsg'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = ''; el.className = 'admin-form-msg'; }
+    });
+    ['fpOtpInput', 'fpNewPassword', 'fpConfirmPassword'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const resendLink = document.getElementById('fpResendLink');
+    if (resendLink) { resendLink.textContent = 'Resend code'; resendLink.classList.remove('disabled'); }
+
+    const tabsBar = document.querySelector('.auth-tabs');
+    if (tabsBar) tabsBar.style.display = 'none';
+    const signinTab = document.getElementById('authTabSignin');
+    const signupTab = document.getElementById('authTabSignup');
+    if (signinTab) signinTab.style.display = 'none';
+    if (signupTab) signupTab.style.display = 'none';
+    const forgotTab = document.getElementById('authTabForgot');
+    if (forgotTab) forgotTab.style.display = 'flex';
+    showForgotStep('email');
+}
+
+// "← Back to Login" - forgot flow থেকে বেরিয়ে আবার Login ট্যাবে ফিরে যায়
+async function closeForgotPasswordFlow() {
+    await cancelPendingRecoverySessionIfAny();
+    clearInterval(fpResendTimer);
+    const forgotTab = document.getElementById('authTabForgot');
+    if (forgotTab) forgotTab.style.display = 'none';
+    const tabsBar = document.querySelector('.auth-tabs');
+    if (tabsBar) tabsBar.style.display = 'flex';
+    switchAuthTab('signin');
+}
+
+// Resend লিংকে ৪৫ সেকেন্ডের cooldown - বারবার ক্লিক করে স্প্যাম পাঠানো ঠেকানোর জন্য
+function startResendCooldown(seconds) {
+    const link = document.getElementById('fpResendLink');
+    if (!link) return;
+    fpResendSecondsLeft = seconds || 45;
+    clearInterval(fpResendTimer);
+    function tick() {
+        if (fpResendSecondsLeft <= 0) {
+            link.textContent = 'Resend code';
+            link.classList.remove('disabled');
+            clearInterval(fpResendTimer);
+            return;
+        }
+        link.textContent = `Resend code (${fpResendSecondsLeft}s)`;
+        link.classList.add('disabled');
+        fpResendSecondsLeft--;
+    }
+    tick();
+    fpResendTimer = setInterval(tick, 1000);
+}
+
+// ধাপ ১ → Username/Email দিয়ে Supabase কে OTP code মেইল করতে বলে
+// (isResend=true হলে ধাপ ২ থেকে "Resend code" চাপার ফলে আবার একই email এ নতুন code পাঠাবে)
+async function handleSendResetOtp(isResend) {
+    if (isResend && document.getElementById('fpResendLink')?.classList.contains('disabled')) return;
+
+    const identifierInput = document.getElementById('fpIdentifier');
     const identifier = (identifierInput?.value || '').trim();
-    const msgEl = document.getElementById('authSigninMsg');
+    const msgEl = document.getElementById(isResend ? 'fpOtpMsg' : 'fpEmailMsg');
+
     if (!identifier) {
-        if (msgEl) { msgEl.textContent = 'Please enter your Username/Email first to send the reset link.'; msgEl.className = 'admin-form-msg error'; }
+        if (msgEl) { msgEl.textContent = 'Please enter your Username/Email first.'; msgEl.className = 'admin-form-msg error'; }
         identifierInput?.focus();
         return;
     }
-    if (msgEl) { msgEl.textContent = 'Sending...'; msgEl.className = 'admin-form-msg'; }
+    if (msgEl) { msgEl.textContent = 'Sending code...'; msgEl.className = 'admin-form-msg'; }
     try {
         const email = await resolveLoginEmail(identifier);
         if (!email) {
@@ -3318,9 +3433,67 @@ async function handleForgotPassword() {
             if (msgEl) { msgEl.textContent = error.message; msgEl.className = 'admin-form-msg error'; }
             return;
         }
-        if (msgEl) { msgEl.textContent = 'A password reset link has been sent to your email ✅ (Signed up with Google? Just click "Continue with Google" below instead — no password needed.)'; msgEl.className = 'admin-form-msg success'; }
+        fpResolvedEmail = email;
+        const emailLabel = document.getElementById('fpOtpEmailLabel');
+        if (emailLabel) emailLabel.textContent = email;
+
+        if (msgEl) { msgEl.textContent = (isResend ? 'A new code has been sent ✅' : 'Code sent ✅'); msgEl.className = 'admin-form-msg success'; }
+        if (!isResend) showForgotStep('otp');
+        startResendCooldown(45);
     } catch (e) {
         if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
+    }
+}
+
+// ধাপ ২ → ইউজারের বসানো 6-digit code Supabase এর সাথে verify করে (type: 'recovery')
+// সফল হলে সাময়িক একটা session তৈরি হয়ে যায়, যেটা দিয়ে পরের ধাপে updateUser() কল করা যাবে
+async function handleVerifyResetOtp() {
+    const otpInput = document.getElementById('fpOtpInput');
+    const code = (otpInput?.value || '').trim();
+    const msgEl = document.getElementById('fpOtpMsg');
+
+    if (!fpResolvedEmail) { showForgotStep('email'); return; }
+    if (!/^\d{6}$/.test(code)) {
+        if (msgEl) { msgEl.textContent = 'Please enter the 6-digit code from your email.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (msgEl) { msgEl.textContent = 'Verifying...'; msgEl.className = 'admin-form-msg'; }
+    try {
+        const { error } = await supabaseClient.auth.verifyOtp({ email: fpResolvedEmail, token: code, type: 'recovery' });
+        if (error) {
+            if (msgEl) { msgEl.textContent = '❌ ' + (error.message || 'Invalid or expired code.'); msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+        fpRecoverySessionActive = true;
+        clearInterval(fpResendTimer);
+        showForgotStep('newpass');
+    } catch (e) {
+        if (msgEl) { msgEl.textContent = 'Something went wrong, please try again.'; msgEl.className = 'admin-form-msg error'; }
+    }
+}
+
+// ধাপ ৩ → নতুন password + repeat password যাচাই করে আসল account password আপডেট করে
+async function handleSubmitNewPassword() {
+    const msgEl = document.getElementById('fpNewPasswordMsg');
+    const newPass = document.getElementById('fpNewPassword')?.value || '';
+    const confirmPass = document.getElementById('fpConfirmPassword')?.value || '';
+
+    if (newPass.length < 6) {
+        if (msgEl) { msgEl.textContent = 'New password must be at least 6 characters.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (newPass !== confirmPass) {
+        if (msgEl) { msgEl.textContent = 'New passwords do not match.'; msgEl.className = 'admin-form-msg error'; }
+        return;
+    }
+    if (msgEl) { msgEl.textContent = 'Updating...'; msgEl.className = 'admin-form-msg'; }
+    try {
+        const { error } = await supabaseClient.auth.updateUser({ password: newPass });
+        if (error) throw error;
+        fpRecoverySessionActive = false; // password change হয়ে গেছে - এখন এটা normal logged-in session
+        showForgotStep('done');
+    } catch (err) {
+        if (msgEl) { msgEl.textContent = '❌ ' + (err?.message || 'Could not update password'); msgEl.className = 'admin-form-msg error'; }
     }
 }
 
@@ -4976,7 +5149,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     lv: 'Latvian', lav: 'Latvian', latvian: 'Latvian',
     et: 'Estonian', est: 'Estonian', estonian: 'Estonian',
     is: 'Icelandic', ice: 'Icelandic', isl: 'Icelandic', icelandic: 'Icelandic',
-    tl: 'Filipino (Tagalog)', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino (Tagalog)',
+    tl: 'Filipino', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
     sw: 'Swahili', swa: 'Swahili', swahili: 'Swahili',
     af: 'Afrikaans', afr: 'Afrikaans', afrikaans: 'Afrikaans',
     am: 'Amharic', amh: 'Amharic', amharic: 'Amharic',
