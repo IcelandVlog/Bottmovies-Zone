@@ -4976,7 +4976,7 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     lv: 'Latvian', lav: 'Latvian', latvian: 'Latvian',
     et: 'Estonian', est: 'Estonian', estonian: 'Estonian',
     is: 'Icelandic', ice: 'Icelandic', isl: 'Icelandic', icelandic: 'Icelandic',
-    tl: 'Filipino', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
+    tl: 'Filipino (Tagalog)', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino (Tagalog)',
     sw: 'Swahili', swa: 'Swahili', swahili: 'Swahili',
     af: 'Afrikaans', afr: 'Afrikaans', afrikaans: 'Afrikaans',
     am: 'Amharic', amh: 'Amharic', amharic: 'Amharic',
