@@ -727,7 +727,8 @@
                         <input type="text" id="adminNavLabelInput" placeholder="Label (e.g. French Movies)">
                         <input type="text" id="adminNavSlugInput" placeholder="Category slug (data-target, e.g. french) — blank = shudhu container/toggle">
                         <input type="text" id="adminNavBannerInput" placeholder="Custom banner text (optional)">
-                        <button type="button" class="admin-banner-save-btn" id="adminNavAddBtn" onclick="addAdminNavItem()">➕ Add Item</button>
+                        <button type="button" class="admin-banner-save-btn" id="adminNavAddBtn" onclick="saveAdminNavItem()">➕ Add Item</button>
+                        <button type="button" class="admin-mini-btn" id="adminNavCancelEditBtn" onclick="cancelEditAdminNavItem()" style="display:none;">✕ Cancel Edit</button>
                     </div>
                     <div class="admin-database-list" id="adminNavList"></div>
                 </div>

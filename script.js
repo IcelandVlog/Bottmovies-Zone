@@ -6661,6 +6661,7 @@ async function renderAdminNavList() {
                 <div class="admin-db-actions">
                     <button type="button" class="admin-banner-move-btn" data-nav-move-id="${item.id}" data-dir="up" ${posIndex <= 0 ? 'disabled' : ''} title="Move earlier">▲</button>
                     <button type="button" class="admin-banner-move-btn" data-nav-move-id="${item.id}" data-dir="down" ${posIndex >= siblings.length - 1 ? 'disabled' : ''} title="Move later">▼</button>
+                    <button type="button" class="admin-mini-btn" data-nav-edit-id="${item.id}" title="Edit this item">✏️ Edit</button>
                     <button type="button" class="admin-db-delete-btn" data-nav-delete-id="${item.id}">Delete</button>
                 </div>
             </div>`;
@@ -6669,12 +6670,59 @@ async function renderAdminNavList() {
     listEl.querySelectorAll('[data-nav-move-id]').forEach(btn => {
         btn.addEventListener('click', () => moveAdminNavItem(parseInt(btn.getAttribute('data-nav-move-id'), 10), btn.getAttribute('data-dir')));
     });
+    listEl.querySelectorAll('[data-nav-edit-id]').forEach(btn => {
+        btn.addEventListener('click', () => editAdminNavItem(parseInt(btn.getAttribute('data-nav-edit-id'), 10)));
+    });
     listEl.querySelectorAll('[data-nav-delete-id]').forEach(btn => {
         btn.addEventListener('click', () => deleteAdminNavItem(parseInt(btn.getAttribute('data-nav-delete-id'), 10)));
     });
 }
 
-async function addAdminNavItem() {
+// null hole notun item add hocche, kono id thakle sheita edit/update hocche
+let adminNavEditingId = null;
+
+function editAdminNavItem(id) {
+    const items = window.__customNavItems || [];
+    const item = items.find(x => x.id === id);
+    if (!item) return;
+
+    const parentSelect = document.getElementById('adminNavParentSelect');
+    const labelInput = document.getElementById('adminNavLabelInput');
+    const slugInput = document.getElementById('adminNavSlugInput');
+    const bannerInput = document.getElementById('adminNavBannerInput');
+    const addBtn = document.getElementById('adminNavAddBtn');
+    const cancelBtn = document.getElementById('adminNavCancelEditBtn');
+    if (!parentSelect || !labelInput) return;
+
+    adminNavEditingId = id;
+    parentSelect.value = item.parent_manifest_id ? item.parent_manifest_id : (item.parent_id ? 'db:' + item.parent_id : '');
+    labelInput.value = item.label || '';
+    if (slugInput) slugInput.value = item.category_slug || '';
+    if (bannerInput) bannerInput.value = item.data_banner || '';
+    if (addBtn) addBtn.textContent = '💾 Update Item';
+    if (cancelBtn) cancelBtn.style.display = '';
+
+    labelInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    labelInput.focus();
+}
+
+function cancelEditAdminNavItem() {
+    adminNavEditingId = null;
+    const labelInput = document.getElementById('adminNavLabelInput');
+    const slugInput = document.getElementById('adminNavSlugInput');
+    const bannerInput = document.getElementById('adminNavBannerInput');
+    const parentSelect = document.getElementById('adminNavParentSelect');
+    const addBtn = document.getElementById('adminNavAddBtn');
+    const cancelBtn = document.getElementById('adminNavCancelEditBtn');
+    if (labelInput) labelInput.value = '';
+    if (slugInput) slugInput.value = '';
+    if (bannerInput) bannerInput.value = '';
+    if (parentSelect) parentSelect.value = '';
+    if (addBtn) addBtn.textContent = '➕ Add Item';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
+async function saveAdminNavItem() {
     const parentSelect = document.getElementById('adminNavParentSelect');
     const labelInput = document.getElementById('adminNavLabelInput');
     const slugInput = document.getElementById('adminNavSlugInput');
@@ -6689,35 +6737,55 @@ async function addAdminNavItem() {
     if (parentVal.startsWith('db:')) parent_id = parseInt(parentVal.slice(3), 10);
     else if (parentVal) parent_manifest_id = parentVal;
 
-    const items = window.__customNavItems || [];
-    const siblings = items.filter(x => (x.parent_id ?? null) === parent_id && (x.parent_manifest_id || null) === parent_manifest_id);
-    const maxOrder = siblings.reduce((max, x) => Math.max(max, x.order_index ?? -1), -1);
-
+    const editingId = adminNavEditingId;
     const addBtn = document.getElementById('adminNavAddBtn');
-    if (addBtn) { addBtn.disabled = true; addBtn.textContent = 'Adding...'; }
 
     try {
-        const { error } = await supabaseClient.from('nav_items').insert({
-            parent_id,
-            parent_manifest_id,
-            label,
-            category_slug: slugInput ? (slugInput.value.trim() || null) : null,
-            data_banner: bannerInput ? (bannerInput.value.trim() || null) : null,
-            order_index: maxOrder + 1
-        });
-        if (error) throw error;
+        if (editingId) {
+            // নিজেকেই নিজের parent বানানো আটকানো
+            if (parent_id === editingId) { showToast('❌ Ekta item nijer parent hote pare na', 'error'); return; }
+            if (addBtn) { addBtn.disabled = true; addBtn.textContent = 'Updating...'; }
 
-        labelInput.value = '';
-        if (slugInput) slugInput.value = '';
-        if (bannerInput) bannerInput.value = '';
-        showToast('✅ Navigation item add hoyeche');
+            const { error } = await supabaseClient.from('nav_items').update({
+                parent_id,
+                parent_manifest_id,
+                label,
+                category_slug: slugInput ? (slugInput.value.trim() || null) : null,
+                data_banner: bannerInput ? (bannerInput.value.trim() || null) : null
+            }).eq('id', editingId);
+            if (error) throw error;
+
+            showToast('✅ Navigation item update hoyeche');
+            cancelEditAdminNavItem();
+        } else {
+            const items = window.__customNavItems || [];
+            const siblings = items.filter(x => (x.parent_id ?? null) === parent_id && (x.parent_manifest_id || null) === parent_manifest_id);
+            const maxOrder = siblings.reduce((max, x) => Math.max(max, x.order_index ?? -1), -1);
+
+            if (addBtn) { addBtn.disabled = true; addBtn.textContent = 'Adding...'; }
+
+            const { error } = await supabaseClient.from('nav_items').insert({
+                parent_id,
+                parent_manifest_id,
+                label,
+                category_slug: slugInput ? (slugInput.value.trim() || null) : null,
+                data_banner: bannerInput ? (bannerInput.value.trim() || null) : null,
+                order_index: maxOrder + 1
+            });
+            if (error) throw error;
+
+            labelInput.value = '';
+            if (slugInput) slugInput.value = '';
+            if (bannerInput) bannerInput.value = '';
+            showToast('✅ Navigation item add hoyeche');
+        }
         await renderAdminNavList();
         renderCustomNavItems();
     } catch (err) {
-        console.error('addAdminNavItem error:', err);
-        showToast('❌ Add failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        console.error('saveAdminNavItem error:', err);
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
     } finally {
-        if (addBtn) { addBtn.disabled = false; addBtn.textContent = '➕ Add Item'; }
+        if (addBtn) { addBtn.disabled = false; addBtn.textContent = adminNavEditingId ? '💾 Update Item' : '➕ Add Item'; }
     }
 }
 
@@ -6727,6 +6795,7 @@ async function deleteAdminNavItem(id) {
     try {
         const { error } = await supabaseClient.from('nav_items').delete().eq('id', id);
         if (error) throw error;
+        if (adminNavEditingId === id) cancelEditAdminNavItem();
         showToast('✅ Deleted');
         await renderAdminNavList();
         renderCustomNavItems();
