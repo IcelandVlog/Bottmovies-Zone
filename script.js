@@ -501,6 +501,12 @@ async function fetchMoviesFromSupabase() {
                 } else if (currentAdminTab === 'banner') {
                     const searchInput = document.getElementById('adminBannerSearchInput');
                     renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
+                } else if (currentAdminTab === 'navigation') {
+                    // Category banner list-টা allMovies-এর category tag থেকেও category বের করে,
+                    // তাই movies load hওয়ার আগে Navigation tab খোলা থাকলে "No categories found"
+                    // দেখায় আর data আসার পরও রিফ্রেশ হতো না — এখন movies load শেষ হলে এটাও রিফ্রেশ হবে
+                    const catBannerSearchInput = document.getElementById('adminCategoryBannerSearchInput');
+                    renderAdminCategoryBannerList(catBannerSearchInput ? catBannerSearchInput.value.trim() : '');
                 } else if (currentAdminTab === 'trash') {
                     renderAdminTrashList();
                 }
