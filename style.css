@@ -1639,17 +1639,32 @@ html.light-mode .admin-section-heading { color: #1a1f2e; }
 
 .admin-category-box { display: flex; flex-wrap: wrap; gap: 8px; }
 .admin-category-pill {
-    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 6px 12px;
     border-radius: 20px;
     background-color: #171e2e;
     border: 1px solid #232d42;
     color: #94a3b8;
     font-size: 11.5px;
     font-weight: 600;
-    cursor: pointer;
     user-select: none;
 }
+.admin-category-pill-label { cursor: pointer; }
 .admin-category-pill.selected { background-color: #8bc34a; border-color: #8bc34a; color: #0b0e14; }
+.admin-category-pill-icon {
+    background: none;
+    border: none;
+    padding: 2px 3px;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1;
+    color: inherit;
+    opacity: 0.65;
+    cursor: pointer;
+}
+.admin-category-pill-icon:hover { opacity: 1; }
 
 .admin-add-category-row { display: flex; gap: 8px; margin-top: 4px; }
 .admin-add-category-row input { flex: 1; }
@@ -2351,6 +2366,21 @@ html.light-mode .admin-request-link-btn:hover { background-color: #e6ddff; }
     line-height: 1.6;
     margin-bottom: 20px;
 }
+
+.custom-confirm-prompt-input {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: #0b0e14;
+    border: 1px solid #232d42;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #e2e8f0;
+    outline: none;
+    margin-bottom: 20px;
+}
+.custom-confirm-prompt-input:focus { border-color: #2563eb; }
+html.light-mode .custom-confirm-prompt-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
 
 .custom-confirm-actions {
     display: flex;

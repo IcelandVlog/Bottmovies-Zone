@@ -5697,12 +5697,33 @@ function renderAdminCategoryBox() {
     cats.forEach(cat => {
         const pill = document.createElement('div');
         pill.className = 'admin-category-pill' + (adminSelectedCategories.has(cat) ? ' selected' : '');
-        pill.textContent = cat;
-        pill.onclick = function() {
+
+        const label = document.createElement('span');
+        label.className = 'admin-category-pill-label';
+        label.textContent = cat;
+        label.onclick = function() {
             if (adminSelectedCategories.has(cat)) adminSelectedCategories.delete(cat);
             else adminSelectedCategories.add(cat);
             renderAdminCategoryBox();
         };
+        pill.appendChild(label);
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'admin-category-pill-icon';
+        editBtn.title = 'Rename category';
+        editBtn.textContent = '✏️';
+        editBtn.onclick = function(e) { e.stopPropagation(); renameAdminCategory(cat); };
+        pill.appendChild(editBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'admin-category-pill-icon';
+        deleteBtn.title = 'Delete category';
+        deleteBtn.textContent = '✕';
+        deleteBtn.onclick = function(e) { e.stopPropagation(); deleteAdminCategory(cat); };
+        pill.appendChild(deleteBtn);
+
         box.appendChild(pill);
     });
 }
@@ -5723,6 +5744,87 @@ function addNewAdminCategory() {
     input.value = '';
     renderAdminCategoryBox();
     saveNewCategoryToDb(slug);
+}
+
+// একটা category-র নাম বদলালে সেটা যত movie-তে ব্যবহার হচ্ছে সব কটাতেই নতুন নাম বসে যাবে
+async function renameAdminCategory(oldSlug) {
+    const typed = await showPromptModal('Rename category "' + escapeHtml(oldSlug) + '" to:', oldSlug);
+    if (typed === null) return;
+    const newSlug = normalizeCategorySlug(slugifyCategory(typed));
+    if (!newSlug) { showToast('❌ Category name lekha lagbe', 'error'); return; }
+    if (newSlug === oldSlug) return;
+
+    const mergingIntoExisting = getAllKnownCategories().includes(newSlug);
+    if (mergingIntoExisting) {
+        const merge = await showConfirmModal(
+            `"${escapeHtml(newSlug)}" already ache. "${escapeHtml(oldSlug)}"-ke er sathe merge korte chao? Shob movie-r tag update hoye jabe.`,
+            { confirmText: 'Merge', danger: false }
+        );
+        if (!merge) return;
+    }
+
+    const affectedMovies = (Array.isArray(allMovies) ? allMovies : []).filter(m => Array.isArray(m.category) && m.category.includes(oldSlug));
+
+    try {
+        const { data: updRows, error: updErr } = await supabaseClient
+            .from('categories').update({ slug: newSlug }).eq('slug', oldSlug).select();
+        if (updErr && updErr.code !== '23505') throw updErr;
+        if (!updRows || !updRows.length) {
+            const { error: insErr } = await supabaseClient.from('categories').insert([{ slug: newSlug }]);
+            if (insErr && insErr.code !== '23505') throw insErr;
+        }
+
+        await Promise.all(affectedMovies.map(async (m) => {
+            const newCats = Array.from(new Set(m.category.map(c => c === oldSlug ? newSlug : c)));
+            const { error } = await supabaseClient.from('movies').update({ category: newCats.join('|') }).eq('id', m.id);
+            if (error) throw error;
+            m.category = newCats;
+        }));
+
+        adminExtraCategories.delete(oldSlug);
+        adminExtraCategories.add(newSlug);
+        if (adminSelectedCategories.has(oldSlug)) {
+            adminSelectedCategories.delete(oldSlug);
+            adminSelectedCategories.add(newSlug);
+        }
+
+        renderAdminCategoryBox();
+        showToast(`✅ "${oldSlug}" ke "${newSlug}" e rename kora hoyeche (${affectedMovies.length}টা title update hoyeche)`);
+    } catch (err) {
+        console.error('renameAdminCategory error:', err);
+        showToast('❌ Rename failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    }
+}
+
+// একটা category delete korle sheita je shob movie-te tag kora ache shekhan theke shudhu tag ta uthe jabe (movie delete hobe na)
+async function deleteAdminCategory(slug) {
+    const affectedMovies = (Array.isArray(allMovies) ? allMovies : []).filter(m => Array.isArray(m.category) && m.category.includes(slug));
+    const warnMsg = affectedMovies.length
+        ? `"${escapeHtml(slug)}" category ${affectedMovies.length}টা title theke remove hobe (title gulo delete hobe na, shudhu category tag ta uthe jabe). Continue?`
+        : `"${escapeHtml(slug)}" category delete korte chao?`;
+    const confirmed = await showConfirmModal(warnMsg, { confirmText: 'Delete', danger: true });
+    if (!confirmed) return;
+
+    try {
+        const { error: delErr } = await supabaseClient.from('categories').delete().eq('slug', slug);
+        if (delErr) throw delErr;
+
+        await Promise.all(affectedMovies.map(async (m) => {
+            const newCats = m.category.filter(c => c !== slug);
+            const { error } = await supabaseClient.from('movies').update({ category: newCats.join('|') }).eq('id', m.id);
+            if (error) throw error;
+            m.category = newCats;
+        }));
+
+        adminExtraCategories.delete(slug);
+        adminSelectedCategories.delete(slug);
+
+        renderAdminCategoryBox();
+        showToast(`✅ "${slug}" category delete kora hoyeche`);
+    } catch (err) {
+        console.error('deleteAdminCategory error:', err);
+        showToast('❌ Delete failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    }
 }
 
 // ---------- TMDB Type / Poster mode toggles ----------
@@ -7268,6 +7370,49 @@ function showConfirmModal(message, options) {
         });
 
         requestAnimationFrame(() => overlay.classList.add('open'));
+    });
+}
+
+// টেক্সট ইনপুট সহ প্রম্পট মডাল (যেমন category rename করার সময় ব্যবহার হয়)
+function showPromptModal(message, defaultValue) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'custom-confirm-overlay';
+        overlay.innerHTML = `
+            <div class="custom-confirm-box">
+                <button type="button" class="custom-confirm-x-btn" aria-label="Close">×</button>
+                <div class="custom-confirm-message">${message}</div>
+                <input type="text" class="custom-confirm-prompt-input" value="${escapeAttr(defaultValue || '')}">
+                <div class="custom-confirm-actions">
+                    <button type="button" class="custom-confirm-cancel-btn">Cancel</button>
+                    <button type="button" class="custom-confirm-ok-btn">Rename</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const input = overlay.querySelector('.custom-confirm-prompt-input');
+
+        const cleanup = (result) => {
+            overlay.remove();
+            resolve(result);
+        };
+
+        overlay.querySelector('.custom-confirm-ok-btn').addEventListener('click', () => cleanup(input.value));
+        overlay.querySelector('.custom-confirm-cancel-btn').addEventListener('click', () => cleanup(null));
+        overlay.querySelector('.custom-confirm-x-btn').addEventListener('click', () => cleanup(null));
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) cleanup(null);
+        });
+        input.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') cleanup(input.value);
+            if (e.key === 'Escape') cleanup(null);
+        });
+
+        requestAnimationFrame(() => {
+            overlay.classList.add('open');
+            input.focus();
+            input.select();
+        });
     });
 }
 
