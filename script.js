@@ -5989,21 +5989,31 @@ function renderAdminCategoryBannerList(filter) {
 async function saveCategoryBannerLabel(slug, label, btn) {
     const trimmed = (label || '').trim();
     try {
-        // upsert() Supabase RLS-এর UPDATE policy-র সাথে conflict করে অনেক সময়
-        // ("violates row-level security policy"), তাই age update try kori,
-        // row na thakle plain insert kori (ei pattern-ta rename/add-e already kaj korche)
-        const { data: updRows, error: updErr } = await supabaseClient
+        // age .update().select() diye check kora hoto row update hoyeche kina,
+        // kintu Supabase RLS-e SELECT policy na thakle update shofol holeo
+        // .select() khali data ferot dey — takei "row nai" bhebe upore insert
+        // try kora hoto, ar shei insert duplicate-key (23505) e giye chup-chap
+        // "Saved" dekhiye ditho, othocho আসল data DB-te save-i hoyni.
+        // Tai এখন { count: 'exact' } diye সরাসরি koyta row update holo seta
+        // dhore, SELECT policy-r upor nirbhor kori na.
+        const { error: updErr, count } = await supabaseClient
             .from('categories')
-            .update({ banner_label: trimmed || null })
-            .eq('slug', slug)
-            .select();
+            .update({ banner_label: trimmed || null }, { count: 'exact' })
+            .eq('slug', slug);
         if (updErr) throw updErr;
 
-        if (!updRows || !updRows.length) {
+        if (!count) {
             const { error: insErr } = await supabaseClient
                 .from('categories')
                 .insert([{ slug: slug, banner_label: trimmed || null }]);
-            if (insErr && insErr.code !== '23505') throw insErr;
+            if (insErr) {
+                if (insErr.code === '23505') {
+                    // Row already ache, tao update-e 0 count — mane row update
+                    // korar RLS policy nai (SELECT policy thakleo UPDATE policy alada)
+                    throw new Error('Row ache kintu update hocche na — Supabase-e "categories" table-er UPDATE policy check korun (RLS)');
+                }
+                throw insErr;
+            }
         }
 
         if (trimmed) categoryBannerLabels[slug] = trimmed;
@@ -6021,7 +6031,7 @@ async function saveCategoryBannerLabel(slug, label, btn) {
     } catch (err) {
         console.error('saveCategoryBannerLabel error:', err);
         if (btn) { btn.disabled = false; btn.textContent = '⚠️ Retry'; }
-        showToast('❌ Save failed — check je "categories" table-e "banner_label" column ache kina: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error') + ' — Supabase-e "categories" table-er RLS (Row Level Security) UPDATE policy check korun', 'error');
     }
 }
 
