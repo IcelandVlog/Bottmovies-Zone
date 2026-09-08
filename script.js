@@ -2462,6 +2462,19 @@ function searchMovies() {
 // currently open category-r banner text update kora jay
 const DEFAULT_NOTICE_TEXT = "We have Changed our Official Domain to BOTTMOVIES.Bookmarks Now";
 
+// nav-link-er data-target (jemon "dc") r categories table-e save howa slug
+// (jemon "DC") case-e mile na-o pare — tai exact match na paile case-insensitive
+// vabe khuje dekha hoy, na hole thik thakleo sotti label-ta miss hoye jay
+function getCategoryBannerLabel(category) {
+    if (!categoryBannerLabels || !category) return null;
+    if (categoryBannerLabels[category]) return categoryBannerLabels[category];
+    const lower = String(category).toLowerCase();
+    for (const key in categoryBannerLabels) {
+        if (key.toLowerCase() === lower) return categoryBannerLabels[key];
+    }
+    return null;
+}
+
 function updateNoticeBannerText(category, targetLink) {
     const noticeText = document.getElementById('noticeBannerText');
     const noticeBanner = document.getElementById('noticeBanner');
@@ -2470,10 +2483,11 @@ function updateNoticeBannerText(category, targetLink) {
     }
 
     if (noticeText) {
+        const customLabel = getCategoryBannerLabel(category);
         if (category === 'all') {
             noticeText.innerText = DEFAULT_NOTICE_TEXT;
-        } else if (categoryBannerLabels && categoryBannerLabels[category]) {
-            noticeText.innerText = categoryBannerLabels[category];
+        } else if (customLabel) {
+            noticeText.innerText = customLabel;
         } else if (targetLink) {
             const customBanner = targetLink.getAttribute('data-banner');
             noticeText.innerText = customBanner || targetLink.innerText.trim();
@@ -5999,7 +6013,7 @@ async function saveCategoryBannerLabel(slug, label, btn) {
         // Ei muhurte user jodi ei category-r page-e already thake, tahole
         // admin panel bondho na kore-o notice banner-er lekha shathe shathe update hobe
         const activeCategory = document.body.getAttribute('data-category');
-        if (activeCategory && activeCategory === slug) {
+        if (activeCategory && activeCategory.toLowerCase() === String(slug).toLowerCase()) {
             updateNoticeBannerText(activeCategory);
         }
 
