@@ -2475,6 +2475,8 @@ function switchCategory(category, initialPage) {
     if (noticeText) {
         if (category === 'all') {
             noticeText.innerText = DEFAULT_NOTICE;
+        } else if (categoryBannerLabels && categoryBannerLabels[category]) {
+            noticeText.innerText = categoryBannerLabels[category];
         } else if (targetLink) {
             const customBanner = targetLink.getAttribute('data-banner');
             noticeText.innerText = customBanner || targetLink.innerText.trim();
@@ -4829,6 +4831,8 @@ let adminSelectedCategories = new Set();
 let currentAdminTab = 'dashboard'; // movies data লোড হওয়ার পর dashboard খোলা থাকলে stats রিফ্রেশ করতে ব্যবহার হয়
 
 let adminExtraCategories = new Set();
+// slug -> custom banner text (category page-e gele notice banner-e ei lekha dekhabe)
+let categoryBannerLabels = {};
 let adminTmdbType = 'movie';
 let adminPosterMode = 'link';
 let adminTrailerThumbMode = 'link';
@@ -4836,9 +4840,16 @@ let adminCategoriesLoaded = false;
 
 async function loadAdminExtraCategories() {
     try {
-        const { data, error } = await supabaseClient
+        let { data, error } = await supabaseClient
             .from('categories')
-            .select('slug');
+            .select('slug, banner_label');
+
+        if (error) {
+            // purono DB-te "banner_label" column na thakle (migration run kora hoyni), shudhu slug diye fallback kori
+            const fallback = await supabaseClient.from('categories').select('slug');
+            data = fallback.data;
+            error = fallback.error;
+        }
 
         if (error) {
             console.error('Error loading categories from Supabase:', error.message, error);
@@ -4848,6 +4859,10 @@ async function loadAdminExtraCategories() {
         console.log('Categories loaded from Supabase:', data);
 
         adminExtraCategories = new Set((data || []).map(row => row.slug).filter(Boolean));
+        categoryBannerLabels = {};
+        (data || []).forEach(row => {
+            if (row && row.slug && row.banner_label) categoryBannerLabels[row.slug] = row.banner_label;
+        });
         adminCategoriesLoaded = true;
         renderAdminCategoryBox();
     } catch (e) {
@@ -4954,6 +4969,8 @@ function switchAdminTab(tab) {
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
     } else if (validTab === 'navigation') {
         renderAdminNavList();
+        const catBannerSearchInput = document.getElementById('adminCategoryBannerSearchInput');
+        renderAdminCategoryBannerList(catBannerSearchInput ? catBannerSearchInput.value.trim() : '');
     } else if (validTab === 'comments') {
         const searchInput = document.getElementById('adminCommentSearchInput');
         renderAdminCommentsList(searchInput ? searchInput.value.trim() : '');
@@ -5129,6 +5146,13 @@ function setupAdminPanel() {
     if (adminBannerSearchInput) {
         adminBannerSearchInput.addEventListener('input', function() {
             renderAdminBannerList(this.value.trim());
+        });
+    }
+
+    const adminCategoryBannerSearchInput = document.getElementById('adminCategoryBannerSearchInput');
+    if (adminCategoryBannerSearchInput) {
+        adminCategoryBannerSearchInput.addEventListener('input', function() {
+            renderAdminCategoryBannerList(this.value.trim());
         });
     }
 
@@ -5764,13 +5788,14 @@ async function renameAdminCategory(oldSlug) {
     }
 
     const affectedMovies = (Array.isArray(allMovies) ? allMovies : []).filter(m => Array.isArray(m.category) && m.category.includes(oldSlug));
+    const bannerLabel = categoryBannerLabels[oldSlug] || null;
 
     try {
         const { data: updRows, error: updErr } = await supabaseClient
             .from('categories').update({ slug: newSlug }).eq('slug', oldSlug).select();
         if (updErr && updErr.code !== '23505') throw updErr;
         if (!updRows || !updRows.length) {
-            const { error: insErr } = await supabaseClient.from('categories').insert([{ slug: newSlug }]);
+            const { error: insErr } = await supabaseClient.from('categories').insert([{ slug: newSlug, banner_label: bannerLabel }]);
             if (insErr && insErr.code !== '23505') throw insErr;
         }
 
@@ -5783,12 +5808,17 @@ async function renameAdminCategory(oldSlug) {
 
         adminExtraCategories.delete(oldSlug);
         adminExtraCategories.add(newSlug);
+        if (bannerLabel) {
+            delete categoryBannerLabels[oldSlug];
+            categoryBannerLabels[newSlug] = bannerLabel;
+        }
         if (adminSelectedCategories.has(oldSlug)) {
             adminSelectedCategories.delete(oldSlug);
             adminSelectedCategories.add(newSlug);
         }
 
         renderAdminCategoryBox();
+        refreshAdminCategoryBannerListIfVisible();
         showToast(`✅ "${oldSlug}" ke "${newSlug}" e rename kora hoyeche (${affectedMovies.length}টা title update hoyeche)`);
     } catch (err) {
         console.error('renameAdminCategory error:', err);
@@ -5805,6 +5835,11 @@ async function deleteAdminCategory(slug) {
     const confirmed = await showConfirmModal(warnMsg, { confirmText: 'Delete', danger: true });
     if (!confirmed) return;
 
+    // ভুলে delete হয়ে গেলে "Undo" দিয়ে ফিরিয়ে আনার জন্য, মুছে ফেলার আগে movie-গুলোর
+    // আসল category লিস্ট আর banner text-এর একটা snapshot রেখে দাও
+    const snapshot = affectedMovies.map(m => ({ id: m.id, category: m.category.slice() }));
+    const bannerLabelSnapshot = categoryBannerLabels[slug] || null;
+
     try {
         const { error: delErr } = await supabaseClient.from('categories').delete().eq('slug', slug);
         if (delErr) throw delErr;
@@ -5818,12 +5853,117 @@ async function deleteAdminCategory(slug) {
 
         adminExtraCategories.delete(slug);
         adminSelectedCategories.delete(slug);
+        delete categoryBannerLabels[slug];
 
         renderAdminCategoryBox();
-        showToast(`✅ "${slug}" category delete kora hoyeche`);
+        refreshAdminCategoryBannerListIfVisible();
+        showToast(`✅ "${slug}" category delete kora hoyeche`, null, {
+            actionLabel: '↩ Undo',
+            duration: 8000,
+            onAction: () => undoDeleteAdminCategory(slug, snapshot, bannerLabelSnapshot)
+        });
     } catch (err) {
         console.error('deleteAdminCategory error:', err);
         showToast('❌ Delete failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    }
+}
+
+// "Undo" চাপলে category-টা আবার ফিরিয়ে আনো, আর যে movie-গুলো থেকে tag উঠে গিয়েছিল
+// সেগুলোতেও আগের মতো tag আর banner text আবার বসিয়ে দাও
+async function undoDeleteAdminCategory(slug, snapshot, bannerLabel) {
+    try {
+        const { error: insErr } = await supabaseClient.from('categories').insert([{ slug, banner_label: bannerLabel || null }]);
+        if (insErr && insErr.code !== '23505') throw insErr;
+
+        await Promise.all((snapshot || []).map(async (snap) => {
+            const movie = (Array.isArray(allMovies) ? allMovies : []).find(m => m.id === snap.id);
+            if (!movie) return;
+            const { error } = await supabaseClient.from('movies').update({ category: snap.category.join('|') }).eq('id', snap.id);
+            if (error) throw error;
+            movie.category = snap.category.slice();
+        }));
+
+        adminExtraCategories.add(slug);
+        if (bannerLabel) categoryBannerLabels[slug] = bannerLabel;
+        renderAdminCategoryBox();
+        refreshAdminCategoryBannerListIfVisible();
+        showToast(`✅ "${slug}" category firiye ana hoyeche`);
+    } catch (err) {
+        console.error('undoDeleteAdminCategory error:', err);
+        showToast('❌ Undo failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+    }
+}
+
+// Navigation ট্যাব খোলা থাকলে category banner list-টাও সাথে সাথে refresh kore dao
+function refreshAdminCategoryBannerListIfVisible() {
+    const list = document.getElementById('adminCategoryBannerList');
+    if (!list) return;
+    const searchInput = document.getElementById('adminCategoryBannerSearchInput');
+    renderAdminCategoryBannerList(searchInput ? searchInput.value.trim() : '');
+}
+
+// ---------- Category banner text (Navigation ট্যাব থেকে সব category-র জন্য আলাদা notice-banner লেখা) ----------
+
+function renderAdminCategoryBannerList(filter) {
+    const container = document.getElementById('adminCategoryBannerList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const q = (filter || '').toLowerCase().trim();
+    const cats = getAllKnownCategories().filter(c => !q || c.toLowerCase().includes(q));
+
+    if (!cats.length) {
+        container.innerHTML = '<div class="admin-db-empty">No categories found.</div>';
+        return;
+    }
+
+    cats.forEach(cat => {
+        const card = document.createElement('div');
+        card.className = 'admin-db-card admin-banner-card';
+        card.innerHTML = `
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(cat)}</div>
+                <div class="admin-banner-fields">
+                    <input type="text" class="admin-banner-label-input admin-category-banner-input" placeholder="Custom banner text for this category (optional)" value="${escapeAttr(categoryBannerLabels[cat] || '')}">
+                </div>
+            </div>
+            <div class="admin-db-actions">
+                <span class="admin-mini-btn admin-banner-save-btn admin-banner-autosave-status" aria-live="polite">Saved</span>
+            </div>
+        `;
+        const input = card.querySelector('.admin-category-banner-input');
+        const statusEl = card.querySelector('.admin-banner-autosave-status');
+
+        const doSave = () => {
+            statusEl.disabled = true;
+            statusEl.textContent = 'Saving...';
+            saveCategoryBannerLabel(cat, input.value, statusEl);
+        };
+        input.addEventListener('input', debounce(doSave, 800));
+        statusEl.style.cursor = 'pointer';
+        statusEl.addEventListener('click', () => { if (statusEl.textContent.includes('Retry')) doSave(); });
+
+        container.appendChild(card);
+    });
+}
+
+async function saveCategoryBannerLabel(slug, label, btn) {
+    const trimmed = (label || '').trim();
+    try {
+        const { error } = await supabaseClient
+            .from('categories')
+            .upsert({ slug: slug, banner_label: trimmed || null }, { onConflict: 'slug' });
+        if (error) throw error;
+
+        if (trimmed) categoryBannerLabels[slug] = trimmed;
+        else delete categoryBannerLabels[slug];
+        adminExtraCategories.add(slug);
+
+        if (btn) { btn.disabled = false; btn.textContent = 'Saved'; }
+    } catch (err) {
+        console.error('saveCategoryBannerLabel error:', err);
+        if (btn) { btn.disabled = false; btn.textContent = '⚠️ Retry'; }
+        showToast('❌ Save failed — check je "categories" table-e "banner_label" column ache kina: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
     }
 }
 
@@ -7418,7 +7558,10 @@ function showPromptModal(message, defaultValue) {
 
 // ছোট, নিজে থেকে মিলিয়ে যাওয়া টোস্ট নোটিফিকেশন — বড় centered modal-এর বদলে
 // দ্রুত inline feedback দেয়ার জন্য (যেমন Banner Save করার পর)
-function showToast(message, type) {
+// options: { actionLabel, onAction, duration } — actionLabel/onAction thakle toast-e ekta
+// extra button (jemon "Undo") dekhabe, click korle onAction call hoye toast bondho hoye jabe.
+function showToast(message, type, options) {
+    options = options || {};
     let wrap = document.getElementById('toastWrap');
     if (!wrap) {
         wrap = document.createElement('div');
@@ -7434,6 +7577,26 @@ function showToast(message, type) {
     msgSpan.textContent = message;
     toast.appendChild(msgSpan);
 
+    let autoHideTimer;
+    const dismiss = () => {
+        clearTimeout(autoHideTimer);
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+        setTimeout(() => toast.remove(), 500);
+    };
+
+    if (options.actionLabel && typeof options.onAction === 'function') {
+        const actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.className = 'toast-action-btn';
+        actionBtn.textContent = options.actionLabel;
+        actionBtn.addEventListener('click', () => {
+            dismiss();
+            options.onAction();
+        });
+        toast.appendChild(actionBtn);
+    }
+
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'toast-close-btn';
@@ -7443,18 +7606,11 @@ function showToast(message, type) {
 
     wrap.appendChild(toast);
 
-    let autoHideTimer;
-    const dismiss = () => {
-        clearTimeout(autoHideTimer);
-        toast.classList.remove('show');
-        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-        setTimeout(() => toast.remove(), 500);
-    };
     closeBtn.addEventListener('click', dismiss);
 
     requestAnimationFrame(() => toast.classList.add('show'));
 
-    autoHideTimer = setTimeout(dismiss, 2500);
+    autoHideTimer = setTimeout(dismiss, options.duration || 2500);
 }
 
 function showNoticeModal(message, options) {

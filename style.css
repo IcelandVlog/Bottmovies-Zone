@@ -2205,6 +2205,21 @@ html.light-mode .admin-banner-label-input { background-color: #ffffff; border-co
     margin: -2px -2px 0 0;
 }
 .toast-close-btn:hover { opacity: 1; }
+.toast-action-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid currentColor;
+    color: #93c5fd;
+    opacity: 0.9;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.toast-action-btn:hover { opacity: 1; background-color: rgba(147, 197, 253, 0.12); }
 .toast-item.show { opacity: 1; transform: translateX(0); }
 .toast-item.toast-error { border-color: rgba(239, 68, 68, 0.5); }
 html.light-mode .toast-item { background-color: #ffffff; color: #14161c; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
