@@ -5950,10 +5950,22 @@ function renderAdminCategoryBannerList(filter) {
 async function saveCategoryBannerLabel(slug, label, btn) {
     const trimmed = (label || '').trim();
     try {
-        const { error } = await supabaseClient
+        // upsert() Supabase RLS-এর UPDATE policy-র সাথে conflict করে অনেক সময়
+        // ("violates row-level security policy"), তাই age update try kori,
+        // row na thakle plain insert kori (ei pattern-ta rename/add-e already kaj korche)
+        const { data: updRows, error: updErr } = await supabaseClient
             .from('categories')
-            .upsert({ slug: slug, banner_label: trimmed || null }, { onConflict: 'slug' });
-        if (error) throw error;
+            .update({ banner_label: trimmed || null })
+            .eq('slug', slug)
+            .select();
+        if (updErr) throw updErr;
+
+        if (!updRows || !updRows.length) {
+            const { error: insErr } = await supabaseClient
+                .from('categories')
+                .insert([{ slug: slug, banner_label: trimmed || null }]);
+            if (insErr && insErr.code !== '23505') throw insErr;
+        }
 
         if (trimmed) categoryBannerLabels[slug] = trimmed;
         else delete categoryBannerLabels[slug];
