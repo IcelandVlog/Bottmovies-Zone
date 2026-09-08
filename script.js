@@ -3438,7 +3438,7 @@ async function handleSendResetOtp(isResend) {
             // চেক ব্যর্থ হলে নিরাপত্তার স্বার্থে আগের মতোই এগিয়ে যাওয়া হচ্ছে (fail-open),
             // যাতে এই RPC ফাংশনটা এখনো সেটআপ করা না থাকলে পুরো ফ্লো ভেঙে না যায়
         } else if (emailExists === false) {
-            if (msgEl) { msgEl.textContent = 'এই ইমেইল/ইউজারনেম দিয়ে কোনো account খোলা নেই।'; msgEl.className = 'admin-form-msg error'; }
+            if (msgEl) { msgEl.textContent = 'No account found with this email/username.'; msgEl.className = 'admin-form-msg error'; }
             return;
         }
 
