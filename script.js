@@ -3184,6 +3184,7 @@ async function initAuth() {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         updateAuthUI(session);
+        syncGoogleAvatarIfNeeded(session); // পুরনো Google ইউজার (যাদের avatar_url এখনো ফাঁকা) পেজ লোড হওয়ার সময়ও sync হয়ে যাবে
 
         const params = new URLSearchParams(window.location.search);
         // dmca.html / report-broken-links.html ইত্যাদি পেজ থেকে "Dashboard" এ ক্লিক করলে
@@ -3206,7 +3207,50 @@ async function initAuth() {
 
     supabaseClient.auth.onAuthStateChange((_event, newSession) => {
         updateAuthUI(newSession);
+        if (_event === 'SIGNED_IN') syncGoogleAvatarIfNeeded(newSession); // নতুন করে Google দিয়ে সাইন-ইন করলে
     });
+}
+
+// Google দিয়ে sign in করলে Google account-এর profile picture-টা নিজে থেকেই
+// Dashboard-এর avatar হিসেবে বসিয়ে দেয় — কিন্তু শুধু তখনই, যখন ইউজার আগে থেকে
+// নিজের কোনো avatar আপলোড/সেট করেনি। ইউজার পরে নিজে থেকে avatar বদলে ফেললে,
+// সেটাই থেকে যাবে, পরের বার লগইন করলেও আর Google ছবি দিয়ে override হবে না।
+async function syncGoogleAvatarIfNeeded(session) {
+    try {
+        const user = session?.user;
+        if (!user) return;
+
+        const isGoogleUser = (user.app_metadata?.provider === 'google') ||
+            (Array.isArray(user.identities) && user.identities.some(i => i.provider === 'google'));
+        if (!isGoogleUser) return;
+
+        // Supabase সাধারণত Google প্রোফাইল ছবিটা user_metadata.avatar_url অথবা .picture হিসেবে রাখে
+        const googlePic = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+        if (!googlePic) return;
+
+        const { data: profile, error } = await supabaseClient
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', user.id)
+            .maybeSingle();
+        if (error) { console.error('Google avatar sync check error:', error); return; }
+
+        if (!profile || !profile.avatar_url) {
+            const { error: updateError } = await supabaseClient
+                .from('profiles')
+                .update({ avatar_url: googlePic })
+                .eq('id', user.id);
+            if (updateError) { console.error('Google avatar sync update error:', updateError); return; }
+
+            // Dashboard খোলা থাকলে সাথে সাথেই নতুন ছবি দেখাও (রিফ্রেশ করা ছাড়াই)
+            const avatarEl = document.getElementById('userDashAvatarPreview');
+            if (avatarEl) avatarEl.src = googlePic;
+            myCommentIdentityCache = null;
+            if (commentsCurrentMovieId !== null && commentsCurrentMovieId !== undefined) renderCommentComposer();
+        }
+    } catch (e) {
+        console.error('Unexpected error syncing Google avatar:', e);
+    }
 }
 
 function openAuthModal(tab) {
