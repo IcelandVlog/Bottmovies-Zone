@@ -2451,6 +2451,33 @@ function searchMovies() {
 
 // ==================== NAVIGATION & CATEGORY SWITCH ====================
 
+// noticeBanner-e কোন লেখা দেখাবে সেটা এক জায়গা থেকে ঠিক করা হয়, যাতে
+// admin panel-e banner label save korar sathe sathe (page switch na kore-o)
+// currently open category-r banner text update kora jay
+const DEFAULT_NOTICE_TEXT = "We have Changed our Official Domain to BOTTMOVIES.Bookmarks Now";
+
+function updateNoticeBannerText(category, targetLink) {
+    const noticeText = document.getElementById('noticeBannerText');
+    const noticeBanner = document.getElementById('noticeBanner');
+    if (!targetLink) {
+        targetLink = document.querySelector(`.nav-link[data-target="${category}"]`);
+    }
+
+    if (noticeText) {
+        if (category === 'all') {
+            noticeText.innerText = DEFAULT_NOTICE_TEXT;
+        } else if (categoryBannerLabels && categoryBannerLabels[category]) {
+            noticeText.innerText = categoryBannerLabels[category];
+        } else if (targetLink) {
+            const customBanner = targetLink.getAttribute('data-banner');
+            noticeText.innerText = customBanner || targetLink.innerText.trim();
+        } else {
+            noticeText.innerText = category;
+        }
+    }
+    if (noticeBanner) noticeBanner.style.display = 'block';
+}
+
 function switchCategory(category, initialPage) {
     if (!category) return;
 
@@ -2468,23 +2495,7 @@ function switchCategory(category, initialPage) {
 
     document.body.setAttribute('data-category', category);
 
-    const noticeText = document.getElementById('noticeBannerText');
-    const noticeBanner = document.getElementById('noticeBanner');
-    const DEFAULT_NOTICE = "We have Changed our Official Domain to BOTTMOVIES.Bookmarks Now";
-
-    if (noticeText) {
-        if (category === 'all') {
-            noticeText.innerText = DEFAULT_NOTICE;
-        } else if (categoryBannerLabels && categoryBannerLabels[category]) {
-            noticeText.innerText = categoryBannerLabels[category];
-        } else if (targetLink) {
-            const customBanner = targetLink.getAttribute('data-banner');
-            noticeText.innerText = customBanner || targetLink.innerText.trim();
-        } else {
-            noticeText.innerText = category;
-        }
-    }
-    if (noticeBanner) noticeBanner.style.display = 'block';
+    updateNoticeBannerText(category, targetLink);
 
     const currentHashCategory = window.location.hash.replace('#', '').split('?')[0];
     const targetHash = category === 'all' ? '' : `#${category}`;
@@ -4865,6 +4876,14 @@ async function loadAdminExtraCategories() {
         });
         adminCategoriesLoaded = true;
         renderAdminCategoryBox();
+
+        // Ei fetch shesh hote hote page-e already ekta category open thakte pare
+        // (jemon direct link/bookmark diye #category niye ashle) — sekhetre
+        // banner_label ashar por notice banner-er lekha refresh kore newa
+        const activeCategory = document.body.getAttribute('data-category');
+        if (activeCategory) {
+            updateNoticeBannerText(activeCategory);
+        }
     } catch (e) {
         console.error('Unexpected error loading categories:', e);
     }
@@ -5970,6 +5989,13 @@ async function saveCategoryBannerLabel(slug, label, btn) {
         if (trimmed) categoryBannerLabels[slug] = trimmed;
         else delete categoryBannerLabels[slug];
         adminExtraCategories.add(slug);
+
+        // Ei muhurte user jodi ei category-r page-e already thake, tahole
+        // admin panel bondho na kore-o notice banner-er lekha shathe shathe update hobe
+        const activeCategory = document.body.getAttribute('data-category');
+        if (activeCategory && activeCategory === slug) {
+            updateNoticeBannerText(activeCategory);
+        }
 
         if (btn) { btn.disabled = false; btn.textContent = 'Saved'; }
     } catch (err) {
