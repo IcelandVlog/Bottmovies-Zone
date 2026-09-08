@@ -7003,23 +7003,36 @@ function renderAdminBannerList(filter) {
                 </div>
             </div>
             <div class="admin-db-actions">
-                <button type="button" class="admin-mini-btn admin-banner-save-btn">Save</button>
+                <span class="admin-mini-btn admin-banner-save-btn admin-banner-autosave-status" aria-live="polite">Saved</span>
             </div>
         `;
-        card.querySelector('.admin-banner-save-btn').addEventListener('click', (e) => {
-            const btn = e.currentTarget;
-            const cb = card.querySelector('.admin-banner-featured-cb');
-            const imageInput = card.querySelector('.admin-banner-image-input');
-            const catSelect = card.querySelector('.admin-banner-category-select');
-            const labelInput = card.querySelector('.admin-banner-label-input');
-            btn.disabled = true;
-            btn.textContent = 'Saving...';
+        const cb = card.querySelector('.admin-banner-featured-cb');
+        const imageInput = card.querySelector('.admin-banner-image-input');
+        const catSelect = card.querySelector('.admin-banner-category-select');
+        const labelInput = card.querySelector('.admin-banner-label-input');
+        const statusBtn = card.querySelector('.admin-banner-autosave-status');
+
+        const doAutoSave = () => {
+            statusBtn.disabled = true;
+            statusBtn.textContent = 'Saving...';
             saveBannerSettings(movie, {
                 featured: cb.checked,
                 featured_image: imageInput.value.trim() || null,
                 featured_category: catSelect.value.trim() || null,
                 featured_category_label: labelInput.value.trim() || null
-            }, btn);
+            }, statusBtn);
+        };
+        // চেকবক্স/ক্যাটাগরি বদলালেই সাথে সাথে auto-save হবে
+        cb.addEventListener('change', doAutoSave);
+        catSelect.addEventListener('change', doAutoSave);
+        // টাইপ করার সময় প্রতি keystroke-এ save না করে, থামার একটু পর (debounce) auto-save হবে
+        const debouncedSave = debounce(doAutoSave, 800);
+        imageInput.addEventListener('input', debouncedSave);
+        labelInput.addEventListener('input', debouncedSave);
+        // Save ব্যর্থ হলে স্ট্যাটাসে ক্লিক করে আবার try করা যাবে
+        statusBtn.style.cursor = 'pointer';
+        statusBtn.addEventListener('click', () => {
+            if (statusBtn.textContent.includes('Retry')) doAutoSave();
         });
         const upBtn = card.querySelector('.admin-banner-move-btn[data-dir="up"]');
         const downBtn = card.querySelector('.admin-banner-move-btn[data-dir="down"]');
@@ -7081,11 +7094,12 @@ async function saveBannerSettings(movie, changes, btn) {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
         if (typeof renderHeroSlides === 'function') renderHeroSlides();
+        if (btn) { btn.disabled = false; btn.textContent = 'Saved'; }
         showToast('✅ Banner settings saved for "' + (movie.title || 'this item') + '"');
     } catch (err) {
         console.error('Save banner settings error:', err);
         showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+        if (btn) { btn.disabled = false; btn.textContent = '⚠️ Retry'; }
     }
 }
 

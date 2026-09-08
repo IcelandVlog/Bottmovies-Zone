@@ -2142,7 +2142,9 @@ html.light-mode .admin-banner-label-input { background-color: #ffffff; border-co
     font-weight: 700;
     cursor: pointer;
     align-self: flex-start;
+    display: inline-block;
 }
+.admin-banner-autosave-status { user-select: none; }
 .admin-banner-save-btn:hover { background-color: #1d3a63; }
 .admin-banner-save-btn:disabled { opacity: 0.6; cursor: default; }
 
