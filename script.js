@@ -3110,6 +3110,13 @@ function submitChatRequest() {
             alert("Failed to send request. Please try again later.");
         });
 }
+// পাসওয়ার্ড "strong" কিনা চেক করে — কমপক্ষে ৮ ক্যারেক্টার, অন্তত একটা বড় হাতের অক্ষর,
+// একটা ছোট হাতের অক্ষর, এবং একটা সংখ্যা থাকতে হবে (Sign Up, Forgot Password, Change Password — সব জায়গায় একই নিয়ম)
+function isStrongPassword(pw) {
+    return typeof pw === 'string' && pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw);
+}
+const STRONG_PASSWORD_MSG = 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.';
+
 // ==================== AUTHENTICATION (Sign In / Sign Up / Dashboard) ====================
 // Supabase Auth ব্যবহার করা হয়েছে — session ডিফল্টভাবেই localStorage-এ persist হয়,
 // তাই page refresh করলে বা site-এর অন্য পেজে গেলেও login state হারায় না।
@@ -3536,8 +3543,8 @@ async function handleSubmitNewPassword() {
     const newPass = document.getElementById('fpNewPassword')?.value || '';
     const confirmPass = document.getElementById('fpConfirmPassword')?.value || '';
 
-    if (newPass.length < 6) {
-        if (msgEl) { msgEl.textContent = 'New password must be at least 6 characters.'; msgEl.className = 'admin-form-msg error'; }
+    if (!isStrongPassword(newPass)) {
+        if (msgEl) { msgEl.textContent = STRONG_PASSWORD_MSG; msgEl.className = 'admin-form-msg error'; }
         return;
     }
     if (newPass !== confirmPass) {
@@ -3828,8 +3835,8 @@ async function handleSignUp() {
         if (msgEl) { msgEl.textContent = 'Please use a valid email from Gmail, Yahoo, Outlook, or another major provider.'; msgEl.className = 'admin-form-msg error'; }
         return;
     }
-    if (password.length < 6) {
-        if (msgEl) { msgEl.textContent = 'Password must be at least 6 characters.'; msgEl.className = 'admin-form-msg error'; }
+    if (!isStrongPassword(password)) {
+        if (msgEl) { msgEl.textContent = STRONG_PASSWORD_MSG; msgEl.className = 'admin-form-msg error'; }
         return;
     }
     if (password !== confirmPassword) {
@@ -4337,8 +4344,8 @@ async function handleChangePassword() {
         if (msgEl) { msgEl.textContent = 'Please enter your old password.'; msgEl.className = 'admin-form-msg error'; }
         return;
     }
-    if (newPass.length < 6) {
-        if (msgEl) { msgEl.textContent = 'New password must be at least 6 characters.'; msgEl.className = 'admin-form-msg error'; }
+    if (!isStrongPassword(newPass)) {
+        if (msgEl) { msgEl.textContent = STRONG_PASSWORD_MSG; msgEl.className = 'admin-form-msg error'; }
         return;
     }
     if (newPass !== confirmPass) {
