@@ -3428,6 +3428,20 @@ async function handleSendResetOtp(isResend) {
             if (msgEl) { msgEl.textContent = 'Incorrect Username or Password'; msgEl.className = 'admin-form-msg error'; }
             return;
         }
+
+        // এই email দিয়ে আদৌ কোনো account আছে কিনা চেক করা হচ্ছে
+        // (Supabase ডিফল্টভাবে না থাকলেও silently "success" দেখায়, নিরাপত্তার জন্য —
+        // কিন্তু এই সাইটে আমরা ইউজারকে স্পষ্ট warning দেখাতে চাই)
+        const { data: emailExists, error: checkError } = await supabaseClient.rpc('check_email_exists', { check_email: email });
+        if (checkError) {
+            console.error('Email existence check error:', checkError);
+            // চেক ব্যর্থ হলে নিরাপত্তার স্বার্থে আগের মতোই এগিয়ে যাওয়া হচ্ছে (fail-open),
+            // যাতে এই RPC ফাংশনটা এখনো সেটআপ করা না থাকলে পুরো ফ্লো ভেঙে না যায়
+        } else if (emailExists === false) {
+            if (msgEl) { msgEl.textContent = 'এই ইমেইল/ইউজারনেম দিয়ে কোনো account খোলা নেই।'; msgEl.className = 'admin-form-msg error'; }
+            return;
+        }
+
         const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
         if (error) {
             if (msgEl) { msgEl.textContent = error.message; msgEl.className = 'admin-form-msg error'; }
