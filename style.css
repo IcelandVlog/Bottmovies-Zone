@@ -898,6 +898,51 @@ html.light-mode .auth-google-btn:hover { background: #f5f6f8; }
 .trailer-label { color: #e2e8f0; font-size: 13.5px; font-weight: 700; margin-top: 10px; }
 .trailer-video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; background-color: #000; }
 .trailer-video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; z-index: 1; }
+
+/* Watch Now button-er play icon-take ekta bordered, transparent-fill
+   "charkona" (square-ish rounded-corner, GOLAKAR/circle na) shape banano
+   hoyeche (Trailer-er solid red rectangular play button theke alada) -
+   majhe shudhu ekta halka semi-transparent background + spashto border-shoho
+   ei box-er bhitore ▶ icon thakbe, jate niche-r poster/thumbnail-o clearly
+   dekha jay. */
+.watch-play-btn {
+    width: 70px;
+    height: 50px;
+    border-radius: 12px;
+    background: rgba(15, 18, 26, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+    padding-left: 4px;
+}
+.trailer-thumb-wrap:hover .watch-play-btn {
+    background: rgba(15, 18, 26, 0.55);
+    border-color: #ffffff;
+    transform: translate(-50%, -50%) scale(1.08);
+}
+
+/* Watch video play hobar por eta upore-right corner-e bheshe thake - eta click
+   korle abar video hide hoye age-r thumbnail card show hoye jay (toggle). */
+.watch-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.watch-close-btn:hover { background: rgba(229, 9, 20, 0.85); }
 .trailer-fallback-link {
     position: absolute;
     right: 10px;
@@ -1007,8 +1052,8 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
 .season-box-item { background: #5b4f8a; border-radius: 8px; overflow: hidden; }
 
 /* এডমিন লিংক রো (ইনপুট বক্স লেআউট ফিক্স) */
-.admin-link-row:not(.admin-season-trailer-row),
-.admin-season-links .admin-link-row:not(.admin-season-trailer-row) {
+.admin-link-row:not(.admin-season-trailer-row):not(.admin-season-watch-row),
+.admin-season-links .admin-link-row:not(.admin-season-trailer-row):not(.admin-season-watch-row) {
     display: grid;
     /* ১ম কলাম: লিংক (১fr - বড়), ২য় কলাম: সাইজ (১২০px - ছোট), ৩য় কলাম: বাটন (৩৬px) */
     grid-template-columns: 1fr 120px 36px !important;
@@ -1039,8 +1084,8 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
 
 /* মোবাইল স্ক্রিনের জন্য রেসপনসিভ এডজাস্টমেন্ট */
 @media (max-width: 480px) {
-    .admin-link-row:not(.admin-season-trailer-row),
-    .admin-season-links .admin-link-row:not(.admin-season-trailer-row) {
+    .admin-link-row:not(.admin-season-trailer-row):not(.admin-season-watch-row),
+    .admin-season-links .admin-link-row:not(.admin-season-trailer-row):not(.admin-season-watch-row) {
         grid-template-columns: 1fr 95px 32px !important;
         gap: 6px;
     }
@@ -1048,16 +1093,58 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
         grid-template-columns: 56px 1fr 1fr 30px !important;
         gap: 6px;
     }
+    .admin-season-watch-row {
+        grid-template-columns: 56px 1fr 30px !important;
+        gap: 6px;
+    }
 }
 
 .season-box-item.fast-server-box { background: #005b66; border: 1px solid #00838f; }
+
+/* "Online Watch" row-take alada box + green color deya hoyeche, jate ata
+   Download/Fast-Server box theke visually distinct thake. */
+.season-box-item.watch-box { background: #1e5f3a; border: 1px solid #2fa25a; }
+
+/* Reachability check cholakalin (background-e) "⚡ Online Watch" box-e ekta
+   choto ghurte thaka spinner dekhano hoy, jate khali/ফাঁকা na legে - bujha
+   jay je kaj cholche. */
+.watch-box-loading .season-box-header:hover { background: transparent; }
+.watch-loading-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: watchLoadingSpin 0.7s linear infinite;
+}
+@keyframes watchLoadingSpin {
+    to { transform: rotate(360deg); }
+}
 
 .season-box-header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: 13px; color: #ffffff; user-select: none; }
 .season-box-header:hover { background: rgba(255, 255, 255, 0.08); }
 .season-badges-right { display: flex; gap: 6px; }
 .badge-icon-list { background: rgba(0, 0, 0, 0.25); padding: 3px 6px; border-radius: 4px; font-size: 11px; }
 
-.season-download-body { display: none; background: #111319; padding: 18px; border: 1px solid #282d3f; border-top: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; text-align: center; }
+.season-download-body {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    background: #111319;
+    border: 1px solid #282d3f;
+    border-top: none;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    text-align: center;
+    padding: 0 18px;
+    transition: max-height 0.32s ease, opacity 0.25s ease, padding 0.32s ease;
+}
+.season-download-body.open { max-height: 800px; opacity: 1; padding: 18px; }
+
+/* "Online Watch" row-er dropdown arrow (▼) - panel open thakle 180deg
+   rotate hoye ▲-er moto dekhay, thik shadharon dropdown menu-r moto. */
+.dropdown-arrow { display: inline-block; transition: transform 0.25s ease; }
+.season-box-header.is-open .dropdown-arrow { transform: rotate(180deg); }
 
 .btn-zip-download { display: inline-block; background: linear-gradient(180deg, #181c28 0%, #0e1017 100%); border: 1.5px solid #00e5ff; box-shadow: 0 0 10px rgba(0, 229, 255, 0.2); color: #ffffff; font-weight: 800; font-size: 13px; padding: 10px 24px; border-radius: 6px; text-decoration: none; transition: all 0.2s; letter-spacing: 0.5px; }
 .btn-zip-download:hover { box-shadow: 0 0 15px rgba(0, 229, 255, 0.5); transform: translateY(-1px); }
@@ -1844,6 +1931,19 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
     padding: 8px 4px;
 }
 
+/* Watch Button tab-er TV series-er per-season link row - Season Trailer
+   row-er moto-i grid, shudhu ekta link column (thumbnail per-season na, tai
+   1-ta kom column). */
+.admin-season-watch-row {
+    grid-template-columns: 70px 1fr auto;
+}
+.admin-season-watch-row input.admin-season-watch-num {
+    text-align: center;
+    padding: 8px 4px;
+}
+.admin-watch-season-rows { margin-top: 10px; width: 100%; }
+.admin-watch-add-season-btn { margin-top: 2px; }
+
 /* Trailer / Teaser admin tab (per-title manual trailer editor, next to Database) */
 .admin-trailer-card { flex-wrap: wrap; }
 .admin-trailer-season-rows { margin-top: 10px; width: 100%; }
@@ -1875,6 +1975,26 @@ html.light-mode .admin-trailer-movie-row input { background-color: #ffffff; bord
 @media (max-width: 480px) {
     .admin-trailer-movie-row { grid-template-columns: 1fr; }
 }
+
+/* Watch Button admin tab (per-title On/Off + custom embed link, next to Trailer/Teaser) */
+.admin-watch-toggle-group { margin-top: 10px; }
+.admin-watch-link-input,
+.admin-watch-thumb-input {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    background-color: #111622;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 12px;
+    color: #e2e8f0;
+    outline: none;
+}
+.admin-watch-link-input:focus,
+.admin-watch-thumb-input:focus { border-color: #2563eb; }
+html.light-mode .admin-watch-link-input,
+html.light-mode .admin-watch-thumb-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
 
 
 .admin-form-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
@@ -2007,6 +2127,18 @@ html.light-mode .admin-db-order-input { background-color: #ffffff; border-color:
     flex-shrink: 0;
 }
 .admin-db-edit-btn:hover { background-color: #1d3a63; }
+.admin-db-watch-btn {
+    background-color: #171e2e;
+    border: 1px solid #16a34a;
+    color: #86efac;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.admin-db-watch-btn:hover { background-color: #143824; }
 .admin-db-empty { text-align: center; color: #64748b; padding: 30px 0; font-size: 13px; }
 
 .admin-db-actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -2841,6 +2973,8 @@ html.light-mode .admin-db-title { color: #14161c; }
 html.light-mode .admin-db-meta { color: #6b7280; }
 html.light-mode .admin-db-edit-btn { background-color: #eef4ff; border-color: #2563eb; color: #1d4ed8; }
 html.light-mode .admin-db-edit-btn:hover { background-color: #dbe8ff; }
+html.light-mode .admin-db-watch-btn { background-color: #eafaf0; border-color: #16a34a; color: #15803d; }
+html.light-mode .admin-db-watch-btn:hover { background-color: #d7f5e3; }
 html.light-mode .admin-db-empty { color: #9aa1ac; }
 html.light-mode .admin-alert-url { color: #9aa1ac; }
 html.light-mode .admin-alert-source-tag { background-color: #f1f3f7; border-color: #dde1e8; color: #1d4ed8; }

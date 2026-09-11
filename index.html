@@ -493,6 +493,7 @@
                 <button type="button" class="admin-nav-btn" id="adminNavBtnAdd" onclick="switchAdminTab('add')">➕ <span>Add / Edit Content</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnManage" onclick="switchAdminTab('manage')">🗂 <span>Database</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnTrailer" onclick="switchAdminTab('trailer')">🎬 <span>Trailer / Teaser</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnWatch" onclick="switchAdminTab('watch')">▶️ <span>Watch Button</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎞️ <span>Hero Banner</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnNavigation" onclick="switchAdminTab('navigation')">🧭 <span>Navigation</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
@@ -665,6 +666,15 @@
                         <div id="adminTrailerThumbPreviewWrap" style="display:none;"><img id="adminTrailerThumbPreview" class="admin-poster-preview"></div>
                     </div>
 
+                    <div class="admin-field" id="adminWatchLinkField">
+                        <label>Watch Button <span class="admin-hint">(On korle - trailer/poster-er moto-i - TMDB-te auto-search kore (title/IMDb ID diye) paoa TMDB ID diye automatic "Watch Now" iframe (embed.filmu.in) show hobe. TMDB-e match na paile ba Off thakle Watch button-i show hobe na)</span></label>
+                        <div class="admin-toggle-group" id="adminWatchEnabledGroup">
+                            <button type="button" class="admin-toggle-btn active" data-value="off" onclick="setWatchEnabled(false)">🚫 Off</button>
+                            <button type="button" class="admin-toggle-btn" data-value="on" onclick="setWatchEnabled(true)">▶️ On</button>
+                        </div>
+                        <input type="text" id="adminWatchLink" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed above)" style="margin-top:8px;">
+                    </div>
+
                     <div class="admin-field" id="adminSeasonTrailersField" style="display:none;">
                         <label>Season Trailers <span class="admin-hint">(optional — series-er প্রতিটা season-এর জন্য আলাদা trailer link দিতে পারেন; কোনো season খালি রাখলে সেই season select করলে auto trailer (TMDB/YouTube) খোঁজা হবে)</span></label>
                         <div id="adminSeasonTrailersList"></div>
@@ -708,6 +718,14 @@
                         <input type="text" id="adminTrailerSearchInput" placeholder="🔍 Search content to add/edit trailer...">
                     </div>
                     <div class="admin-database-list" id="adminTrailerList"></div>
+                </div>
+
+                <!-- WATCH BUTTON TAB (quickly On/Off toggle the "Online Watch" button + set a custom embed link for any movie/series, without opening the full Add/Edit Content form) -->
+                <div class="admin-tab-content" id="adminTabWatch" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminWatchSearchInput" placeholder="🔍 Search content to add/edit Watch Button...">
+                    </div>
+                    <div class="admin-database-list" id="adminWatchList"></div>
                 </div>
 
                 <!-- HERO BANNER TAB (select which movies/series show on the homepage auto-slide banner) -->
