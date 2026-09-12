@@ -2602,7 +2602,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
     container.innerHTML = `
         <div class="season-box-item watch-box" id="watchBox" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-title="${escapeAttr(title)}">
             <div class="season-box-header" onclick="incrementMovieViews(currentModalMovie); toggleAccordion('watchAccordionBody')">
-                <span>▶️ Online Watch</span>
+                <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
                     <span class="dropdown-arrow">▼</span>
                 </div>
@@ -7893,6 +7893,7 @@ function renderAdminWatchList(filter) {
     filtered.forEach(movie => {
         const isTv = movie.tmdbType === 'tv';
         const isOn = !!movie.watchEnabled;
+        const hasSeasonLinks = isTv && Array.isArray(movie.watchSeasonLinks) && movie.watchSeasonLinks.length > 0;
         const card = document.createElement('div');
         card.className = 'admin-db-card admin-trailer-card admin-watch-card';
         card.innerHTML = `
@@ -7905,11 +7906,14 @@ function renderAdminWatchList(filter) {
                     <button type="button" class="admin-toggle-btn admin-watch-on-btn ${isOn ? 'active' : ''}" data-value="on">▶️ On</button>
                 </div>
                 ${isTv ? `
+                <label class="admin-watch-auto-toggle">
+                    <input type="checkbox" class="admin-watch-auto-checkbox" ${hasSeasonLinks ? '' : 'checked'}>
+                    <span>Auto (one link for all seasons)</span>
+                </label>
                 <div class="admin-watch-season-rows"></div>
                 <button type="button" class="admin-add-row-btn admin-watch-add-season-btn">+ Add Season Watch Link</button>
-                ` : `
+                ` : ''}
                 <input type="text" class="admin-watch-link-input" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed)" value="${escapeAttr(movie.watchLink || '')}">
-                `}
                 <input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}">
             </div>
             <div class="admin-db-actions">
@@ -7921,6 +7925,7 @@ function renderAdminWatchList(filter) {
         const offBtn = card.querySelector('.admin-watch-off-btn');
         const onBtn = card.querySelector('.admin-watch-on-btn');
         const thumbInput = card.querySelector('.admin-watch-thumb-input');
+        const linkInput = card.querySelector('.admin-watch-link-input');
         const saveBtn = card.querySelector('.admin-watch-save-btn');
 
         // On/Off button-e click korlei — Save button-e chapa na diyeo —
@@ -7944,12 +7949,12 @@ function renderAdminWatchList(filter) {
             saveAdminWatchSettings(movie, card, e.currentTarget, () => watchOnState);
         });
 
-        // Custom watch thumbnail field-e likhe blur (field-er baire click)
+        // Custom watch thumbnail/link field-e likhe blur (field-er baire click)
         // korle othoba Enter chaplei — Save button-e chapa na diyeo —
         // auto-save hoye jabe. Value age theke jeta save kora chilo tar
-        // shathe mile gele abar save hobe na. Field khali rakhle frontend-e
-        // automatic-bhabe movie-r nijer poster-i dekhano hoy (kono kichu
-        // manually add korte hoy na).
+        // shathe mile gele abar save hobe na. Thumbnail field khali rakhle
+        // frontend-e automatic-bhabe movie-r nijer poster-i dekhano hoy (kono
+        // kichu manually add korte hoy na).
         const makeFieldAutoSave = (inputEl, savedValueGetter) => {
             const trigger = () => {
                 const newVal = inputEl.value.trim() || null;
@@ -7965,22 +7970,40 @@ function renderAdminWatchList(filter) {
             });
         };
         makeFieldAutoSave(thumbInput, () => movie.watchThumb || null);
+        makeFieldAutoSave(linkInput, () => movie.watchLink || null);
 
         if (isTv) {
-            // TV series - ekta shingle link-er bodole, Trailer tab-er Season
-            // Trailer row-er moto-i - proti season-er jonno alada Watch link
-            // add korar sujog (eta "manually link add korle-i" prasongik -
-            // kono row na thakle/khali thakle, auto TMDB embed-i chalu thake,
-            // age-r moto-i).
+            // TV series - "Auto" checkbox diye dui-rokom mode-er modhye
+            // switch kora jay: (1) checked = Movie-r moto-i ekটাই shingle
+            // Custom watch link field, shob season/episode-er jonno ekই link
+            // - season row/Add button hide thake. (2) unchecked = Trailer
+            // tab-er Season Trailer-er moto-i proti season-er jonno alada
+            // Watch link (season row-gula dekha jay, shingle link field hide
+            // thake). Checkbox change korleo shathe shathe auto-save hoy,
+            // jate database-o shothik mode onujayi update hoy.
+            const autoCheckbox = card.querySelector('.admin-watch-auto-checkbox');
             const rowsContainer = card.querySelector('.admin-watch-season-rows');
+            const addSeasonBtn = card.querySelector('.admin-watch-add-season-btn');
+
             const existingSw = Array.isArray(movie.watchSeasonLinks) ? movie.watchSeasonLinks : [];
             if (existingSw.length > 0) {
                 existingSw.forEach(sw => addAdminWatchSeasonRow(rowsContainer, sw));
             } else {
                 addAdminWatchSeasonRow(rowsContainer);
             }
-            const addSeasonBtn = card.querySelector('.admin-watch-add-season-btn');
             addSeasonBtn.addEventListener('click', () => addAdminWatchSeasonRow(rowsContainer));
+
+            const applyWatchModeVisibility = () => {
+                const isAuto = autoCheckbox.checked;
+                rowsContainer.style.display = isAuto ? 'none' : '';
+                addSeasonBtn.style.display = isAuto ? 'none' : '';
+                linkInput.style.display = isAuto ? '' : 'none';
+            };
+            applyWatchModeVisibility();
+            autoCheckbox.addEventListener('change', () => {
+                applyWatchModeVisibility();
+                saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState);
+            });
 
             // Season watch row-gula dynamic-bhabe add/remove hoy, tai "blur"
             // (bubble kore na) er bodole "focusout" (bubble kore) event
@@ -8004,11 +8027,6 @@ function renderAdminWatchList(filter) {
                 if (!e.target.matches('.admin-row-remove-btn')) return;
                 saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState);
             });
-        } else {
-            // Movie (TV series na) hole - age-r moto-i shingle Custom watch
-            // link field, blur/Enter-e auto-save.
-            const linkInput = card.querySelector('.admin-watch-link-input');
-            makeFieldAutoSave(linkInput, () => movie.watchLink || null);
         }
 
         container.appendChild(card);
@@ -8022,13 +8040,19 @@ function renderAdminWatchList(filter) {
     });
 }
 
-// Card-er bhitorer On/Off + custom link (movie-r khetre shingle link, TV
-// series-er khetre per-season link list) theke data niye Supabase-e save
-// kore, thik saveAdminTrailerSettings()-er moto-i pattern - local allMovies
-// cache-o shathe shathe update kore dey jate list/modal notun data-i dekhay.
+// Card-er bhitorer On/Off + custom link (movie-r khetre, ba TV series-er
+// "Auto" mode-e, shingle link; TV series-er "Season" mode-e per-season link
+// list) theke data niye Supabase-e save kore, thik saveAdminTrailerSettings()-er
+// moto-i pattern - local allMovies cache-o shathe shathe update kore dey jate
+// list/modal notun data-i dekhay.
 async function saveAdminWatchSettings(movie, card, btn, getOnState) {
     if (!movie || !movie.id) return;
     const isTv = movie.tmdbType === 'tv';
+    // TV series-e "Auto" checkbox uncheck kora thakleই shudhu Season mode
+    // (per-season row) active dhora hoy - checked thakle (ba movie hole,
+    // checkbox-i thake na) shingle link field-i active.
+    const autoCheckbox = isTv ? card.querySelector('.admin-watch-auto-checkbox') : null;
+    const useSeasonMode = isTv && autoCheckbox && !autoCheckbox.checked;
     btn.disabled = true;
     btn.textContent = 'Saving...';
 
@@ -8039,7 +8063,7 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
         let payload;
         let parsedWatchSeasonLinks = null;
         let linkRaw = null;
-        if (isTv) {
+        if (useSeasonMode) {
             parsedWatchSeasonLinks = collectAdminWatchSeasonRows(card);
             payload = { watchEnabled, watchSeasonLinks: JSON.stringify(parsedWatchSeasonLinks), watchThumb: thumbRaw };
         } else {
@@ -8052,7 +8076,7 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
 
         movie.watchEnabled = watchEnabled;
         movie.watchThumb = thumbRaw;
-        if (isTv) {
+        if (useSeasonMode) {
             movie.watchSeasonLinks = parsedWatchSeasonLinks;
         } else {
             movie.watchLink = linkRaw;

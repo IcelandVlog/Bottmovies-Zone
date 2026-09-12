@@ -906,9 +906,9 @@ html.light-mode .auth-google-btn:hover { background: #f5f6f8; }
    ei box-er bhitore ▶ icon thakbe, jate niche-r poster/thumbnail-o clearly
    dekha jay. */
 .watch-play-btn {
-    width: 70px;
-    height: 50px;
-    border-radius: 12px;
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
     background: rgba(15, 18, 26, 0.35);
     border: 2px solid rgba(255, 255, 255, 0.85);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
@@ -1943,6 +1943,24 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
 }
 .admin-watch-season-rows { margin-top: 10px; width: 100%; }
 .admin-watch-add-season-btn { margin-top: 2px; }
+.admin-watch-auto-toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #a7b0c0;
+    cursor: pointer;
+    user-select: none;
+}
+.admin-watch-auto-toggle input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: #2563eb;
+    cursor: pointer;
+}
+html.light-mode .admin-watch-auto-toggle { color: #55606f; }
 
 /* Trailer / Teaser admin tab (per-title manual trailer editor, next to Database) */
 .admin-trailer-card { flex-wrap: wrap; }
