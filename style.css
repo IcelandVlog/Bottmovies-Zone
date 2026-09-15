@@ -874,6 +874,17 @@ html.light-mode .auth-google-btn:hover { background: #f5f6f8; }
     background: #000;
 }
 .trailer-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* "Online Watch" box-e Trailer-er moto YouTube-er sothik 16:9 thumbnail thake
+   na - eikhane movie/series-er nijer poster (shadharonoto lomba/portrait,
+   2:3 ratio) dekhano hoy. "object-fit: cover" dile ei portrait poster-take
+   16:9 box-e jorpurbok fit korte giye majhkhan theke onek-ta crop/zoom kore
+   fele dito (upor-nicher onek ongsho kete jeto). Tai "Online Watch" box-er
+   thumbnail-er jonno "contain" byabohar kora hoy, jate puro poster-ta
+   biggoron chara-i (kono crop na kore) dekha jay - dorkar hole pasher dik-e
+   samanyo khali jaiga (letterbox) thakte pare, kintu poster-ta puro-i
+   dekha jabe.
+*/
+.watch-box .trailer-thumb-img { object-fit: contain; }
 .trailer-play-btn {
     position: absolute;
     top: 50%;

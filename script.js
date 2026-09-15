@@ -2557,11 +2557,22 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
     if (!container) return;
 
     // Admin panel-e (Watch Button tab) ekta custom "watchThumb" diye rakhle
-    // shei thumbnail-i priority pabe (trailerThumb-er moto-i pattern) - na
-    // dile automatic-bhabe movie/series-er nijer poster-i thumbnail hishebe
-    // dekhano hoy, tai admin-ke alada kore kichu na korleo Watch button-e
-    // shobshomoy ekta thumbnail thake.
-    const watchThumbUrl = (movie.watchThumb && String(movie.watchThumb).trim()) || poster;
+    // shei thumbnail-i shobar age priority pabe (trailerThumb-er moto-i
+    // pattern). Na dile, movie/series-er "poster" (shadharonoto lomba/
+    // portrait, 2:3 ratio) er bodole TMDB-r "backdrop" (16:9 landscape
+    // screenshot-moto image, Hero banner-e jeta byabohar hoy) auto-thumbnail
+    // hishebe byabohar kora hoy - eta already box-er 16:9 shape-er shathe
+    // match kore, tai kono crop/letterbox lage na, thik "Trailer" section-er
+    // thumbnail-er moto-i porishkar bhabe dekhte lage. Backdrop kono karone
+    // na paoa gele (TMDB match nei, fetch fail, ইত্যাদি) - shesh upay
+    // hishebe age-r moto poster-i dekhano hoy.
+    const customWatchThumb = (movie.watchThumb && String(movie.watchThumb).trim()) || null;
+    let watchThumbUrl = customWatchThumb;
+    if (!watchThumbUrl) {
+        const backdropData = await fetchHeroBackdrop(movie).catch(() => null);
+        if (!stillRelevant()) return; // ei await cholakalin modal bondho/movie change hoye gele ar egono na
+        watchThumbUrl = (backdropData && backdropData.backdrop) || poster;
+    }
 
     // Series (TV)-er khetre admin panel-e (Watch Button tab) 1-er beshi
     // season-er jonno alada-alada manual watch link add kora thakle, ekta
