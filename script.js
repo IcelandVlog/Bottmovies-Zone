@@ -130,10 +130,15 @@ function buildTrailerComingSoonHTML(subText) {
 function getManualSeasonTrailer(movie, seasonNumber) {
     if (!movie || seasonNumber == null || !Array.isArray(movie.seasonTrailers) || !movie.seasonTrailers.length) return null;
     const entry = movie.seasonTrailers.find(st => st && Number(st.season) === Number(seasonNumber));
-    if (!entry || !entry.link) return null;
-    const ytId = extractYoutubeVideoId(entry.link);
-    if (!ytId) return null;
-    return { key: ytId, thumb: entry.thumb || `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` };
+    if (!entry) return null;
+    // Admin shudhu Thumbnail dile-o (YouTube link na diyeও) eta kaje lage -
+    // tokhon "key" null thake (mane video-r jonno auto/TMDB trailer-i use
+    // hobe), kintu "thumb"-ta admin-er deya custom-ta-i priority pabe. Dutoi
+    // (link ar thumb) khali/invalid hole shudhu-i null return kore, jate
+    // caller purapuri auto-e chole jete pare.
+    const ytId = entry.link ? extractYoutubeVideoId(entry.link) : null;
+    if (!ytId && !entry.thumb) return null;
+    return { key: ytId, thumb: entry.thumb || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null) };
 }
 
 // Admin manually koyta season-er trailer add koreche tar modhye shobcheye
@@ -2231,8 +2236,8 @@ fastServersList.forEach((fs, fIdx) => {
             // newa hoy, na hole TMDB slow/fail hoile trailer box-i miss hoye jeto.
             const fb = resolveManualSeasonTrailerFallback(movie, isTV, null);
             if (fb) {
-                trailerKey = fb.key;
-                trailerThumbOverride = fb.thumb;
+                if (fb.key) trailerKey = fb.key;
+                if (fb.thumb) trailerThumbOverride = fb.thumb;
                 trailerSelectedSeason = fb.season;
                 trailerTvId = movie.tmdbId || null;
             }
@@ -2297,8 +2302,8 @@ fastServersList.forEach((fs, fIdx) => {
                 // trailer-o override kore dey.
                 const manualSeasonTrailer = getManualSeasonTrailer(movie, trailerSelectedSeason);
                 if (manualSeasonTrailer) {
-                    trailerKey = manualSeasonTrailer.key;
-                    trailerThumbOverride = manualSeasonTrailer.thumb;
+                    if (manualSeasonTrailer.key) trailerKey = manualSeasonTrailer.key;
+                    if (manualSeasonTrailer.thumb) trailerThumbOverride = manualSeasonTrailer.thumb;
                 }
             } else {
                 if (tmdb.runtime && tmdb.runtime !== "N/A") {
@@ -2315,8 +2320,8 @@ fastServersList.forEach((fs, fIdx) => {
         if (isTV && !trailerKey) {
             const fb = resolveManualSeasonTrailerFallback(movie, isTV, trailerSelectedSeason);
             if (fb) {
-                trailerKey = fb.key;
-                trailerThumbOverride = fb.thumb;
+                if (fb.key) trailerKey = fb.key;
+                if (fb.thumb) trailerThumbOverride = fb.thumb;
                 trailerSelectedSeason = fb.season;
                 trailerTvId = trailerTvId || (tmdb && tmdb.id) || movie.tmdbId || null;
             }
@@ -2339,8 +2344,8 @@ fastServersList.forEach((fs, fIdx) => {
             clearTimeout(forceTimeout);
             const fb = resolveManualSeasonTrailerFallback(movie, isTV, trailerSelectedSeason);
             if (fb) {
-                trailerKey = fb.key;
-                trailerThumbOverride = fb.thumb;
+                if (fb.key) trailerKey = fb.key;
+                if (fb.thumb) trailerThumbOverride = fb.thumb;
                 trailerSelectedSeason = fb.season;
                 trailerTvId = trailerTvId || movie.tmdbId || null;
             }
@@ -2697,10 +2702,10 @@ async function changeModalTrailerSeason(selectEl) {
     selectEl.disabled = true;
     bodyEl.innerHTML = `<div class="trailer-empty-msg trailer-loading-msg">Loading Season ${seasonNumber} trailer...</div>`;
 
-    // Admin panel theke ei season-er jonno manually trailer deya thakle, seta-i
-    // shobar age use kora hoy - TMDB-e API call korar dorkar-i pore na.
+    // Admin panel theke ei season-er jonno manually trailer link deya thakle,
+    // seta-i shobar age use kora hoy - TMDB-e API call korar dorkar-i pore na.
     const manualSeasonTrailer = getManualSeasonTrailer(currentModalMovie, seasonNumber);
-    if (manualSeasonTrailer) {
+    if (manualSeasonTrailer && manualSeasonTrailer.key) {
         box.setAttribute('data-ytid', manualSeasonTrailer.key);
         box.setAttribute('data-thumb', manualSeasonTrailer.thumb);
         bodyEl.innerHTML = `
@@ -2721,7 +2726,10 @@ async function changeModalTrailerSeason(selectEl) {
             bodyEl.innerHTML = buildTrailerComingSoonHTML(`Season ${seasonNumber} trailer will be added soon`);
             return;
         }
-        const thumbUrl = `https://img.youtube.com/vi/${encodeURIComponent(newKey)}/hqdefault.jpg`;
+        // Admin YouTube link na diyeও shudhu Thumbnail-i deya thakle (manualSeasonTrailer.thumb) -
+        // video-r jonno upore-r auto (per-season) key-i use hobe, kintu
+        // thumbnail-e admin-er deya custom-ta-i priority pabe.
+        const thumbUrl = (manualSeasonTrailer && manualSeasonTrailer.thumb) || `https://img.youtube.com/vi/${encodeURIComponent(newKey)}/hqdefault.jpg`;
         box.setAttribute('data-ytid', newKey);
         box.setAttribute('data-thumb', thumbUrl);
         bodyEl.innerHTML = `
@@ -7754,21 +7762,24 @@ function collectAdminTrailerSeasonRows(card) {
         const link = row.querySelector('.admin-season-trailer-link').value.trim();
         const thumb = row.querySelector('.admin-season-trailer-thumb').value.trim();
 
-        // Season number ar link dutai khali - ei row-ta khali/unused, chupchap skip.
-        if (!seasonRaw && !link) return;
+        // Link ar Thumbnail duitai khali - ei row-ta khali/unused (notun
+        // add kora row hole "Season" number-o auto-fill kora thake, tao
+        // real kono content na thakle chupchap skip - error dekhano hoy na).
+        if (!link && !thumb) return;
 
         const seasonNum = parseInt(seasonRaw, 10);
         if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
-            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link "${link || '(khali)'}" er jonno eta lagbe.`);
+            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link/thumbnail "${link || thumb || '(khali)'}" er jonno eta lagbe.`);
         }
-        if (!link) {
-            throw new Error(`Season ${seasonNum}-er jonno YouTube link dao, na hole ei row-ta "✕" diye muche felo.`);
-        }
-        if (!extractYoutubeVideoId(link)) {
+        // Link na diyeও shudhu Thumbnail-i deya jete pare - tokhon video-r
+        // jonno auto (TMDB/YouTube) trailer-i use hobe, kintu thumbnail-ta
+        // admin-er deya custom-ta-i dekhabe (ei row-take r khali "link nei"
+        // bole error dekhiye reject kora hoy na).
+        if (link && !extractYoutubeVideoId(link)) {
             throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro.`);
         }
 
-        result.push({ season: seasonNum, link, thumb: thumb || null });
+        result.push({ season: seasonNum, link: link || null, thumb: thumb || null });
     });
     return result;
 }
