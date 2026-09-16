@@ -917,9 +917,9 @@ html.light-mode .auth-google-btn:hover { background: #f5f6f8; }
    ei box-er bhitore ▶ icon thakbe, jate niche-r poster/thumbnail-o clearly
    dekha jay. */
 .watch-play-btn {
-    width: 72px;
-    height: 50px;
-    border-radius: 14px;
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
     background: rgba(15, 18, 26, 0.35);
     border: 2px solid rgba(255, 255, 255, 0.85);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
@@ -1105,7 +1105,7 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
         gap: 6px;
     }
     .admin-season-watch-row {
-        grid-template-columns: 56px 1fr 30px !important;
+        grid-template-columns: 56px 1fr 1fr 30px !important;
         gap: 6px;
     }
 }
@@ -1943,10 +1943,9 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
 }
 
 /* Watch Button tab-er TV series-er per-season link row - Season Trailer
-   row-er moto-i grid, shudhu ekta link column (thumbnail per-season na, tai
-   1-ta kom column). */
+   row-er moto-i grid (Season + Link + Thumbnail + Remove, 4 column). */
 .admin-season-watch-row {
-    grid-template-columns: 70px 1fr auto;
+    grid-template-columns: 70px 1fr 1fr auto;
 }
 .admin-season-watch-row input.admin-season-watch-num {
     text-align: center;
@@ -3436,3 +3435,118 @@ html.light-mode .comment-login-prompt { background-color: #f7f8fa; border-color:
 
 html.light-mode .hero-badge { background-color: rgba(255,255,255,0.85); color: #23262f; border-color: rgba(0,0,0,0.08); }
 html.light-mode .hero-badge-featured { color: #d9480f; }
+
+/* ==================== "500K+ Movies & TV Shows" massive-watch section
+   (homepage, pagination-er thik pore) - TMDB-r puro catalog theke jekono
+   naam search kore, admin-er database-e add kora na thakleও, shorashori
+   "Online Watch"-e byabohar hoya shei ekই embed.filmu.in iframe diye
+   shathe-shathe watch kora jay. ==================== */
+.massive-watch-section {
+    margin: 10px 0 40px 0;
+    padding-top: 28px;
+    border-top: 1px solid #1c202b;
+}
+.massive-watch-heading { text-align: center; margin-bottom: 20px; }
+.massive-watch-heading h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0 0 6px 0;
+}
+.massive-watch-heading p {
+    font-size: 13px;
+    color: #8b93a7;
+    margin: 0;
+}
+
+.massive-watch-search-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+.massive-watch-input {
+    width: 100%;
+    max-width: 480px;
+    background-color: #151821;
+    border: 1px solid #282d3f;
+    border-radius: 30px;
+    padding: 12px 20px;
+    font-size: 14px;
+    color: #eceff1;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.massive-watch-input::placeholder { color: #6b7385; }
+.massive-watch-input:focus { border-color: #2563eb; }
+
+.massive-watch-status {
+    text-align: center;
+    color: #8b93a7;
+    font-size: 13px;
+    padding: 30px 10px;
+}
+
+.massive-watch-results {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px 12px;
+}
+.massive-watch-card {
+    cursor: pointer;
+    background-color: #111319;
+    border: 1px solid #1c202b;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.15s, border-color 0.15s;
+}
+.massive-watch-card:hover {
+    transform: translateY(-2px);
+    border-color: #2563eb;
+}
+.massive-watch-card img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    background-color: #1c202b;
+}
+.massive-watch-card-info { padding: 8px 9px; }
+.massive-watch-card-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #eceff1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+}
+.massive-watch-card-meta {
+    font-size: 10.5px;
+    color: #8b93a7;
+    margin-top: 3px;
+}
+
+.massive-watch-player { margin-top: 24px; max-width: 640px; margin-left: auto; margin-right: auto; }
+.massive-watch-player .massive-watch-status {
+    background-color: #151821;
+    border: 1px solid #282d3f;
+    border-radius: 10px;
+}
+
+@media (max-width: 900px) {
+    .massive-watch-results { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 560px) {
+    .massive-watch-results { grid-template-columns: repeat(3, 1fr); gap: 10px 8px; }
+    .massive-watch-heading h2 { font-size: 18px; }
+    .massive-watch-heading p { font-size: 12px; padding: 0 10px; }
+}
+
+html.light-mode .massive-watch-section { border-color: #e5e8ee; }
+html.light-mode .massive-watch-heading h2 { color: #14161c; }
+html.light-mode .massive-watch-heading p { color: #6b7280; }
+html.light-mode .massive-watch-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
+html.light-mode .massive-watch-card { background-color: #f7f8fa; border-color: #e5e8ee; }
+html.light-mode .massive-watch-card-title { color: #14161c; }
+html.light-mode .massive-watch-player .massive-watch-status { background-color: #f7f8fa; border-color: #e5e8ee; }

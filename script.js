@@ -225,6 +225,16 @@ function resolveManualSeasonWatchLinkFallback(movie, isTV, preferredSeason) {
     return fallbackLink ? { link: fallbackLink, season: bestSeason } : null;
 }
 
+// Admin panel theke series-er kono ekta specific season-er Watch Link row-e
+// (Season + Link-er pashe) manually ekta Thumbnail-o deya thakle, seta return
+// kore. Na thakle null - tokhon caller "Custom watch thumbnail" (global,
+// shob season-er jonno common) field ba auto poster/backdrop byabohar korbe.
+function getManualSeasonWatchThumb(movie, seasonNumber) {
+    if (!movie || seasonNumber == null || !Array.isArray(movie.watchSeasonLinks) || !movie.watchSeasonLinks.length) return null;
+    const entry = movie.watchSeasonLinks.find(sw => sw && Number(sw.season) === Number(seasonNumber));
+    return (entry && entry.thumb) ? entry.thumb : null;
+}
+
 // Video title-e thaka "reaction/review/recap" type shobdo dekhle shei video-take
 // bad deya hoy - eigulote 'trailer' shobdo thaka sotteo eta আসল trailer na,
 // third-party commentary/reaction video (jeta age bad porto na, karon age
@@ -2556,24 +2566,6 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
     const container = document.getElementById('watchBoxContainer');
     if (!container) return;
 
-    // Admin panel-e (Watch Button tab) ekta custom "watchThumb" diye rakhle
-    // shei thumbnail-i shobar age priority pabe (trailerThumb-er moto-i
-    // pattern). Na dile, movie/series-er "poster" (shadharonoto lomba/
-    // portrait, 2:3 ratio) er bodole TMDB-r "backdrop" (16:9 landscape
-    // screenshot-moto image, Hero banner-e jeta byabohar hoy) auto-thumbnail
-    // hishebe byabohar kora hoy - eta already box-er 16:9 shape-er shathe
-    // match kore, tai kono crop/letterbox lage na, thik "Trailer" section-er
-    // thumbnail-er moto-i porishkar bhabe dekhte lage. Backdrop kono karone
-    // na paoa gele (TMDB match nei, fetch fail, ইত্যাদি) - shesh upay
-    // hishebe age-r moto poster-i dekhano hoy.
-    const customWatchThumb = (movie.watchThumb && String(movie.watchThumb).trim()) || null;
-    let watchThumbUrl = customWatchThumb;
-    if (!watchThumbUrl) {
-        const backdropData = await fetchHeroBackdrop(movie).catch(() => null);
-        if (!stillRelevant()) return; // ei await cholakalin modal bondho/movie change hoye gele ar egono na
-        watchThumbUrl = (backdropData && backdropData.backdrop) || poster;
-    }
-
     // Series (TV)-er khetre admin panel-e (Watch Button tab) 1-er beshi
     // season-er jonno alada-alada manual watch link add kora thakle, ekta
     // Season dropdown dekhano hoy (Trailer tab-er moto-i) - jate user chaile
@@ -2588,12 +2580,33 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
             .map(sw => Number(sw.season))
             .sort((a, b) => a - b)
         : [];
+    const defaultWatchSeason = manualWatchSeasons.length ? manualWatchSeasons[manualWatchSeasons.length - 1] : null;
+
+    // Thumbnail priority: (1) shei nirdishto season-er Watch Link row-e
+    // manually deya thumbnail (jodi TV series-e season-wise link byabohar
+    // hoy) - (2) "Custom watch thumbnail" (global, shob season-er jonno
+    // common) field - (3) TMDB-r "backdrop" (16:9 landscape screenshot-moto
+    // image, Hero banner-e jeta byabohar hoy, poster-er theke box-er shape-er
+    // shathe onek beshi manay) - (4) shesh upay hishebe movie/series-er
+    // "poster" (lomba/portrait). "fallbackThumbUrl" (global watchThumb/
+    // backdrop/poster) ta box-e data-attribute hishebe rekhe deya hoy, jate
+    // Season dropdown-e switch korar shomoy (changeModalWatchSeason) backdrop
+    // abar fetch na kore-i reuse kora jay.
+    const seasonSpecificThumb = defaultWatchSeason != null ? getManualSeasonWatchThumb(movie, defaultWatchSeason) : null;
+    const customWatchThumb = (movie.watchThumb && String(movie.watchThumb).trim()) || null;
+    let fallbackThumbUrl = customWatchThumb;
+    if (!fallbackThumbUrl) {
+        const backdropData = await fetchHeroBackdrop(movie).catch(() => null);
+        if (!stillRelevant()) return; // ei await cholakalin modal bondho/movie change hoye gele ar egono na
+        fallbackThumbUrl = (backdropData && backdropData.backdrop) || poster;
+    }
+    const watchThumbUrl = seasonSpecificThumb || fallbackThumbUrl;
+
     let watchSeasonSelectorHTML = '';
     if (manualWatchSeasons.length > 1) {
-        const defaultSeason = manualWatchSeasons[manualWatchSeasons.length - 1];
         let seasonOptionsHTML = '';
         manualWatchSeasons.forEach(s => {
-            seasonOptionsHTML += `<option value="${s}" ${s === defaultSeason ? 'selected' : ''}>Season ${s}</option>`;
+            seasonOptionsHTML += `<option value="${s}" ${s === defaultWatchSeason ? 'selected' : ''}>Season ${s}</option>`;
         });
         watchSeasonSelectorHTML = `
         <div class="trailer-season-row watch-season-row">
@@ -2616,7 +2629,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
     // ekei session-e duibar count hote pare - eta download link-er khetreo
     // ekই rokom shadharon click-count hishebe rakha hoyeche).
     container.innerHTML = `
-        <div class="season-box-item watch-box" id="watchBox" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-title="${escapeAttr(title)}">
+        <div class="season-box-item watch-box" id="watchBox" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}">
             <div class="season-box-header" onclick="incrementMovieViews(currentModalMovie); toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
@@ -2694,6 +2707,13 @@ function changeModalWatchSeason(selectEl) {
     const newLink = getManualSeasonWatchLink(currentModalMovie, seasonNumber);
     if (!newLink) return;
     box.setAttribute('data-link', newLink);
+    // Ei season-er Watch Link row-e nijer kono manual thumbnail deya thakle
+    // seta-i priority pabe, na hole shuru-te resolve kora "fallback" thumbnail
+    // (global Custom watch thumbnail / TMDB backdrop / poster - data-fallback-thumb-e
+    // save kora ache) byabohar hobe - notun kore backdrop fetch korar dorkar nei.
+    const seasonThumb = getManualSeasonWatchThumb(currentModalMovie, seasonNumber);
+    const fallbackThumb = box.getAttribute('data-fallback-thumb') || box.getAttribute('data-poster') || '';
+    box.setAttribute('data-poster', seasonThumb || fallbackThumb);
     resetWatchBoxToThumbnail(box);
 }
 
@@ -7847,11 +7867,11 @@ async function saveAdminTrailerSettings(movie, card, btn) {
 
 // TV series-er khetre - ekta shingle "Custom watch link" field-er bodole,
 // Trailer tab-er "Season Trailer" row-er moto-i - proti season-er jonno alada
-// Watch link deyar sujog thake (jehetu series-er khetre alada-alada season-e
-// alada video/link lagte pare, ekta flat link diye shob season cover kora
-// jaay na). Thumbnail per-season na, shob season-er jonno ekই (upor-e deya)
-// "Custom watch thumbnail" field-i byabohar hoy - shudhu "link" er khetreই
-// per-season support dorkar bole eijonno alada thumb-column rakha hoyni.
+// Watch link (chaile Thumbnail-o) deyar sujog thake (jehetu series-er khetre
+// alada-alada season-e alada video/link/thumbnail lagte pare, ekta flat link
+// diye shob season cover kora jaay na). Kono season-e alada Thumbnail na
+// dile, upore-r global "Custom watch thumbnail" field (thakle) fallback
+// hishebe byabohar hoy.
 function addAdminWatchSeasonRow(container, data) {
     if (!container) return;
     data = data || {};
@@ -7861,6 +7881,7 @@ function addAdminWatchSeasonRow(container, data) {
     row.innerHTML = `
         <input type="number" min="1" class="admin-season-watch-num" placeholder="Season" value="${escapeAttr(nextSeasonGuess)}">
         <input type="text" class="admin-season-watch-link" placeholder="Custom watch/embed link for this season" value="${escapeAttr(data.link)}">
+        <input type="text" class="admin-season-watch-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}">
         <button type="button" class="admin-row-remove-btn">✕</button>
     `;
     row.querySelector('.admin-row-remove-btn').addEventListener('click', () => row.remove());
@@ -7870,24 +7891,27 @@ function addAdminWatchSeasonRow(container, data) {
 // Card-er bhitorer season-watch row gula theke data collect kore -
 // collectAdminTrailerSeasonRows()-er moto-i pattern, shudhu YouTube-video-ID
 // validation nei (Watch link jekono embed URL hote pare, shudhu YouTube na).
+// Link na diyeও shudhu Thumbnail-i deya jete pare (Trailer tab-er thumb-only
+// support-er moto-i) - tokhon video-r jonno auto/global watch link-i use
+// hobe, kintu thumbnail-ta shei season-er jonno custom-ta-i dekhabe.
 function collectAdminWatchSeasonRows(card) {
     const rows = card.querySelectorAll('.admin-watch-season-rows .admin-season-watch-row');
     const result = [];
     rows.forEach(row => {
         const seasonRaw = row.querySelector('.admin-season-watch-num').value.trim();
         const link = row.querySelector('.admin-season-watch-link').value.trim();
+        const thumb = row.querySelector('.admin-season-watch-thumb').value.trim();
 
-        // Season number ar link dutai khali - ei row-ta khali/unused, chupchap skip.
-        if (!seasonRaw && !link) return;
+        // Link ar Thumbnail duitai khali - ei row-ta khali/unused (notun add
+        // kora row hole "Season" number-o auto-fill kora thake, tao real
+        // kono content na thakle chupchap skip - error dekhano hoy na).
+        if (!link && !thumb) return;
 
         const seasonNum = parseInt(seasonRaw, 10);
         if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
-            throw new Error(`Watch Link row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link "${link || '(khali)'}" er jonno eta lagbe.`);
+            throw new Error(`Watch Link row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link/thumbnail "${link || thumb || '(khali)'}" er jonno eta lagbe.`);
         }
-        if (!link) {
-            throw new Error(`Season ${seasonNum}-er jonno Watch link dao, na hole ei row-ta "✕" diye muche felo.`);
-        }
-        result.push({ season: seasonNum, link });
+        result.push({ season: seasonNum, link: link || null, thumb: thumb || null });
     });
     return result;
 }
@@ -8030,18 +8054,18 @@ function renderAdminWatchList(filter) {
             // Season watch row-gula dynamic-bhabe add/remove hoy, tai "blur"
             // (bubble kore na) er bodole "focusout" (bubble kore) event
             // delegation-e ekbar-i rowsContainer-e listener boshano hoy - notun
-            // row add korleও alada kore attach korte hoy na. Shudhu Link
-            // field-e (Season number-e na, karon notun row-e seta age-thekei
-            // auto-fill kora thake, chuye gele-i premature "link dao" error
-            // dekhabe) blur/Enter korleই auto-save hoy. Row remove ("✕")
-            // korleও shathe shathe save hoye jay.
+            // row add korleও alada kore attach korte hoy na. Link ar Thumbnail
+            // duitা field-e-i (Season number-e na, karon notun row-e seta
+            // age-thekei auto-fill kora thake, chuye gele-i premature "link/
+            // thumbnail dao" error dekhabe) blur/Enter korleই auto-save hoy.
+            // Row remove ("✕") korleও shathe shathe save hoye jay.
             rowsContainer.addEventListener('focusout', (e) => {
-                if (!e.target.matches('.admin-season-watch-link')) return;
+                if (!e.target.matches('.admin-season-watch-link, .admin-season-watch-thumb')) return;
                 saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState);
             });
             rowsContainer.addEventListener('keydown', (e) => {
                 if (e.key !== 'Enter') return;
-                if (!e.target.matches('.admin-season-watch-link')) return;
+                if (!e.target.matches('.admin-season-watch-link, .admin-season-watch-thumb')) return;
                 e.preventDefault();
                 e.target.blur();
             });
