@@ -2717,6 +2717,235 @@ function changeModalWatchSeason(selectEl) {
     resetWatchBoxToThumbnail(box);
 }
 
+// ==================== "500K+ Movies & TV Shows" homepage search-and-watch
+// section ====================
+// Admin panel-e database-e add kora na thakleও - je kono movie/TV series
+// nam diye search korle, TMDB theke shei content-er ID ber kore, "Online
+// Watch"-e byabohar hoya shei ekই embed.filmu.in iframe pattern use kore
+// shathe shathe watch kora jay. Eta ekTA shudhu-i "kono nirdishto movie-r
+// object" na thaka obosthay-o kaj kore, tai movie-grid/admin database-er
+// baire, homepage-e nijer alada, shwotontro (self-contained) code.
+
+let massiveWatchDebounceTimer = null;
+let massiveWatchRequestId = 0;
+
+function initMassiveWatchSection() {
+    const input = document.getElementById('massiveWatchInput');
+    const clearBtn = document.getElementById('massiveWatchClearBtn');
+    const resultsEl = document.getElementById('massiveWatchResults');
+    const wrap = input ? input.closest('.massive-watch-search-wrap') : null;
+    if (!input || !resultsEl) return;
+
+    const hideSuggestions = () => { resultsEl.innerHTML = ''; };
+
+    input.addEventListener('input', () => {
+        clearTimeout(massiveWatchDebounceTimer);
+        const q = input.value.trim();
+        const playerEl = document.getElementById('massiveWatchPlayer');
+        massiveWatchRequestId++; // age-r kono pending search/player update thakle seta bad
+        if (playerEl) playerEl.innerHTML = '';
+        // Search bar-e kichu likhle-i clear ("✕") button dekha jay, khali thakle
+        // hidden thake.
+        if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+        if (!q) {
+            hideSuggestions();
+            return;
+        }
+        massiveWatchDebounceTimer = setTimeout(() => runMassiveWatchSearch(q), 350);
+    });
+
+    // Clear ("✕") button-e click korle - search bar khali kore, suggestion
+    // dropdown ar (jodi thake) player-o bondho kore dey, tarpor abar
+    // search bar-e focus kore dey (jate user shathe shathe notun kore
+    // likhte pare).
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            input.value = '';
+            clearBtn.style.display = 'none';
+            hideSuggestions();
+            const playerEl = document.getElementById('massiveWatchPlayer');
+            if (playerEl) playerEl.innerHTML = '';
+            massiveWatchRequestId++;
+            input.focus();
+        });
+    }
+
+    // Search bar-er baire kono jaygay click korle suggestion dropdown-ta
+    // bondho hoye jabe (shadharon autocomplete UX pattern-er moto-i).
+    document.addEventListener('click', (e) => {
+        if (wrap && !wrap.contains(e.target)) hideSuggestions();
+    });
+}
+
+async function runMassiveWatchSearch(query) {
+    const myRequestId = ++massiveWatchRequestId;
+    const resultsEl = document.getElementById('massiveWatchResults');
+    if (!resultsEl) return;
+    resultsEl.innerHTML = '<div class="massive-watch-status">Searching...</div>';
+    if (!TMDB_API_KEY) {
+        resultsEl.innerHTML = '<div class="massive-watch-status">Search is unavailable right now.</div>';
+        return;
+    }
+    try {
+        const url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false`;
+        const res = await fetch(url);
+        if (myRequestId !== massiveWatchRequestId) return; // ei shomoy-e user aro likhe felle, ei purono result-ta ar dorkar nei
+        if (!res.ok) throw new Error('TMDB search failed: ' + res.status);
+        const data = await res.json();
+        if (myRequestId !== massiveWatchRequestId) return;
+
+        const items = (data.results || [])
+            .filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path)
+            .slice(0, 8);
+
+        if (!items.length) {
+            resultsEl.innerHTML = '<div class="massive-watch-status">No results found. Try a different name.</div>';
+            return;
+        }
+
+        // Autocomplete dropdown-er moto compact list - proti row-e ekta choto
+        // (poster-shape) thumbnail + naam + year/type, click korleই niche
+        // watch box khule jay. Dropdown-er choto thumbnail-e poster-i thik
+        // ache (portrait shape-er shathe manay), kintu niche-r "watch box"-e
+        // (16:9 shape) fit korার jonno alada-bhabe "backdrop_path"-o
+        // (TMDB search result-e already thake, notun kore fetch korte hoy
+        // na) save kore rakha hoy - "Online Watch"-e Hero banner-er backdrop
+        // byabohar korar ekই cause-e, jate portrait poster দিয়ে 16:9 box-e
+        // crop/letterbox na hoy.
+        resultsEl.innerHTML = items.map(item => {
+            const rawTitle = item.title || item.name || 'Untitled';
+            const year = ((item.release_date || item.first_air_date || '').slice(0, 4)) || '';
+            const poster = `https://image.tmdb.org/t/p/w92${item.poster_path}`;
+            const fullPoster = `https://image.tmdb.org/t/p/w342${item.poster_path}`;
+            const backdrop = item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : '';
+            const typeLabel = item.media_type === 'tv' ? 'TV Series' : 'Movie';
+            return `
+                <div class="massive-watch-suggestion-item" data-id="${item.id}" data-type="${item.media_type}" data-title="${escapeAttr(rawTitle)}" data-poster="${escapeAttr(fullPoster)}" data-backdrop="${escapeAttr(backdrop)}" onclick="selectMassiveWatchResult(this)">
+                    <img src="${poster}" alt="${escapeAttr(rawTitle)}" loading="lazy">
+                    <div class="massive-watch-suggestion-info">
+                        <div class="massive-watch-suggestion-title">${escapeHtml(rawTitle)}</div>
+                        <div class="massive-watch-suggestion-meta">${typeLabel}${year ? ' • ' + year : ''}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        if (myRequestId !== massiveWatchRequestId) return;
+        console.error('Massive watch search error:', err);
+        resultsEl.innerHTML = '<div class="massive-watch-status">Search failed, please try again.</div>';
+    }
+}
+
+function selectMassiveWatchResult(itemEl) {
+    const id = itemEl.getAttribute('data-id');
+    const type = itemEl.getAttribute('data-type');
+    const title = itemEl.getAttribute('data-title');
+    const poster = itemEl.getAttribute('data-poster');
+    const backdrop = itemEl.getAttribute('data-backdrop');
+
+    // Selection kora matro-i suggestion dropdown bondho hoye jay ar search
+    // bar-e select kora naam-ta boshe jay (shadharon autocomplete UX-er moto-i),
+    // tarpor "Online Watch"-er moto-i box-e content-ta watch kora jay.
+    const input = document.getElementById('massiveWatchInput');
+    const resultsEl = document.getElementById('massiveWatchResults');
+    if (input) input.value = title;
+    if (resultsEl) resultsEl.innerHTML = '';
+
+    // Player box-ta 16:9 shape-er, tai portrait "poster"-er bodole TMDB-r
+    // "backdrop" (16:9 landscape screenshot-moto image) thakle seta-i
+    // priority pabe - eta box-er shape-er shathe onek beshi manay, tai kono
+    // crop/letterbox chara-i clear bhabe dekhte lage. Backdrop na thakle
+    // (kichu title-er backdrop nao thakte pare) - poster-i fallback hishebe
+    // byabohar hoy.
+    const thumb = (backdrop && backdrop.trim()) || poster;
+    renderMassiveWatchPlayer(id, type, title, thumb);
+    const playerEl = document.getElementById('massiveWatchPlayer');
+    if (playerEl) playerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster) {
+    const playerEl = document.getElementById('massiveWatchPlayer');
+    if (!playerEl) return;
+    const requestId = ++massiveWatchRequestId;
+
+    // "Online Watch"-e byabohar hoya shei ekই embed.filmu.in URL pattern -
+    // movie hole "movie/{tmdbId}", series hole "tv/{tmdbId}/1/1" (Season 1,
+    // Episode 1 default - shei ekই limitation "Online Watch"-erও ache).
+    const link = mediaType === 'tv'
+        ? `https://embed.filmu.in/tv/${encodeURIComponent(tmdbId)}/1/1`
+        : `https://embed.filmu.in/movie/${encodeURIComponent(tmdbId)}`;
+
+    playerEl.innerHTML = `
+        <div class="season-box-item watch-box massive-watch-box" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(poster)}" data-title="${escapeAttr(title)}">
+            <div class="season-box-header" style="cursor:default;">
+                <span>⚡ ${escapeHtml(title)}</span>
+                <span class="watch-loading-spinner" aria-hidden="true"></span>
+            </div>
+        </div>
+    `;
+
+    const ok = await checkWatchLinkReachable(link, () => requestId === massiveWatchRequestId);
+    if (requestId !== massiveWatchRequestId) return; // ei shomoy-e user notun kichu select/search kore fellে, ei result-ta ar dorkar nei
+
+    if (!ok) {
+        playerEl.innerHTML = `<div class="massive-watch-status">"${escapeHtml(title)}" is not available to watch right now. Please try another title.</div>`;
+        return;
+    }
+
+    playerEl.innerHTML = `
+        <div class="season-box-item watch-box massive-watch-box" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(poster)}" data-title="${escapeAttr(title)}">
+            <div class="season-box-header" style="cursor:default;">
+                <span>⚡ ${escapeHtml(title)}</span>
+            </div>
+            <div class="season-download-body open">
+                <div class="trailer-thumb-wrap" onclick="playMassiveWatch(this)">
+                    <img class="trailer-thumb-img" src="${poster}" alt="${escapeAttr(title)} Watch" loading="lazy" onerror="handlePosterImgError(this)">
+                    <button type="button" class="trailer-play-btn watch-play-btn" aria-label="Play watch">▶</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Trailer/Online-Watch box-er playModalWatch()-er ekdom ekই pattern - shudhu
+// modal-er bhitorer .watch-box na, homepage-er standalone .massive-watch-box
+// niye kaj kore. View count এখানে barano hoy na, karon eta admin database-e
+// thaka kono movie/series na - shudhu TMDB theke shorashori search kore paoa
+// arbitrary content.
+function playMassiveWatch(el) {
+    const box = el.closest('.massive-watch-box');
+    if (!box) return;
+    const link = box.getAttribute('data-link');
+    const bodyEl = box.querySelector('.season-download-body');
+    if (!bodyEl || !link) return;
+
+    let embedUrl = link;
+    const ytId = extractYoutubeVideoId(link);
+    if (ytId) embedUrl = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`;
+
+    bodyEl.innerHTML = `
+        <button type="button" class="watch-close-btn" aria-label="Hide video" onclick="closeMassiveWatch(this)">✖</button>
+        <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>
+    `;
+}
+
+function closeMassiveWatch(el) {
+    const box = el.closest('.massive-watch-box');
+    if (!box) return;
+    const bodyEl = box.querySelector('.season-download-body');
+    if (!bodyEl) return;
+    const title = box.getAttribute('data-title') || '';
+    const poster = box.getAttribute('data-poster') || '';
+    bodyEl.innerHTML = `
+        <div class="trailer-thumb-wrap" onclick="playMassiveWatch(this)">
+            <img class="trailer-thumb-img" src="${poster}" alt="${escapeAttr(title)} Watch" loading="lazy" onerror="handlePosterImgError(this)">
+            <button type="button" class="trailer-play-btn watch-play-btn" aria-label="Play watch">▶</button>
+        </div>
+    `;
+}
+
+document.addEventListener('DOMContentLoaded', initMassiveWatchSection);
+
 // Season dropdown-e onno season select korle shei season-er trailer fetch kore
 // thumbnail/play button-take update kore dey (already play hocche emon video thakle
 // seta-o notun thumbnail diye replace hoye jay - abar click korle notun season-er

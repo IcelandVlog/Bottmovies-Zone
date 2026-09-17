@@ -148,9 +148,12 @@
         <p>Search any title by name — watch it instantly, even if it isn't in our library yet.</p>
     </div>
     <div class="massive-watch-search-row">
-        <input type="text" id="massiveWatchInput" class="massive-watch-input" placeholder="Search any movie or TV show name..." autocomplete="off">
+        <div class="massive-watch-search-wrap">
+            <input type="text" id="massiveWatchInput" class="massive-watch-input" placeholder="Search any movie or TV show name..." autocomplete="off">
+            <button type="button" id="massiveWatchClearBtn" class="massive-watch-clear-btn" aria-label="Clear search" style="display:none;">✕</button>
+            <div class="massive-watch-suggestions" id="massiveWatchResults"></div>
+        </div>
     </div>
-    <div class="massive-watch-results" id="massiveWatchResults"></div>
     <div class="massive-watch-player" id="massiveWatchPlayer"></div>
 </section>
 </main>
