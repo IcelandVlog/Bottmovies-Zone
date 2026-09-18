@@ -906,6 +906,27 @@ html.light-mode .auth-google-btn:hover { background: #f5f6f8; }
     transition: background 0.15s ease, transform 0.15s ease;
 }
 .trailer-thumb-wrap:hover .trailer-play-btn { background: #FF8A00; transform: translate(-50%, -50%) scale(1.08); }
+
+/* "Online Watch" thumbnail/poster-er upore-right corner-e boshano choto
+   "EP {number}" badge - jei season+episode-er jonno admin manually watch
+   link diyeche, shei episode number-ta automatic-bhabe eikhane show hoy
+   (Season/Episode dropdown change korle-o eta shathe shathe update hoy). */
+.watch-thumb-episode-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    background: rgba(15, 18, 26, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
 .trailer-label { color: #e2e8f0; font-size: 13.5px; font-weight: 700; margin-top: 10px; }
 .trailer-video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; background-color: #000; }
 .trailer-video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; z-index: 1; }
@@ -1103,10 +1124,14 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
         grid-template-columns: 56px 1fr 1fr 30px !important;
         gap: 6px;
     }
+    /* "Ep" field-e ekhon number chara TEXT-o (jemon "Finale") lekha jay,
+       tai mobile-eও ei column-ta agher 36px theke ektu chowRa kora hoyeche. */
     .admin-season-watch-row {
-        grid-template-columns: 56px 1fr 1fr 30px !important;
-        gap: 6px;
+        grid-template-columns: 40px 68px 1fr 1fr 26px !important;
+        gap: 5px;
     }
+    .admin-episode-thumb-preview { width: 40px; height: 32px; }
+    .admin-episode-thumb-badge { font-size: 8px; padding: 1px 3px; }
 }
 
 .season-box-item.fast-server-box { background: #005b66; border: 1px solid #00838f; }
@@ -1114,16 +1139,39 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
 /* "Online Watch" row-take alada box + green color deya hoyeche, jate ata
    Download/Fast-Server box theke visually distinct thake. */
 .season-box-item.watch-box { background: #1e5f3a; border: 1px solid #2fa25a; }
-/* Video play korar AGE (thumbnail, .trailer-thumb-wrap-er nijer
-   aspect-ratio:16/9 ache) ar play korar PORE (iframe, jar kono nijer
-   height/aspect-ratio nei - iframe-er height="100%" tokhoni thik kaj kore
-   jokhon tar parent-er nijer ekta shothik height thake) - duई obosthay-i
-   box-er height ek-i rakhar jonno, ".watch-box"-er bhitorer body-take
-   shorasori 16:9 aspect-ratio diye deya hoy. Na hole play korar por
-   iframe-er kono nijer height na thakay body-ta choto hoye jeto (browser-er
-   default iframe height, ~150px, e chole aste chaito).
-*/
-.watch-box .season-download-body.open { aspect-ratio: 16 / 9; }
+/* AGE ekhane ".watch-box .season-download-body.open"-e SORASORI
+   "aspect-ratio: 16/9" deya chilo - mane pura accordion body-r height = tar
+   nijer width-er 16:9. Kintu ei body-r bhitore shudhu video-i na, upore
+   Season/Episode dropdown row ar char-pashe 18px padding-o thake. Fole
+   bhitorer video wrap (jar nijer-o 16:9 ache) body-r height-er cheye BORO
+   hoye jeto, ar body-te "overflow: hidden" thakay video-r NICHER ongsho
+   (player-er progress bar/control bar) kete jeto - thik screenshot-er moto.
+   Ekhon body-ke nijer content onujayi height nite deya hoy - video wrap-er
+   nijer aspect-ratio-i height thik kore, tai je kono player (control bar
+   shoho) puro-i frame-er bhitore fit hoy. */
+.watch-box .season-download-body.open { max-height: 1600px; }
+/* Boro screen-e video jate modal-er baire beriye na jay - viewport-er
+   uchchotar ekta nirapod simar modhye rakha hoy (chhobi-r ratio thik
+   thake, shudhu pashe halka letterbox porte pare). */
+.watch-box .trailer-video-wrap,
+.watch-box .trailer-thumb-wrap { max-height: 78vh; }
+
+/* Choto (mobile) device-e "Online Watch" box-er bhitore video-r char-pashe
+   je boro gap/margin (body-r 18px padding + selector row-er 10px niche-r gap)
+   thakto - seta onek jaiga khete chilo ar video-ta choto dekhacchilo. Tai
+   shudhu choto screen-e ei padding ekdom kome ashe, video-ta box-er kinar
+   porjonto (prai edge-to-edge) dekha jay - "massive watch" player-e jemon
+   kora hoyeche, thik temon-i. */
+@media (max-width: 600px) {
+    .watch-box .season-download-body.open { padding: 8px; }
+    .watch-box .watch-season-row { margin-bottom: 8px; }
+    .watch-box .trailer-video-wrap,
+    .watch-box .trailer-thumb-wrap { border-radius: 6px; }
+}
+@media (max-width: 420px) {
+    .watch-box .season-download-body.open { padding: 5px; }
+    .watch-box .watch-season-row { margin-bottom: 6px; gap: 6px; }
+}
 
 /* Reachability check cholakalin (background-e) "⚡ Online Watch" box-e ekta
    choto ghurte thaka spinner dekhano hoy, jate khali/ফাঁকা na legে - bujha
@@ -1951,17 +1999,84 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
     padding: 8px 4px;
 }
 
-/* Watch Button tab-er TV series-er per-season link row - Season Trailer
-   row-er moto-i grid (Season + Link + Thumbnail + Remove, 4 column). */
+/* Watch Button tab-er TV series-er per-episode link row - upore-r Season
+   dropdown diye season select kora hoy bole, row-er nijer Season number
+   input-ta ekhon shudhu internal data hishebe thake (visually hide kora,
+   ".admin-watch-hidden-field" dekho) - tai row-e shudhu Episode + Link +
+   Thumbnail + Remove, 4-i visible column. */
+.admin-watch-hidden-field { display: none !important; }
+/* "Ep" column-ta age 50px chilo (shudhu number dhorar jonno) - ekhon
+   ekhane TEXT label-o (jemon "Finale", "EP 3 (Hindi)") lekha jay, tai
+   column-take chowRa kora hoyeche jate lekha-ta pora jay. */
 .admin-season-watch-row {
-    grid-template-columns: 70px 1fr 1fr auto;
+    grid-template-columns: 56px 120px 1fr 1fr auto;
+    align-items: center;
 }
-.admin-season-watch-row input.admin-season-watch-num {
+.admin-season-watch-row input.admin-season-watch-num,
+.admin-season-watch-row input.admin-episode-watch-num {
     text-align: center;
-    padding: 8px 4px;
+    padding: 8px 6px;
+    text-overflow: ellipsis;
+}
+
+/* Row-er bam-dik-e ekta choto live-preview thumbnail - Thumbnail link field-e
+   ki deya ache (na dile movie-r poster) shei image-ta dekhay, ar tar
+   right-top corner-e "EP {number}" badge-ta - jate admin type korar shomoy-i
+   (kono save/refresh chara) bujhte pare frontend-e Watch button-er thumbnail-e
+   eta exactly kemon dekhabe. */
+.admin-episode-thumb-preview {
+    position: relative;
+    width: 56px;
+    height: 40px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid #1e293b;
+    flex-shrink: 0;
+}
+.admin-episode-thumb-preview-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.admin-episode-thumb-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 2;
+    background: rgba(15, 18, 26, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 1px 4px;
+    border-radius: 999px;
+    line-height: 1.3;
+    pointer-events: none;
 }
 .admin-watch-season-rows { margin-top: 10px; width: 100%; }
 .admin-watch-add-season-btn { margin-top: 2px; }
+/* Season dropdown ("Season 1 (3 EP)") + notun season shuru korar "+ Season"
+   button - ekshathe ekta row-e, jate compact thake ar jaiga kom lage. */
+.admin-watch-season-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    width: 100%;
+}
+.admin-watch-season-select {
+    flex: 1;
+    background-color: #111622;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    outline: none;
+    cursor: pointer;
+}
+.admin-watch-season-select:focus { border-color: #2563eb; }
+.admin-watch-add-season-inline-btn { white-space: nowrap; }
+html.light-mode .admin-watch-season-select { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
 .admin-watch-auto-toggle {
     display: flex;
     align-items: center;
@@ -1982,7 +2097,23 @@ html.light-mode .btn-favorite-action { color: #14161c; border-color: #d7dbe3; }
 html.light-mode .admin-watch-auto-toggle { color: #55606f; }
 
 /* Trailer / Teaser admin tab (per-title manual trailer editor, next to Database) */
-.admin-trailer-card { flex-wrap: wrap; }
+.admin-trailer-card {
+    flex-wrap: wrap;
+    /* AGE ".admin-db-card"-er "align-items: center" (nicher rule-e deya)
+       ei card-guloতe-o apply hoto - shomossha eta je, Watch/Trailer card-e
+       Season/Episode row-er list অনেক LOMBA hote pare (12+ episode row),
+       tai card-tao onek lomba hoye jeto. "center" alignment-e thumbnail ar
+       ▶ Save button (.admin-db-actions) shei PURO lomba card-er VERTICAL
+       MIDDLE-e giye boshto - fole button-ta majhkhaner kono ekটা
+       episode-row-er upore majhe majhe overlap kore boshe jeto (choto
+       (mobile) screen-e row-gula-o choto hoy, tai overlap aro spashto hoy -
+       screenshot-e dekha problem-ta ei-i). Ekhon "flex-start" diye
+       thumbnail + Save button - card-er UPORER dik-e (title/toggle row-er
+       shomoprthok height-e) fix kore deya hoy, tai eta r kokhono niche-r
+       kono row-er upore boshe na. */
+    align-items: flex-start;
+}
+.admin-trailer-card .admin-db-actions { margin-top: 2px; }
 .admin-trailer-season-rows { margin-top: 10px; width: 100%; }
 .admin-trailer-add-season-btn { margin-top: 2px; }
 .admin-trailer-movie-row {
@@ -2014,9 +2145,93 @@ html.light-mode .admin-trailer-movie-row input { background-color: #ffffff; bord
 }
 
 /* Watch Button admin tab (per-title On/Off + custom embed link, next to Trailer/Teaser) */
+
+/* ---- Collapsible (dropdown-er moto) watch card ----
+   Search list-e shob content-er PURO editor ek-shathe khola thakle list-ta
+   obishwash rokom lomba hoye jeto (proti series-e 12+ episode row). Ekhon
+   prottek card SHURU-te bondho thake - shudhu header (title + type line +
+   On/Off pill + caret) dekha jay - header-e click korle shudhu SHEI ekta
+   content-er control-gula khule. */
+.admin-watch-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    outline: none;
+}
+.admin-watch-card-head-text { flex: 1; min-width: 0; }
+.admin-watch-card-head:focus-visible { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.55); border-radius: 6px; }
+.admin-watch-collapse-caret {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #94a3b8;
+    transition: transform 0.18s ease, color 0.18s ease;
+}
+.admin-watch-card-head:hover .admin-watch-collapse-caret { color: #e2e8f0; }
+.admin-watch-card.is-collapsed .admin-watch-collapse-caret { transform: rotate(-90deg); }
+/* Header-er pill-ta ekhon nijei On/Off TOGGLE button (age-r boro dui-button
+   group-er kaj eta-i kore) - tai click-able look (cursor, hover, active
+   press) deya hoyeche. */
+.admin-watch-state-pill {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.admin-watch-state-pill:active { transform: scale(0.95); }
+.admin-watch-state-pill.on { color: #86efac; background: rgba(22, 163, 74, 0.16); border-color: rgba(22, 163, 74, 0.45); }
+.admin-watch-state-pill.on:hover { background: rgba(22, 163, 74, 0.3); border-color: #16a34a; }
+.admin-watch-state-pill.off { color: #94a3b8; background: rgba(100, 116, 139, 0.14); border-color: rgba(100, 116, 139, 0.35); }
+.admin-watch-state-pill.off:hover { background: rgba(100, 116, 139, 0.26); border-color: #64748b; }
+
+/* "Show / Hide" button - thik shei jaigay-i (title-er niche) boshe jekhane
+   age On/Off toggle-group-ta chilo. Card bondho thakuk ba khola - eta
+   shob-shomoy-i dekha jay. */
+.admin-watch-showhide-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    background-color: #151b2a;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.admin-watch-showhide-btn:hover { background-color: #1d2436; border-color: #475569; color: #ffffff; }
+html.light-mode .admin-watch-showhide-btn { background-color: #f7f8fa; border-color: #dde1e8; color: #14161c; }
+html.light-mode .admin-watch-showhide-btn:hover { background-color: #eef1f6; border-color: #b9c0cd; }
+
+.admin-watch-card-body { animation: adminWatchBodyIn 0.16s ease; }
+@keyframes adminWatchBodyIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: none; }
+}
+/* Bondho obosthay body + Save-status - dutoi hide, ar card-ta ekta choto
+   ek-line row-er moto compact hoye jay. */
+.admin-watch-card.is-collapsed .admin-watch-card-body,
+.admin-watch-card.is-collapsed .admin-db-actions { display: none; }
+.admin-watch-card.is-collapsed { align-items: center; }
+.admin-watch-card.is-collapsed .admin-db-thumb { width: 38px; height: 38px; }
+html.light-mode .admin-watch-collapse-caret { color: #667085; }
+html.light-mode .admin-watch-state-pill.off { color: #55606f; }
+
 .admin-watch-toggle-group { margin-top: 10px; }
 .admin-watch-link-input,
-.admin-watch-thumb-input {
+.admin-watch-thumb-input,
+.admin-watch-season-badge-input {
     display: block;
     width: 100%;
     margin-top: 8px;
@@ -2029,9 +2244,15 @@ html.light-mode .admin-trailer-movie-row input { background-color: #ffffff; bord
     outline: none;
 }
 .admin-watch-link-input:focus,
-.admin-watch-thumb-input:focus { border-color: #2563eb; }
+.admin-watch-thumb-input:focus,
+.admin-watch-season-badge-input:focus { border-color: #2563eb; }
 html.light-mode .admin-watch-link-input,
-html.light-mode .admin-watch-thumb-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
+html.light-mode .admin-watch-thumb-input,
+html.light-mode .admin-watch-season-badge-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
+/* "Poster label" field-ta - color-e Season dropdown/episode row theke alada
+   dekhate (highlight korte, jate admin bujhte pare eta ekta special/optional
+   field) - halka sobuj accent border deya hoyeche. */
+.admin-watch-season-badge-input { border-color: #2fa25a; }
 
 
 .admin-form-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
@@ -2331,6 +2552,25 @@ html.light-mode .admin-banner-label-input { background-color: #ffffff; border-co
 .admin-banner-autosave-status { user-select: none; }
 .admin-banner-save-btn:hover { background-color: #1d3a63; }
 .admin-banner-save-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Trailer/Watch tab-er "Save" button-er jaygay ekhon ekta chhoto passive
+   status indicator ("Saved"/"Saving...") boshano hoy - karon shob field
+   (Ep/Link/Thumbnail/On-Off/Auto checkbox) blur/change-eই nijeI auto-save
+   hoy, tai alada kore chaপার moto kono button r dorkar nei. Status-ta
+   button na, tai .admin-mini-btn-er default "cursor: pointer" (clickable
+   dekhায়, kintu click-e kichu hoy na - confusing) override kore "default"
+   kora hoy, r halka dim kore dekhano hoy jate ata je ekta INFO label,
+   button na - bujha jay. */
+.admin-autosave-status { cursor: default; user-select: none; opacity: 0.85; }
+.admin-autosave-status:hover { background-color: #171e2e; }
+/* Ei "Saved"/"Saving..." status label-ta admin-er kache extra ekTA button-er
+   moto dekhaচ্ছিলো (jodio click-e kichu hoy na) - tai eta ekebare hide kore
+   deya hoy. Save success/fail-er feedback age-theke-i alada bhabe toast
+   (screen-er upore/niche popup message) hishebe dekhano hoy, tai ei label
+   na thakleo admin bujhte parbe save hoyeche kina - element-ta DOM-e thekei
+   jay (shudhu invisible), jate JS-er textContent shet kora code bhenge na
+   jay. */
+.admin-autosave-status { display: none; }
 
 .toast-wrap {
     position: fixed;
