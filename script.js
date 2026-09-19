@@ -236,6 +236,16 @@ function getManualEpisodeLabel(movie, seasonNumber, episodeNumber) {
     return label || null;
 }
 
+// Thik ek-i bhabe - admin jodi "Season" dropdown-er default "Season {N}"
+// text-er bodole nijer kono custom nam (jemon "সিজন ৫", "Bachelor Point S5")
+// diye thake - shei nam ber kore dey. Na dile null (tokhon caller shadharon
+// "Season {N}" format byabohar korbe).
+function getManualSeasonLabel(movie, seasonNumber) {
+    if (!movie || !Array.isArray(movie.watchSeasonLinks) || seasonNumber == null) return null;
+    const entry = movie.watchSeasonLinks.find(sw => sw && Number(sw.season) === Number(seasonNumber) && sw.seasonLabel && String(sw.seasonLabel).trim());
+    return entry ? String(entry.seasonLabel).trim() : null;
+}
+
 // Ekta season-er jonno "default" (shobcheye choto/prothom) manually-added
 // episode number ber kore dey - kono nirdishto episode na thakle (shudhu
 // gota-season entry) - null return kore (mane "shob episode-e-i ekই link").
@@ -2780,11 +2790,14 @@ function buildWatchSelectorsHTML(movie, manualWatchSeasons, selectedSeason) {
     if (manualWatchSeasons.length > 1) {
         let seasonOptionsHTML = '';
         manualWatchSeasons.forEach(s => {
-            seasonOptionsHTML += `<option value="${s}" ${s === selectedSeason ? 'selected' : ''}>Season ${s}</option>`;
+            // Admin nijer TEXT label diye thakle dropdown-e shei lekha-i
+            // dekhabe, na hole shadharon "Season 5".
+            const sText = getManualSeasonLabel(movie, s) || `Season ${s}`;
+            seasonOptionsHTML += `<option value="${s}" ${s === selectedSeason ? 'selected' : ''}>${escapeHtml(sText)}</option>`;
         });
         html += `
         <div class="trailer-season-row watch-season-row">
-            <label for="watchSeasonSelect">Watch:</label>
+            <label for="watchSeasonSelect">Season:</label>
             <select id="watchSeasonSelect" class="trailer-season-select watch-season-select" onchange="changeModalWatchSeason(this)">
                 ${seasonOptionsHTML}
             </select>
@@ -8513,6 +8526,7 @@ function addAdminWatchSeasonRow(container, data, forcedSeason, fallbackPoster) {
             const seasonSelectEl = card.querySelector('.admin-watch-season-select');
             const activeSeason = seasonSelectEl ? parseInt(seasonSelectEl.value, 10) : parseInt(removedSeason, 10);
             updateAdminWatchSeasonBadgeUI(card, activeSeason);
+            updateAdminWatchSeasonLabelUI(card, activeSeason);
         }
     });
 
@@ -8592,6 +8606,29 @@ function updateAdminWatchSeasonBadgeUI(card, seasonNum) {
         : 'Poster label for this season (optional) — e.g. EP-(01-02)';
 }
 
+// "Season name" input-take current-active season-er shathe sync rakhe -
+// (Episode field-e admin je-bhabe number-er bodole nijer kono TEXT likhte
+// pare, ek-i rokom bhabe ei field-e Season-er jonno-o nijer kono custom
+// nam/text likhte pare - jemon "Season 5" na likhe "সিজন ৫" ba "Bachelor
+// Point S5" - Season dropdown-e Season number-er bodole eta-i dekhabe).
+// Badge input-er ulTo - eta shobshomoy dekhano hoy (episode shonkha
+// nirbishesheh), karon 1-ta episode thakleo season-er nijer ekTa nam thakte
+// pare.
+function updateAdminWatchSeasonLabelUI(card, seasonNum) {
+    if (!card) return;
+    const labelInput = card.querySelector('.admin-watch-season-label-input');
+    if (!labelInput) return;
+    if (seasonNum == null || Number.isNaN(Number(seasonNum))) {
+        labelInput.style.display = 'none';
+        return;
+    }
+    const labels = card._watchSeasonLabels || (card._watchSeasonLabels = {});
+    labelInput.style.display = '';
+    labelInput.setAttribute('data-active-season', seasonNum);
+    labelInput.value = labels[seasonNum] || '';
+    labelInput.placeholder = `Season name (optional) — leave blank for auto "Season ${seasonNum}"`;
+}
+
 
 // list ar proti-season-e koyta episode row ache seta ber kore, Season
 // dropdown-take notun kore populate kore ("Season X (Y EP)" format-e) - ar
@@ -8649,6 +8686,7 @@ function filterAdminWatchRowsBySeason(rowsContainer, seasonNum) {
 function collectAdminWatchSeasonRows(card) {
     const rows = card.querySelectorAll('.admin-watch-season-rows .admin-season-watch-row');
     const seasonBadges = card._watchSeasonBadges || {};
+    const seasonLabels = card._watchSeasonLabels || {};
     const result = [];
     // Proti season-e kon kon episode number already byabohar hoye geche -
     // shudhu-text ("Finale" moto) row-e automatic number assign korar shomoy
@@ -8706,7 +8744,11 @@ function collectAdminWatchSeasonRows(card) {
         // thumbnail resolve hoy) shei label-take khuje pete pare.
         const badge = seasonBadges[seasonNum] || null;
 
-        result.push({ season: seasonNum, episode: episodeNum, epLabel: episodeLabel, link: link || null, thumb: thumb || null, badge });
+        // Thik ekই bhabe - kono custom "Season name" (jemon "সিজন ৫") deya
+        // thakle, seta-o proti row-e attach kore rakha hoy.
+        const seasonLabel = seasonLabels[seasonNum] || null;
+
+        result.push({ season: seasonNum, episode: episodeNum, epLabel: episodeLabel, link: link || null, thumb: thumb || null, badge, seasonLabel });
     });
     return result;
 }
@@ -8759,6 +8801,8 @@ function renderAdminWatchList(filter) {
                     <select class="admin-watch-season-select"></select>
                     <button type="button" class="admin-mini-btn admin-watch-add-season-inline-btn" title="Add a new season">+ Season</button>
                 </div>
+                <input type="text" class="admin-watch-season-label-input" placeholder="Season name (optional) — e.g. Season 5 / সিজন ৫">
+                <input type="text" class="admin-watch-season-badge-input" placeholder="Poster label for this season (optional) — e.g. EP-(01-02)" style="display:none;">
                 <div class="admin-watch-season-rows"></div>
                 <button type="button" class="admin-add-row-btn admin-watch-add-season-btn">+ Add Episode</button>
                 ` : ''}
@@ -8916,6 +8960,18 @@ function renderAdminWatchList(filter) {
             });
             card._watchSeasonBadges = seasonBadges;
 
+            // Thik shei-i bhabe - kono season-e admin age-i custom "Season
+            // name" (jemon "সিজন ৫") save kore thakle, shei-o ekটা alada
+            // map-e (season number -> label) group kore rakha hoy.
+            const seasonLabels = {};
+            existingSw.forEach(sw => {
+                if (sw && sw.seasonLabel && String(sw.seasonLabel).trim() && sw.season != null) {
+                    const sNum = Number(sw.season);
+                    if (Number.isFinite(sNum) && !seasonLabels[sNum]) seasonLabels[sNum] = String(sw.seasonLabel).trim();
+                }
+            });
+            card._watchSeasonLabels = seasonLabels;
+
             if (existingSw.length > 0) {
                 existingSw.forEach(sw => addAdminWatchSeasonRow(rowsContainer, sw, sw.season, resolveRowFallbackPoster()));
             } else {
@@ -8923,6 +8979,7 @@ function renderAdminWatchList(filter) {
             }
             refreshAdminWatchSeasonSelect(card);
             updateAdminWatchSeasonBadgeUI(card, parseInt(seasonSelect.value, 10));
+            updateAdminWatchSeasonLabelUI(card, parseInt(seasonSelect.value, 10));
 
             // Season dropdown-e onno season select korle - shudhu shei
             // season-er episode row-gula-i dekhano hoy, baki-gula hide
@@ -8931,6 +8988,7 @@ function renderAdminWatchList(filter) {
                 const activeSeason = parseInt(seasonSelect.value, 10);
                 filterAdminWatchRowsBySeason(rowsContainer, activeSeason);
                 updateAdminWatchSeasonBadgeUI(card, activeSeason);
+                updateAdminWatchSeasonLabelUI(card, activeSeason);
             });
 
             // "+ Season" - shobcheye boro existing season number-er porerta
@@ -8948,6 +9006,7 @@ function renderAdminWatchList(filter) {
                 addAdminWatchSeasonRow(rowsContainer, { episode: 1 }, newSeason, resolveRowFallbackPoster());
                 refreshAdminWatchSeasonSelect(card, newSeason);
                 updateAdminWatchSeasonBadgeUI(card, newSeason);
+                updateAdminWatchSeasonLabelUI(card, newSeason);
             });
 
             // "+ Add Episode" - dropdown-e ekhon je season select kora ache,
@@ -8958,14 +9017,21 @@ function renderAdminWatchList(filter) {
                 addAdminWatchSeasonRow(rowsContainer, {}, activeSeason, resolveRowFallbackPoster());
                 refreshAdminWatchSeasonSelect(card, activeSeason);
                 updateAdminWatchSeasonBadgeUI(card, activeSeason);
+                updateAdminWatchSeasonLabelUI(card, activeSeason);
             });
 
             const applyWatchModeVisibility = () => {
                 const isAuto = autoCheckbox.checked;
                 card.querySelector('.admin-watch-season-picker').style.display = isAuto ? 'none' : '';
+                card.querySelector('.admin-watch-season-label-input').style.display = isAuto ? 'none' : '';
+                card.querySelector('.admin-watch-season-badge-input').style.display = isAuto ? 'none' : '';
                 rowsContainer.style.display = isAuto ? 'none' : '';
                 addSeasonBtn.style.display = isAuto ? 'none' : '';
                 linkInput.style.display = isAuto ? '' : 'none';
+                if (!isAuto) {
+                    updateAdminWatchSeasonBadgeUI(card, parseInt(seasonSelect.value, 10));
+                    updateAdminWatchSeasonLabelUI(card, parseInt(seasonSelect.value, 10));
+                }
             };
             applyWatchModeVisibility();
             autoCheckbox.addEventListener('change', () => {
@@ -9014,6 +9080,48 @@ function renderAdminWatchList(filter) {
                         previewImg.src = fallback || ADMIN_POSTER_PLACEHOLDER;
                     }
                 });
+            });
+
+            // "Poster label" input (jemon "EP-(01-02)") - shudhu tokhon-i
+            // dekhano hoy jokhon currently-selected season-e 1-er beshi
+            // episode-specific row thake. Admin nijer moto likhle seta
+            // seasonBadges map-e save hoy, r blur/Enter korleই auto-save
+            // hoy - kono value na dile (khali), auto-computed range-i
+            // (placeholder-e dekhano) frontend-e byabohar hobe.
+            const seasonBadgeInput = card.querySelector('.admin-watch-season-badge-input');
+            seasonBadgeInput.addEventListener('blur', () => {
+                const activeSeason = parseInt(seasonBadgeInput.getAttribute('data-active-season'), 10);
+                if (Number.isNaN(activeSeason)) return;
+                const badges = card._watchSeasonBadges || (card._watchSeasonBadges = {});
+                const newVal = seasonBadgeInput.value.trim() || null;
+                if ((badges[activeSeason] || null) === newVal) return;
+                if (newVal) badges[activeSeason] = newVal; else delete badges[activeSeason];
+                saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState);
+            });
+            seasonBadgeInput.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                seasonBadgeInput.blur();
+            });
+
+            // "Season name" input - Episode-er moto-i, admin nijer kono
+            // custom nam/text (jemon "সিজন ৫") diye Season dropdown/label-er
+            // default "Season 5" ke override korte pare - blur/Enter korleই
+            // seasonLabels map-e save hoy ar auto-save hoy.
+            const seasonLabelInput = card.querySelector('.admin-watch-season-label-input');
+            seasonLabelInput.addEventListener('blur', () => {
+                const activeSeason = parseInt(seasonLabelInput.getAttribute('data-active-season'), 10);
+                if (Number.isNaN(activeSeason)) return;
+                const labels = card._watchSeasonLabels || (card._watchSeasonLabels = {});
+                const newVal = seasonLabelInput.value.trim() || null;
+                if ((labels[activeSeason] || null) === newVal) return;
+                if (newVal) labels[activeSeason] = newVal; else delete labels[activeSeason];
+                saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState);
+            });
+            seasonLabelInput.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                seasonLabelInput.blur();
             });
         }
 

@@ -2231,7 +2231,8 @@ html.light-mode .admin-watch-state-pill.off { color: #55606f; }
 .admin-watch-toggle-group { margin-top: 10px; }
 .admin-watch-link-input,
 .admin-watch-thumb-input,
-.admin-watch-season-badge-input {
+.admin-watch-season-badge-input,
+.admin-watch-season-label-input {
     display: block;
     width: 100%;
     margin-top: 8px;
@@ -2245,14 +2246,19 @@ html.light-mode .admin-watch-state-pill.off { color: #55606f; }
 }
 .admin-watch-link-input:focus,
 .admin-watch-thumb-input:focus,
-.admin-watch-season-badge-input:focus { border-color: #2563eb; }
+.admin-watch-season-badge-input:focus,
+.admin-watch-season-label-input:focus { border-color: #2563eb; }
 html.light-mode .admin-watch-link-input,
 html.light-mode .admin-watch-thumb-input,
-html.light-mode .admin-watch-season-badge-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
-/* "Poster label" field-ta - color-e Season dropdown/episode row theke alada
-   dekhate (highlight korte, jate admin bujhte pare eta ekta special/optional
-   field) - halka sobuj accent border deya hoyeche. */
+html.light-mode .admin-watch-season-badge-input,
+html.light-mode .admin-watch-season-label-input { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
+/* "Poster label" ar "Season name" field duiটা - color-e Season
+   dropdown/episode row theke alada dekhate (highlight korte, jate admin
+   bujhte pare eta-gula special/optional field) - halka accent border deya
+   hoyeche (Poster label = sobuj, Season name = neel, jate duiTa field
+   alada kore chena jay). */
 .admin-watch-season-badge-input { border-color: #2fa25a; }
+.admin-watch-season-label-input { border-color: #2563eb; }
 
 
 .admin-form-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
