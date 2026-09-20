@@ -97,6 +97,33 @@ async function getLatestSeasonTrailerKey(tvId, seasonNumber) {
     return promise;
 }
 
+// Season-specific video na paoya gele (khub common - TMDB-e beshirbhag
+// season-er jonno আলাদা video thake na, shudhu show/overall-level-e thake)
+// eta fallback hishebe show-level (/tv/{id}/videos) trailer khoje - initial
+// modal-load-er "pickTmdbTrailerKey(detailData)" step-er shathe consistent,
+// jate season switch korar shomoy-o ekই fallback chain mena hoy.
+const showTrailerCache = new Map();
+async function getShowLevelTrailerKey(tvId) {
+    if (!TMDB_API_KEY || tvId == null) return null;
+    const cacheKey = `tv:${tvId}:show`;
+    if (showTrailerCache.has(cacheKey)) return showTrailerCache.get(cacheKey);
+
+    const promise = (async () => {
+        try {
+            const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${tvId}/videos?api_key=${TMDB_API_KEY}`, {}, 6000);
+            if (!res.ok) return null;
+            const data = await res.json();
+            return pickBestTrailerFromResults(data.results);
+        } catch (e) {
+            console.error('TMDB show-level videos error:', e);
+            return null;
+        }
+    })();
+
+    showTrailerCache.set(cacheKey, promise);
+    return promise;
+}
+
 function getLatestRealSeasonNumber(detailData) {
     if (!detailData || !Array.isArray(detailData.seasons) || !detailData.seasons.length) return null;
     // season_number 0 shadharonoto "Specials" - shei-ta baad diye asol shobcheye
@@ -2428,10 +2455,20 @@ fastServersList.forEach((fs, fIdx) => {
         verifyAndRenderWatchBox(movie, effectiveWatchLink, title, poster);
     }
 
-    let isRendered = false;
+    // Age ei "isRendered" flag-ta timeout-fallback render howar por SHOB
+    // SHOMOY true hoye thakto, ar tarpor je asol TMDB+OMDb data ashto (Promise.all
+    // resolve hoile) seta-o `if (!isRendered)` check-e আটকে গিয়ে কখনো
+    // apply/re-render hoto na - ফলে trailer (specially jokhon per-season TMDB video
+    // na thakay YouTube search porjonto lagto, jate 1.5s timeout-er cheye beshi
+    // shomoy lagto) shudhu-i "Coming Soon" dekhiye ATKE thakto, real trailer
+    // pore paoya gele-o r kokhono dekhano hoto na. Ekhon "fallbackRendered" shudhu
+    // timeout-ta EKBAR-i fire hoy eta nishchit korte byabohar hocche - asol
+    // TMDB/OMDb data ashar por (deri hole-o) shobshomoy notun kore render hobe,
+    // jate trailer/rating/cast ইত্যাদি shob field-i shesh porjonto thik data-ta pay.
+    let fallbackRendered = false;
     const forceTimeout = setTimeout(() => {
-        if (!isRendered) {
-            isRendered = true;
+        if (!fallbackRendered) {
+            fallbackRendered = true;
             // TMDB response 1.5s-er modhye na ashle amra ei fallback render-e chole jai -
             // kintu tar age-o admin-er manually deya season trailer thakle seta lagiye
             // newa hoy, na hole TMDB slow/fail hoile trailer box-i miss hoye jeto.
@@ -2452,9 +2489,12 @@ fastServersList.forEach((fs, fIdx) => {
             getOMDbDetails(movie).catch(() => null)
         ]);
 
-        if (!isRendered) {
-            isRendered = true;
-            clearTimeout(forceTimeout);
+        clearTimeout(forceTimeout);
+        // Ei fetch-ta shesh howar age-i user onno kono movie-r modal khule fele
+        // thakle (currentModalMovie ekhon ar ei movie na) - ei purono/stale
+        // result-ta notun modal-er upore giye bhul kore boshe pore na, tai
+        // eikhane thamiye deya hoy.
+        if (currentModalMovie !== movie) return;
 
         if (tmdb) {
             // Tumi poster link dile TMDB seta r overwrite korbe na
@@ -2529,29 +2569,26 @@ fastServersList.forEach((fs, fIdx) => {
         }
 
         if (omdb) {
-                if (omdb.awards && omdb.awards !== "N/A") awards = omdb.awards;
-                // TMDB-e match na paile OMDb (IMDb ID diye) er poster use koro
-                if (omdb.poster && !movie.poster && !(tmdb && tmdb.poster)) poster = omdb.poster;
-            }
-
-            smartRating = getSmartRating(tmdb, omdb);
-
-            renderModalContent(smartRating);
+            if (omdb.awards && omdb.awards !== "N/A") awards = omdb.awards;
+            // TMDB-e match na paile OMDb (IMDb ID diye) er poster use koro
+            if (omdb.poster && !movie.poster && !(tmdb && tmdb.poster)) poster = omdb.poster;
         }
+
+        smartRating = getSmartRating(tmdb, omdb);
+
+        renderModalContent(smartRating);
     } catch (err) {
         console.error("Modal fetch error:", err);
-        if (!isRendered) {
-            isRendered = true;
-            clearTimeout(forceTimeout);
-            const fb = resolveManualSeasonTrailerFallback(movie, isTV, trailerSelectedSeason);
-            if (fb) {
-                if (fb.key) trailerKey = fb.key;
-                if (fb.thumb) trailerThumbOverride = fb.thumb;
-                trailerSelectedSeason = fb.season;
-                trailerTvId = trailerTvId || movie.tmdbId || null;
-            }
-            renderModalContent("N/A");
+        clearTimeout(forceTimeout);
+        if (currentModalMovie !== movie) return;
+        const fb = resolveManualSeasonTrailerFallback(movie, isTV, trailerSelectedSeason);
+        if (fb) {
+            if (fb.key) trailerKey = fb.key;
+            if (fb.thumb) trailerThumbOverride = fb.thumb;
+            trailerSelectedSeason = fb.season;
+            trailerTvId = trailerTvId || movie.tmdbId || null;
         }
+        renderModalContent("N/A");
     }
 }
 
@@ -3330,7 +3367,22 @@ async function changeModalTrailerSeason(selectEl) {
     }
 
     try {
-        const newKey = await getLatestSeasonTrailerKey(tvId, seasonNumber);
+        let newKey = await getLatestSeasonTrailerKey(tvId, seasonNumber);
+
+        // TMDB-r per-season video endpoint-e (upore) ONNO season-er (latest
+        // season chara) trailer prai kokhono thake na - age ekhane shudhu
+        // eta-i try kore "Coming Soon" dekhiye dito, tai beshirbhag multi-
+        // season content-e trailer load hoto na. Ekhon "Coming Soon"
+        // dekhanor age aro duita fallback try kora hoy - (1) show-er
+        // overall TMDB trailer, (2) YouTube search (title + season number
+        // diye) - initial modal-load-e je 3-tier fallback hoy, ekhane
+        // season switch korar shomoy-o thik shei-i consistency rakha hocche.
+        if (!newKey) newKey = await getShowLevelTrailerKey(tvId);
+        if (!newKey) {
+            const title = (currentModalMovie && currentModalMovie.title) || '';
+            if (title) newKey = await searchYoutubeTrailer(`${title} Season ${seasonNumber}`, null);
+        }
+
         if (!newKey) {
             box.setAttribute('data-ytid', '');
             bodyEl.innerHTML = buildTrailerComingSoonHTML(`Season ${seasonNumber} trailer will be added soon`);
