@@ -665,31 +665,6 @@
                         <div id="adminPosterPreviewWrap" style="display:none;"><img id="adminPosterPreview" class="admin-poster-preview"></div>
                     </div>
 
-                    <div class="admin-field" id="adminTrailerLinkField">
-                        <label>Trailer Link <span class="admin-hint">(optional — YouTube link or video ID, only needed when auto trailer isn't found for this title)</span></label>
-                        <input type="text" id="adminTrailerLink" placeholder="https://www.youtube.com/watch?v=... or youtu.be/... or just the video ID">
-                    </div>
-
-                    <div class="admin-field" id="adminTrailerThumbField">
-                        <label>Trailer Thumbnail <span class="admin-hint">(optional — link or upload, leave empty to auto-use the YouTube trailer's own thumbnail)</span></label>
-                        <div class="admin-toggle-group" id="adminTrailerThumbModeGroup">
-                            <button type="button" class="admin-toggle-btn active" data-value="link" onclick="setTrailerThumbMode('link')">🔗 Link</button>
-                            <button type="button" class="admin-toggle-btn" data-value="file" onclick="setTrailerThumbMode('file')">📁 Upload File</button>
-                        </div>
-                        <input type="text" id="adminTrailerThumb" placeholder="https://... custom trailer thumbnail image link" style="margin-top:8px;">
-                        <input type="file" id="adminTrailerThumbFile" accept="image/*" style="display:none; margin-top:8px;">
-                        <div id="adminTrailerThumbPreviewWrap" style="display:none;"><img id="adminTrailerThumbPreview" class="admin-poster-preview"></div>
-                    </div>
-
-                    <div class="admin-field" id="adminWatchLinkField">
-                        <label>Watch Button <span class="admin-hint">(On korle - trailer/poster-er moto-i - TMDB-te auto-search kore (title/IMDb ID diye) paoa TMDB ID diye automatic "Watch Now" iframe (embed.filmu.in) show hobe. TMDB-e match na paile ba Off thakle Watch button-i show hobe na)</span></label>
-                        <div class="admin-toggle-group" id="adminWatchEnabledGroup">
-                            <button type="button" class="admin-toggle-btn active" data-value="off" onclick="setWatchEnabled(false)">🚫 Off</button>
-                            <button type="button" class="admin-toggle-btn" data-value="on" onclick="setWatchEnabled(true)">▶️ On</button>
-                        </div>
-                        <input type="text" id="adminWatchLink" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed above)" style="margin-top:8px;">
-                    </div>
-
                     <div class="admin-field" id="adminSeasonTrailersField" style="display:none;">
                         <label>Season Trailers <span class="admin-hint">(optional — series-er প্রতিটা season-এর জন্য আলাদা trailer link দিতে পারেন; কোনো season খালি রাখলে সেই season select করলে auto trailer (TMDB/YouTube) খোঁজা হবে)</span></label>
                         <div id="adminSeasonTrailersList"></div>

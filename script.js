@@ -1162,10 +1162,7 @@ function updateHeroVisibilityForCategory(category) {
     if (category !== 'all') {
         heroSection.style.display = 'none';
         stopHeroAutoplay();
-        return;
-    }
-
-    if (heroSlidesData.length === 0) {
+    } else if (heroSlidesData.length === 0) {
         renderHeroSlides();
     } else {
         heroSection.style.display = '';
@@ -1366,7 +1363,7 @@ function restoreMovieModalFromUrl() {
 function stopModalTrailerPlayback() {
     const overlay = document.getElementById('movieModalOverlay');
     if (!overlay) return;
-    overlay.querySelectorAll('.trailer-video-wrap').forEach(wrap => wrap.remove());
+    overlay.querySelectorAll('.trailer-video-wrap, .watch-player-toolbar').forEach(el => el.remove());
 }
 
 // Kono kono khetre trailerKey resolve hoy (tai trailer-box render hoye jay),
@@ -1769,7 +1766,8 @@ async function fetchFullTMDBDetailsUncached(movie) {
         if (!trailerKey) {
             trailerKey = pickTmdbTrailerKey(detailData);
         }
-        if (!trailerKey) {
+        if (!trailerKey && movie.trailerEnabled !== false) {
+            // (Trailer "Off" thakle YouTube search-o kora hoy na - quota bachano jonno)
             const searchTitle = latestSeasonNumber != null ? `${ytTitle} Season ${latestSeasonNumber}` : ytTitle;
             trailerKey = await searchYoutubeTrailer(searchTitle, year !== "N/A" ? year : null);
         }
@@ -2299,7 +2297,11 @@ fastServersList.forEach((fs, fIdx) => {
             <div class="trailer-label">Watch Trailer</div>
         ` : (trailerSeasonSelectorHTML ? buildTrailerComingSoonHTML('Trailer for this season will be added soon') : '');
 
-        const trailerHTML = (trailerKey || trailerSeasonSelectorHTML) ? `
+        // Admin panel theke Trailer "Off" kora thakle (movie.trailerEnabled === false)
+        // Trailer box-i dekhano hobe na (auto/manual kono trailer-i na). Column-er
+        // value null/undefined/true hole age-r moto trailer dekhabe.
+        const trailerIsOff = movie.trailerEnabled === false;
+        const trailerHTML = (!trailerIsOff && (trailerKey || trailerSeasonSelectorHTML)) ? `
         <div class="trailer-box" id="trailerBox" data-ytid="${escapeAttr(trailerKey || '')}" data-thumb="${escapeAttr(trailerThumbUrl)}">
             ${trailerSeasonSelectorHTML}
             <div id="trailerBoxBody">${trailerBodyInnerHTML}</div>
@@ -2992,8 +2994,15 @@ function playModalWatch(el) {
     // karone segula chara third-party iframe (filmu.in/YouTube shobar jonno-i)
     // browser default-e block kore dite pare - tai trailer iframe-er moto ekhaneo
     // rakha hoyeche, jate embed shob browser-e reliably load hoy.
-    bodyEl.innerHTML = `<div class="trailer-video-wrap">
-        <button type="button" class="watch-close-btn" aria-label="Hide video" onclick="closeModalWatch(this)">✖</button>
+    // Close button ekhon video-r (iframe-er) BAIRE, upore alada ekta slim bar-e
+    // thake - age eta iframe-er upore (top-right) bhaseto, fole player-er nijer
+    // panel (jemon Audio/Subtitle menu)-er close button-er thik upore chole
+    // jeto, ar user panel bondho korte giye bhul kore pura video-i close kore
+    // felto.
+    bodyEl.innerHTML = `<div class="watch-player-toolbar">
+        <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeModalWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="trailer-video-wrap">
         <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>
     </div>`;
 
@@ -3289,9 +3298,16 @@ function playMassiveWatch(el) {
     const ytId = extractYoutubeVideoId(link);
     if (ytId) embedUrl = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`;
 
+    // Modal-er Online Watch-er moto-i: close button iframe-er baire (upore
+    // alada bar-e) - jate player-er nijer Audio/Subtitle panel-er close
+    // button-er upore na pore.
     bodyEl.innerHTML = `
-        <button type="button" class="watch-close-btn" aria-label="Hide video" onclick="closeMassiveWatch(this)">✖</button>
-        <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>
+        <div class="watch-player-toolbar">
+            <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeMassiveWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+        </div>
+        <div class="trailer-video-wrap">
+            <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>
+        </div>
     `;
 }
 
@@ -5917,8 +5933,7 @@ let adminExtraCategories = new Set();
 let categoryBannerLabels = {};
 let adminTmdbType = 'movie';
 let adminPosterMode = 'link';
-let adminTrailerThumbMode = 'link';
-let adminWatchEnabled = false;
+let adminOriginalPosterUrl = null; // Edit-er shomoy khali field-e save korleo ei poster-i use hobe
 let adminCategoriesLoaded = false;
 
 async function loadAdminExtraCategories() {
@@ -6181,9 +6196,6 @@ function setupAdminPanel() {
     const posterLinkInput = document.getElementById('adminPosterLink');
     if (posterLinkInput) posterLinkInput.addEventListener('input', updateAdminPosterPreview);
 
-    const trailerThumbInput = document.getElementById('adminTrailerThumb');
-    if (trailerThumbInput) trailerThumbInput.addEventListener('input', updateAdminTrailerThumbPreview);
-
     const posterFileInput = document.getElementById('adminPosterFile');
     if (posterFileInput) {
         posterFileInput.addEventListener('change', function() {
@@ -6192,21 +6204,6 @@ function setupAdminPanel() {
                 reader.onload = function(e) {
                     const prev = document.getElementById('adminPosterPreview');
                     const wrap = document.getElementById('adminPosterPreviewWrap');
-                    if (prev && wrap) { prev.src = e.target.result; wrap.style.display = 'block'; }
-                };
-                reader.readAsDataURL(this.files[0]);
-            }
-        });
-    }
-
-    const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
-    if (trailerThumbFileInput) {
-        trailerThumbFileInput.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const prev = document.getElementById('adminTrailerThumbPreview');
-                    const wrap = document.getElementById('adminTrailerThumbPreviewWrap');
                     if (prev && wrap) { prev.src = e.target.result; wrap.style.display = 'block'; }
                 };
                 reader.readAsDataURL(this.files[0]);
@@ -6340,7 +6337,10 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     lv: 'Latvian', lav: 'Latvian', latvian: 'Latvian',
     et: 'Estonian', est: 'Estonian', estonian: 'Estonian',
     is: 'Icelandic', ice: 'Icelandic', isl: 'Icelandic', icelandic: 'Icelandic',
-    tl: 'Filipino', fil: 'Filipino', filipino: 'Filipino', tagalog: 'Filipino',
+    // "tgl" hocche Tagalog bhasha-r 3-letter (ISO 639-2) code, "fil" Filipino-r -
+    // eta na thakle "lat"-er moto-i shomoshsha hoto (video file-e 3-letter code
+    // thake, kintu map-e shudhu "tl" (2-letter) chilo).
+    tl: 'Filipino (Tagalog)', fil: 'Filipino (Tagalog)', tgl: 'Filipino (Tagalog)', filipino: 'Filipino (Tagalog)', tagalog: 'Filipino (Tagalog)',
     sw: 'Swahili', swa: 'Swahili', swahili: 'Swahili',
     af: 'Afrikaans', afr: 'Afrikaans', afrikaans: 'Afrikaans',
     am: 'Amharic', amh: 'Amharic', amharic: 'Amharic',
@@ -6406,7 +6406,14 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     'ru-ru': 'Russian (Russia)',
     'ar-sa': 'Arabic (Saudi Arabia)', 'ar-eg': 'Arabic (Egypt)',
 
-    la: 'Latin American'
+    // "la" ISO 639-1 code-e asholei "Latin" bhasha bojhay (es-419/es-la-r
+    // moto "Latin American" region na) - tai age bhul kore "Latin American"
+    // deya chilo, seta thik kore deya holo. "lat" hocche eki bhasha-r
+    // 3-letter (ISO 639-2) code - beshirbhag video/MKV file-e language
+    // shadharonoto ei 3-letter code-e-i thake (onno shob bhashar jonno-o
+    // upore 2-letter + 3-letter dutoi ache), tai eta na thakle "lat" detect
+    // hoto na - ei-i chilo "Latin detect hocche na" problem-er asol karon.
+    la: 'Latin', lat: 'Latin'
 };
 
 // অনেক MKV uploader/muxer regional info একদম hyphenated code (es-LA) হিসেবে
@@ -6495,8 +6502,13 @@ async function mediaScanEnsureFFmpeg(onProgress) {
 }
 
 function mediaScanParseStreamLogs(lines) {
-    const audio = new Set();
-    const subtitle = new Set();
+    // Set-er bodole array byabohar kora hocche - eki language-er duita/tinta
+    // alada audio (ba subtitle) track thakle age Set duplicate-gulo shoriye
+    // dito, tai ekta-i "Spanish" dekhato - ekhon file-e joto-bar shei bhasha-r
+    // track ache thik totobar-i dekhabe (jemon 2 ta Spanish track thakle
+    // "Spanish, Spanish").
+    const audio = [];
+    const subtitle = [];
     const streamRe = /Stream #\d+:\d+(?:\[[^\]]*\])?(?:\(([^)]+)\))?:\s*(Audio|Subtitle)/i;
     const metaLangRe = /^\s*language(-ietf)?\s*:\s*(\S+)/i;
     const metaTitleRe = /^\s*title\s*:\s*(.+?)\s*$/i;
@@ -6521,7 +6533,12 @@ function mediaScanParseStreamLogs(lines) {
             const codeRaw = (m[1] || '').toLowerCase().trim();
             current = {
                 kind: m[2].toLowerCase(),
-                code: (codeRaw && codeRaw !== 'und') ? codeRaw : null,
+                // "und" (undefined) age null kore bad deya hoto, fole ei track-er
+                // baseName ber kora jeto na ar resolveTrack() null return korto -
+                // track-ta "Unknown" dekhanor bodole ekdom baad porto. Ekhon "und"
+                // rekhe deya hocche, jate MEDIA_SCAN_LANGUAGE_MAP-er und -> "Unknown"
+                // entry-i thik moto match hoy.
+                code: codeRaw || null,
                 ietf: null,
                 title: null
             };
@@ -6532,7 +6549,7 @@ function mediaScanParseStreamLogs(lines) {
         if (lm) {
             const isIetf = !!lm[1];
             const val = (lm[2] || '').toLowerCase().trim();
-            if (val && val !== 'und') {
+            if (val) {
                 if (isIetf) current.ietf = val;
                 else if (!current.code) current.code = val;
             }
@@ -6552,7 +6569,12 @@ function mediaScanParseStreamLogs(lines) {
     // ১) title-এ সরাসরি hyphenated locale code (es-LA) থাকলে সেটা, ২) না থাকলে
     // base language + title-এর qualifier শব্দ মিলিয়ে regional label বানানো।
     function resolveTrack(t) {
-        const baseName = mediaScanGuessLanguageFromToken(t.ietf || t.code);
+        // t.ietf/t.code dutoi null hote pare jodi track-e kono "language:"
+        // metadata line-i na thake (FFmpeg log-e "und" likhe-o na, kichu-i na) -
+        // agey ei obosthay resolveTrack() null return korto, fole track-ta
+        // "Unknown" hishebe dekhanor bodole puropuri skip hoye jeto. Tai
+        // language ekdom na paile default "Unknown"-e fallback kora hocche.
+        const baseName = mediaScanGuessLanguageFromToken(t.ietf || t.code) || 'Unknown';
         if (t.title) {
             const matches = t.title.match(localeTokenRe);
             if (matches) {
@@ -6567,10 +6589,10 @@ function mediaScanParseStreamLogs(lines) {
         return baseName;
     }
 
-    audioTracks.forEach(t => { const n = resolveTrack(t); if (n) audio.add(n); });
-    subtitleTracks.forEach(t => { const n = resolveTrack(t); if (n) subtitle.add(n); });
+    audioTracks.forEach(t => { const n = resolveTrack(t); if (n) audio.push(n); });
+    subtitleTracks.forEach(t => { const n = resolveTrack(t); if (n) subtitle.push(n); });
 
-    return { audio: Array.from(audio), subtitle: Array.from(subtitle) };
+    return { audio, subtitle };
 }
 
 // ffmpeg.wasm's own fetchFile() reads the whole file through the old
@@ -6689,27 +6711,40 @@ function mediaScanFormatScanTag(scanNums) {
     return `(${shown.join('/')}${truncated} Only)`;
 }
 
-// একাধিক স্ক্যানের ফলাফল মিলিয়ে একটাই ইউনিক লিস্ট বানায়। প্রতিটা আইটেম কোন কোন
-// স্ক্যানে (1-indexed) পাওয়া গেছে সেটা ট্র্যাক করে - সব স্ক্যানে থাকলে ট্যাগ ছাড়া,
-// নাহলে "Only" ট্যাগসহ বসে। প্রথমবার যে ক্রমে ভাষাগুলো পাওয়া গেছে সেই ক্রমই বজায় থাকে।
+// একাধিক স্ক্যানের ফলাফল মিলিয়ে একটাই লিস্ট বানায়। এখন প্রতিটা স্ক্যানে একই ভাষার
+// কয়টা করে track পাওয়া গেছে সেটাও (multiset হিসেবে) গোনা হয় - যেমন এক ফাইলে ২টা
+// Spanish track থাকলে ফলাফলে "Spanish, Spanish" দুটোই থাকবে, একটায় মিশে যাবে না।
+// প্রতিটা occurrence (১ম Spanish, ২য় Spanish...) আলাদাভাবে চেক হয় - সব স্ক্যানে ওই
+// occurrence-count থাকলে ট্যাগ ছাড়া বসে, নাহলে যে স্ক্যানগুলোতে আছে তাদের "Only"
+// ট্যাগ নিয়ে বসে। প্রথমবার যে ক্রমে ভাষাগুলো পাওয়া গেছে সেই ক্রমই বজায় থাকে।
 function mediaScanMergeHistory(historyKey) {
     const totalScans = mediaScanHistory.length;
     if (totalScans === 0) return { labels: [], count: 0, commonCount: 0 };
 
-    const presence = new Map(); // item -> Set(scanNum)
+    const order = []; // item naam-gulo prothom dekha jawar order-e
+    const countsByItem = new Map(); // item -> [scan1-count, scan2-count, ...]
     mediaScanHistory.forEach((scan, idx) => {
-        const scanNum = idx + 1;
         (scan[historyKey] || []).forEach(item => {
-            if (!presence.has(item)) presence.set(item, new Set());
-            presence.get(item).add(scanNum);
+            if (!countsByItem.has(item)) { countsByItem.set(item, new Array(totalScans).fill(0)); order.push(item); }
+            countsByItem.get(item)[idx]++;
         });
     });
 
     let commonCount = 0;
-    const labels = Array.from(presence.entries()).map(([item, scanSet]) => {
-        const isCommon = scanSet.size === totalScans;
-        if (isCommon) { commonCount++; return item; }
-        return `${item} ${mediaScanFormatScanTag(scanSet)}`;
+    const labels = [];
+    order.forEach(item => {
+        const counts = countsByItem.get(item);
+        const maxCount = Math.max(...counts);
+        for (let k = 1; k <= maxCount; k++) {
+            const scansWithK = [];
+            for (let s = 0; s < totalScans; s++) { if (counts[s] >= k) scansWithK.push(s + 1); }
+            if (scansWithK.length === totalScans) {
+                commonCount++;
+                labels.push(item);
+            } else {
+                labels.push(`${item} ${mediaScanFormatScanTag(new Set(scansWithK))}`);
+            }
+        }
     });
 
     return { labels, count: labels.length, commonCount };
@@ -7110,11 +7145,7 @@ function selectTmdbType(value) {
     if (movieField) movieField.style.display = value === 'movie' ? 'flex' : 'none';
     if (seasonsField) seasonsField.style.display = value === 'tv' ? 'flex' : 'none';
 
-    const trailerLinkField = document.getElementById('adminTrailerLinkField');
-    const trailerThumbField = document.getElementById('adminTrailerThumbField');
     const seasonTrailersField = document.getElementById('adminSeasonTrailersField');
-    if (trailerLinkField) trailerLinkField.style.display = value === 'movie' ? 'flex' : 'none';
-    if (trailerThumbField) trailerThumbField.style.display = value === 'movie' ? 'flex' : 'none';
     if (seasonTrailersField) seasonTrailersField.style.display = value === 'tv' ? 'flex' : 'none';
 }
 
@@ -7129,26 +7160,14 @@ function setPosterMode(mode) {
     if (fileInput) fileInput.style.display = mode === 'file' ? 'block' : 'none';
 }
 
-function setTrailerThumbMode(mode) {
-    adminTrailerThumbMode = mode;
-    document.querySelectorAll('#adminTrailerThumbModeGroup .admin-toggle-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-value') === mode);
-    });
-    const linkInput = document.getElementById('adminTrailerThumb');
-    const fileInput = document.getElementById('adminTrailerThumbFile');
-    if (linkInput) linkInput.style.display = mode === 'link' ? 'block' : 'none';
-    if (fileInput) fileInput.style.display = mode === 'file' ? 'block' : 'none';
-}
-
-// "Watch Button" On/Off toggle - On thakle (r TMDB ID thakle) embed.filmu.in theke
-// oi content-er TMDB ID diye auto watch iframe generate hoy, kono full link hate
-// diye likhte hoy na. Custom Watch Link (adminWatchLink input) diye chaile eta
-// override-o kora jay (jemon TV series-er khetre, jekhane auto-embed support nei).
-function setWatchEnabled(value) {
-    adminWatchEnabled = !!value;
-    document.querySelectorAll('#adminWatchEnabledGroup .admin-toggle-btn').forEach(btn => {
-        btn.classList.toggle('active', (btn.getAttribute('data-value') === 'on') === adminWatchEnabled);
-    });
+// "trailerEnabled" column Supabase-e na thakle save fail kore - shei khetre
+// admin-ke bujhiye dawar moto ekta clear message ber kore.
+function friendlyTrailerToggleError(err) {
+    const msg = (err && err.message) ? err.message : '';
+    if (/trailerEnabled/i.test(msg)) {
+        return 'Supabase-e "trailerEnabled" column nei. Supabase → SQL Editor-e ei ta ekbar run koro: ALTER TABLE movies ADD COLUMN IF NOT EXISTS "trailerEnabled" boolean DEFAULT true;';
+    }
+    return msg || 'Unknown error';
 }
 
 function updateAdminPosterPreview() {
@@ -7156,21 +7175,9 @@ function updateAdminPosterPreview() {
     const prev = document.getElementById('adminPosterPreview');
     const wrap = document.getElementById('adminPosterPreviewWrap');
     if (!linkInput || !prev || !wrap) return;
-    const link = linkInput.value.trim();
-    if (link) {
-        prev.src = link;
-        wrap.style.display = 'block';
-    } else {
-        wrap.style.display = 'none';
-    }
-}
-
-function updateAdminTrailerThumbPreview() {
-    const linkInput = document.getElementById('adminTrailerThumb');
-    const prev = document.getElementById('adminTrailerThumbPreview');
-    const wrap = document.getElementById('adminTrailerThumbPreviewWrap');
-    if (!linkInput || !prev || !wrap) return;
-    const link = linkInput.value.trim();
+    // Field khali thakleo, jodi eta auto TMDB poster hidden thaka ekta edit hoy,
+    // taholeo original poster-tar preview thumbnail dekhano hoy (link text chara).
+    const link = linkInput.value.trim() || adminOriginalPosterUrl || '';
     if (link) {
         prev.src = link;
         wrap.style.display = 'block';
@@ -7226,11 +7233,7 @@ function selectTmdbType(value) {
     if (movieField) movieField.style.display = value === 'movie' ? 'flex' : 'none';
     if (seasonsField) seasonsField.style.display = value === 'tv' ? 'flex' : 'none';
 
-    const trailerLinkField = document.getElementById('adminTrailerLinkField');
-    const trailerThumbField = document.getElementById('adminTrailerThumbField');
     const seasonTrailersField = document.getElementById('adminSeasonTrailersField');
-    if (trailerLinkField) trailerLinkField.style.display = value === 'movie' ? 'flex' : 'none';
-    if (trailerThumbField) trailerThumbField.style.display = value === 'movie' ? 'flex' : 'none';
     if (seasonTrailersField) seasonTrailersField.style.display = value === 'tv' ? 'flex' : 'none';
 
     if (value === 'movie') {
@@ -7324,22 +7327,23 @@ function collectSeasonTrailers() {
         const link = row.querySelector('.admin-season-trailer-link').value.trim();
         const thumb = row.querySelector('.admin-season-trailer-thumb').value.trim();
 
-        // Season number ar link dutai khali - eta ekta na-bhorা (blank/unused) row,
-        // eta chupchap skip kora hoy, kono error dekhano hobe na.
-        if (!seasonRaw && !link) return;
+        // Link ar Thumbnail duitai khali - ei row-ta khali/unused (notun add
+        // kora row-e "Season" number auto-fill kora thake, tao real kono
+        // content na thakle chupchap skip - error dekhano hoy na).
+        if (!link && !thumb) return;
 
         const seasonNum = parseInt(seasonRaw, 10);
         if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
-            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link "${link || '(khali)'}" er jonno eta lagbe.`);
+            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link/thumbnail "${link || thumb || '(khali)'}" er jonno eta lagbe.`);
         }
-        if (!link) {
-            throw new Error(`Season ${seasonNum}-er jonno YouTube link dao, na hole ei row-ta "✕" diye muche felo.`);
-        }
-        if (!extractYoutubeVideoId(link)) {
-            throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro (poro YouTube link ba khali 11-character video ID dite paro).`);
+        // YouTube link OPTIONAL - na dile video-r jonno auto (TMDB/YouTube)
+        // trailer-i use hobe (thumbnail thakle seta-o kaje lagbe). Shudhu
+        // link dile-i seta valid YouTube link/ID kina check kora hoy.
+        if (link && !extractYoutubeVideoId(link)) {
+            throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro (poro YouTube link ba khali 11-character video ID dite paro), ba link-ta khali rekhe dao.`);
         }
 
-        result.push({ season: seasonNum, link, thumb: thumb || null });
+        result.push({ season: seasonNum, link: link || null, thumb: thumb || null });
     });
     return result;
 }
@@ -7459,24 +7463,12 @@ function resetAdminForm() {
     document.getElementById('adminAudio').value = '';
     document.getElementById('adminSubtitles').value = '';
     document.getElementById('adminPosterLink').value = '';
+    document.getElementById('adminPosterLink').placeholder = 'https://... poster image link';
+    adminOriginalPosterUrl = null;
     const fileInput = document.getElementById('adminPosterFile');
     if (fileInput) fileInput.value = '';
     updateAdminPosterPreview();
     setPosterMode('link');
-
-    const trailerLinkInput = document.getElementById('adminTrailerLink');
-    if (trailerLinkInput) trailerLinkInput.value = '';
-
-    const trailerThumbInput = document.getElementById('adminTrailerThumb');
-    if (trailerThumbInput) trailerThumbInput.value = '';
-    const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
-    if (trailerThumbFileInput) trailerThumbFileInput.value = '';
-    updateAdminTrailerThumbPreview();
-    setTrailerThumbMode('link');
-
-    const watchLinkInput = document.getElementById('adminWatchLink');
-    if (watchLinkInput) watchLinkInput.value = '';
-    setWatchEnabled(false);
 
     const mediaScanFileInput = document.getElementById('adminMediaScanFile');
     if (mediaScanFileInput) mediaScanFileInput.value = '';
@@ -7523,20 +7515,23 @@ function loadMovieIntoAdminForm(movie) {
     selectTmdbType(movie.tmdbType === 'tv' ? 'tv' : 'movie');
 
     setPosterMode('link');
-    document.getElementById('adminPosterLink').value = movie.poster || '';
+    // TMDB theke auto-asha poster (image.tmdb.org) link-ta field-e text hisheve
+    // dekhano hoy na - field khali thake, shudhu ekta note thake je poster
+    // already ache. Field khali rekhe Save korleo ei poster-i thake, karon
+    // adminOriginalPosterUrl-e eta save kora ache (nichey submit handler dekho).
+    // Nijer deya (manual/custom) poster link hole age-r moto field-e dekha jay,
+    // jate shohoje dekhe-check-edit kora jay.
+    const posterLinkInput = document.getElementById('adminPosterLink');
+    const isAutoTmdbPoster = !!(movie.poster && /image\.tmdb\.org/i.test(movie.poster));
+    adminOriginalPosterUrl = movie.poster || null;
+    if (isAutoTmdbPoster) {
+        posterLinkInput.value = '';
+        posterLinkInput.placeholder = '✓ Auto TMDB poster already set - khali rakhle eta-i thakbe, notun link dile replace hobe';
+    } else {
+        posterLinkInput.value = movie.poster || '';
+        posterLinkInput.placeholder = 'https://... poster image link';
+    }
     updateAdminPosterPreview();
-
-    const trailerLinkInput = document.getElementById('adminTrailerLink');
-    if (trailerLinkInput) trailerLinkInput.value = movie.trailerLink || '';
-
-    setTrailerThumbMode('link');
-    const trailerThumbInput = document.getElementById('adminTrailerThumb');
-    if (trailerThumbInput) trailerThumbInput.value = movie.trailerThumb || '';
-    updateAdminTrailerThumbPreview();
-
-    const watchLinkInput = document.getElementById('adminWatchLink');
-    if (watchLinkInput) watchLinkInput.value = movie.watchLink || '';
-    setWatchEnabled(!!movie.watchEnabled);
 
     document.getElementById('adminMovieLinksList').innerHTML = '';
     document.getElementById('adminSeasonsList').innerHTML = '';
@@ -7610,7 +7605,7 @@ async function submitAdminContent() {
     submitBtn.textContent = 'Saving...';
 
     try {
-        let posterUrl = document.getElementById('adminPosterLink').value.trim() || null;
+        let posterUrl = document.getElementById('adminPosterLink').value.trim() || adminOriginalPosterUrl || null;
         if (adminPosterMode === 'file') {
             const fileInput = document.getElementById('adminPosterFile');
             if (fileInput && fileInput.files && fileInput.files[0]) {
@@ -7628,36 +7623,6 @@ async function submitAdminContent() {
                 submitBtn.textContent = 'Saving...';
             }
         }
-
-        let trailerThumbUrl = document.getElementById('adminTrailerThumb').value.trim() || null;
-        if (adminTrailerThumbMode === 'file') {
-            const trailerThumbFileInput = document.getElementById('adminTrailerThumbFile');
-            if (trailerThumbFileInput && trailerThumbFileInput.files && trailerThumbFileInput.files[0]) {
-                submitBtn.textContent = 'Uploading trailer thumbnail...';
-                trailerThumbUrl = await uploadPosterFile(trailerThumbFileInput.files[0], 'trailer_thumb');
-
-                const reachable = await verifyPosterUrlReachable(trailerThumbUrl);
-                if (!reachable) {
-                    throw new Error(
-                        'Trailer thumbnail uploaded to Storage, but the public URL is not loading in the browser. ' +
-                        'This means the "' + ADMIN_POSTER_BUCKET + '" bucket is Private or missing a public read policy. ' +
-                        'Go to Supabase → Storage → posters → make the bucket Public (or add a public SELECT policy), then try again.'
-                    );
-                }
-                submitBtn.textContent = 'Saving...';
-            }
-        }
-
-        const trailerLinkRaw = document.getElementById('adminTrailerLink').value.trim() || null;
-        if (trailerLinkRaw && !extractYoutubeVideoId(trailerLinkRaw)) {
-            throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
-        }
-
-        // Watch Link ekhane kono format restriction nei (YouTube link chara-o Google
-        // Drive preview link, direct video link, streaming embed link etc. deya jay) -
-        // shudhu khali/na-thakle Watch button-i show hobe na (movie card/modal-e).
-        const watchLinkInputEl = document.getElementById('adminWatchLink');
-        const watchLinkRaw = watchLinkInputEl ? (watchLinkInputEl.value.trim() || null) : null;
 
         // Original title (TMDB primary, IMDb/OMDb fallback - dekho
         // fetchOriginalTitle()-er comment) fetch kore rakha hocche, jate
@@ -7693,14 +7658,19 @@ async function submitAdminContent() {
             languages: audio,
             Subtitles: subtitles,
             poster: posterUrl,
-            trailerLink: isTvType ? null : trailerLinkRaw,
-            trailerThumb: isTvType ? null : trailerThumbUrl,
             seasonTrailers: isTvType ? JSON.stringify(seasonTrailers) : null,
             downloadBlocks: JSON.stringify(downloadBlocks),
-            originalTitle: originalTitle,
-            watchLink: watchLinkRaw,
-            watchEnabled: adminWatchEnabled
+            originalTitle: originalTitle
         };
+
+        // Trailer Link/Thumbnail, Trailer On/Off ar Watch Button (On/Off + Custom
+        // Watch Link) ekhon ei form-e nei - segulo alada "Trailer / Teaser" ar
+        // "Watch Button" tab-e manage kora hoy. Tai edit-er shomoy payload-e
+        // ei column-gulo pathano hoy na, jate oi tab-e deya value overwrite hoye
+        // na jay. Notun content add korar shomoy Watch Button auto "On" thake
+        // (chaile pore Watch Button tab theke Off kora jabe).
+        if (!editingId) payload.watchEnabled = true;
+
 
 
         // নতুন content add করলে (edit নয়) সেটা সবসময় Serial #1-এ বসবে, আর যে item গুলোতে
@@ -7829,36 +7799,6 @@ async function fetchTmdbPosterQuick(movie) {
     return posterUrl;
 }
 
-// Admin panel-er "Manage" list-e "▶ Watch" button-e click korle - full movie modal
-// khule (site-e visitor-ra jevabe dekhe thik shei-i), tarpor reachability check
-// shesh hoye #watchBox jaygamoto ashar jonno ektu opekkha kore - pele automatic
-// scroll + play kore dey, jate admin-ke ar aksha click-o korte na hoy. Kono
-// working watch link na paile (Off/TMDB match nei/embed server unreachable)
-// ekta toast diye janiye dey.
-async function adminPreviewWatch(movie) {
-    openMovieModal(movie);
-
-    const timeoutMs = 8000;
-    const pollGapMs = 300;
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeoutMs) {
-        const overlay = document.getElementById('movieModalOverlay');
-        if (!overlay || overlay.style.display !== 'flex') return; // admin modal bondho kore diyeche
-
-        const watchBox = document.getElementById('watchBox');
-        if (watchBox) {
-            watchBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            const thumbWrap = watchBox.querySelector('.trailer-thumb-wrap');
-            if (thumbWrap) thumbWrap.click();
-            return;
-        }
-        await new Promise(resolve => setTimeout(resolve, pollGapMs));
-    }
-
-    showToast('⚠️ "' + (movie.title || 'Ei content') + '"-er jonno kono working Watch link paoa jayni - Watch Button On ache kina, TMDB ID/match thik ache kina, ba embed server unreachable kina check korun', 'error');
-}
-
 function renderAdminDatabaseList(filter) {
     const container = document.getElementById('adminDatabaseList');
     if (!container) return;
@@ -7911,12 +7851,10 @@ function renderAdminDatabaseList(filter) {
                 </div>
             </div>
             <div class="admin-db-actions">
-                <button type="button" class="admin-db-watch-btn">▶ Watch</button>
                 <button type="button" class="admin-db-edit-btn">Edit</button>
                 <button type="button" class="admin-db-delete-btn">Delete</button>
             </div>
         `;
-        card.querySelector('.admin-db-watch-btn').addEventListener('click', () => adminPreviewWatch(movie));
         card.querySelector('.admin-db-edit-btn').addEventListener('click', () => loadMovieIntoAdminForm(movie));
         card.querySelector('.admin-db-delete-btn').addEventListener('click', () => deleteMovieToTrash(movie));
         const orderInput = card.querySelector('.admin-db-order-input');
@@ -8315,9 +8253,15 @@ function renderAdminTrailerList(filter) {
                 `}
             </div>
             <div class="admin-db-actions">
+                <button type="button" class="admin-watch-state-pill admin-trailer-state-pill ${movie.trailerEnabled === false ? 'off' : 'on'}" title="Trailer On/Off toggle">${movie.trailerEnabled === false ? '🚫 Off' : '🎬 On'}</button>
                 <span class="admin-mini-btn admin-trailer-save-btn admin-autosave-status" aria-live="polite">Saved</span>
             </div>
         `;
+        card.classList.toggle('is-trailer-off', movie.trailerEnabled === false);
+
+        // Trailer On/Off pill - click korle shathe shathe save hoy (alada Save lage na).
+        const trailerPill = card.querySelector('.admin-trailer-state-pill');
+        trailerPill.addEventListener('click', () => toggleAdminTrailerEnabled(movie, card, trailerPill));
 
         if (isTv) {
             const rowsContainer = card.querySelector('.admin-trailer-season-rows');
@@ -8440,6 +8384,30 @@ function collectAdminTrailerSeasonRows(card) {
         result.push({ season: seasonNum, link: link || null, thumb: thumb || null });
     });
     return result;
+}
+
+// Trailer/Teaser tab-er card-e "On/Off" pill-e click korle - trailerEnabled
+// value ulte diye (Off = trailer box-i user-er modal-e dekha jabe na) shathe shathe
+// Supabase-e save kore.
+async function toggleAdminTrailerEnabled(movie, card, pill) {
+    if (!movie || !movie.id || pill.disabled) return;
+    const newValue = movie.trailerEnabled === false; // ekhon Off chilo -> On hobe, othoba ulta
+    pill.disabled = true;
+    try {
+        const { error } = await supabaseClient.from('movies').update({ trailerEnabled: newValue }).eq('id', movie.id);
+        if (error) throw error;
+        movie.trailerEnabled = newValue;
+        pill.classList.toggle('on', newValue);
+        pill.classList.toggle('off', !newValue);
+        pill.textContent = newValue ? '🎬 On' : '🚫 Off';
+        card.classList.toggle('is-trailer-off', !newValue);
+        showToast((newValue ? '🎬 Trailer On' : '🚫 Trailer Off') + ' for "' + (movie.title || 'this item') + '"');
+    } catch (err) {
+        console.error('Toggle trailer error:', err);
+        showToast('❌ Save failed: ' + friendlyTrailerToggleError(err), 'error');
+    } finally {
+        pill.disabled = false;
+    }
 }
 
 // Save button-e click korle - series hole shob season-trailer row collect kore

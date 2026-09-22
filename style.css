@@ -974,6 +974,52 @@ html.light-mode .auth-google-btn:hover { background: #f5f6f8; }
     transition: background 0.15s ease;
 }
 .watch-close-btn:hover { background: rgba(229, 9, 20, 0.85); }
+
+/* ✖ Close button - shudhu icon (kono text nei). Desktop-e eta video-r
+   top-right KONAR thik upor boshe (aadha video-r baire gutter-e, aadha kone-r
+   bhitore) - tai player-er nijer panel (Audio/Subtitle menu ইত্যাদি)-er close
+   button (jeta kone theke kichuta bhitore thake)-er shathe overlap hoy na.
+   Choto (mobile) screen-e video-r baire jayga kom, tai shekhane video-r upore
+   alada ekta slim strip-e thake. */
+.watch-player-toolbar {
+    position: relative;
+    height: 0;
+    margin: 0;
+    z-index: 5;
+}
+.watch-player-toolbar .watch-close-btn {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 11px;
+    background: #1b1f2b;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.watch-player-toolbar .watch-close-btn svg { display: block; width: 12px; height: 12px; pointer-events: none; }
+.watch-player-toolbar .watch-close-btn:hover { background: rgba(229, 9, 20, 0.95); border-color: transparent; }
+
+@media (max-width: 600px) {
+    .watch-player-toolbar {
+        height: auto;
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 6px;
+    }
+    .watch-player-toolbar .watch-close-btn { position: static; }
+    .massive-watch-box .watch-player-toolbar { padding: 6px 8px 0; }
+}
+html.light-mode .watch-player-toolbar .watch-close-btn {
+    background: #ffffff;
+    border-color: rgba(20, 22, 28, 0.3);
+    color: #23262f;
+}
+html.light-mode .watch-player-toolbar .watch-close-btn:hover { background: rgba(229, 9, 20, 0.95); color: #fff; }
 .trailer-fallback-link {
     position: absolute;
     right: 10px;
@@ -2391,18 +2437,6 @@ html.light-mode .admin-db-order-input { background-color: #ffffff; border-color:
     flex-shrink: 0;
 }
 .admin-db-edit-btn:hover { background-color: #1d3a63; }
-.admin-db-watch-btn {
-    background-color: #171e2e;
-    border: 1px solid #16a34a;
-    color: #86efac;
-    padding: 7px 14px;
-    border-radius: 7px;
-    font-size: 11.5px;
-    font-weight: 700;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.admin-db-watch-btn:hover { background-color: #143824; }
 .admin-db-empty { text-align: center; color: #64748b; padding: 30px 0; font-size: 13px; }
 
 .admin-db-actions { display: flex; gap: 8px; flex-shrink: 0; }
@@ -3256,8 +3290,6 @@ html.light-mode .admin-db-title { color: #14161c; }
 html.light-mode .admin-db-meta { color: #6b7280; }
 html.light-mode .admin-db-edit-btn { background-color: #eef4ff; border-color: #2563eb; color: #1d4ed8; }
 html.light-mode .admin-db-edit-btn:hover { background-color: #dbe8ff; }
-html.light-mode .admin-db-watch-btn { background-color: #eafaf0; border-color: #16a34a; color: #15803d; }
-html.light-mode .admin-db-watch-btn:hover { background-color: #d7f5e3; }
 html.light-mode .admin-db-empty { color: #9aa1ac; }
 html.light-mode .admin-alert-url { color: #9aa1ac; }
 html.light-mode .admin-alert-source-tag { background-color: #f1f3f7; border-color: #dde1e8; color: #1d4ed8; }
@@ -3858,3 +3890,10 @@ html.light-mode .massive-watch-suggestion-item { border-color: #eef0f4; }
 html.light-mode .massive-watch-suggestion-item:hover { background-color: #f7f8fa; }
 html.light-mode .massive-watch-suggestion-title { color: #14161c; }
 html.light-mode .massive-watch-player .massive-watch-status { background-color: #f7f8fa; border-color: #e5e8ee; }
+
+
+/* Trailer/Teaser tab - Trailer "Off" thakle card-er link/thumbnail field-gulo
+   halka (dim) dekhay, jate ek nojorei bojha jay ei content-er trailer bondho. */
+.admin-trailer-card.is-trailer-off .admin-db-info { opacity: 0.55; }
+.admin-trailer-card .admin-trailer-state-pill { align-self: center; }
+
