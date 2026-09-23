@@ -165,7 +165,7 @@ function getManualSeasonTrailer(movie, seasonNumber) {
     // caller purapuri auto-e chole jete pare.
     const ytId = entry.link ? extractYoutubeVideoId(entry.link) : null;
     if (!ytId && !entry.thumb) return null;
-    return { key: ytId, thumb: entry.thumb || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null) };
+    return { key: ytId, thumb: entry.thumb || (ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null) };
 }
 
 // Admin manually koyta season-er trailer add koreche tar modhye shobcheye
@@ -1369,16 +1369,35 @@ function stopModalTrailerPlayback() {
 // Kono kono khetre trailerKey resolve hoy (tai trailer-box render hoye jay),
 // kintu shei YouTube video-ta আসলে thake na (delete/private/invalid id) -
 // tokhon img.youtube.com thumbnail hishebe ekটা fixed 120x90 "no thumbnail"
-// placeholder pathay (normal thumbnail onek boro hoy, jemon hqdefault 480x360).
-// Eta check kore, ba thumbnail load-i na hole (network error), amra pura
-// .trailer-box-take hide kore dei - tai user ekta "load hocche na" emon
-// khali/bhanga trailer box r dekhbe na, box-ta simply thakbei na.
+// placeholder pathay (normal thumbnail onek boro hoy, jemon maxresdefault
+// 1280x720 ba hqdefault 480x360).
+// Amra "maxresdefault" (shobcheye high-quality HD thumbnail) age try kori -
+// kintu shob purono/choto video-r jonno YouTube eta generate kore na, tokhon
+// oi 120x90 placeholder ashe (video-ta bhanga na, shudhu HD thumbnail-i nei) -
+// tokhon "hqdefault"-e (shob video-teই thake) fallback kora hoy. Duitai
+// (maxres ar hq) fail korle - mane video-ta আসলেই bhanga/delete/private -
+// tokhon pura .trailer-box-take hide kore dei, jate user ekta "load hocche na"
+// emon khali/bhanga trailer box r dekhbe na.
 function handleTrailerThumbLoad(imgEl) {
     if (imgEl.naturalWidth === 120 && imgEl.naturalHeight === 90) {
+        if (imgEl.dataset.thumbTier === 'maxres' && imgEl.dataset.ytid) {
+            imgEl.dataset.thumbTier = 'hq';
+            imgEl.src = `https://img.youtube.com/vi/${encodeURIComponent(imgEl.dataset.ytid)}/hqdefault.jpg`;
+            return;
+        }
         hideBrokenTrailerBox(imgEl);
     }
 }
 function handleTrailerThumbError(imgEl) {
+    // Shadharonoto img.youtube.com kokhono real error/404 dey na (maxresdefault
+    // na thakleo 120x90 placeholder-i pathay, tai eta onload-e-i handle hoy) -
+    // kintu kono network issue-e sotti error hole-o age hq-e try na kore direct
+    // hide na kore, ekbar hq fallback try kora hocche safety hishebe.
+    if (imgEl.dataset.thumbTier === 'maxres' && imgEl.dataset.ytid) {
+        imgEl.dataset.thumbTier = 'hq';
+        imgEl.src = `https://img.youtube.com/vi/${encodeURIComponent(imgEl.dataset.ytid)}/hqdefault.jpg`;
+        return;
+    }
     hideBrokenTrailerBox(imgEl);
 }
 function hideBrokenTrailerBox(imgEl) {
@@ -2270,7 +2289,7 @@ fastServersList.forEach((fs, fIdx) => {
         const revenueRow = hasVal(revenueFormatted) ? `<div class="meta-inline-item" id="modalRevenueDiv"><strong>REVENUE</strong> ${revenueFormatted}</div>` : '';
         const budgetRevenueGroup = (budgetRow || revenueRow) ? `<div class="meta-inline-group">${budgetRow}${revenueRow}</div>` : '';
 
-        const trailerThumbUrl = trailerThumbOverride || movie.trailerThumb || (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg` : '');
+        const trailerThumbUrl = trailerThumbOverride || movie.trailerThumb || (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/maxresdefault.jpg` : '');
 
         // Series-er khetre ekta Season dropdown dekhano hoy, jate user chaile onno
         // (age-r) season-er trailer-o dekhte pare - default-e latest season select kora thake.
@@ -2291,7 +2310,7 @@ fastServersList.forEach((fs, fIdx) => {
 
         const trailerBodyInnerHTML = trailerKey ? `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="${trailerThumbUrl}" alt="${escapeAttr(title)} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
+                <img class="trailer-thumb-img" src="${trailerThumbUrl}" data-ytid="${trailerKey || ''}" data-thumb-tier="maxres" alt="${escapeAttr(title)} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
@@ -2730,7 +2749,7 @@ function playModalTrailer(el) {
     // shei browser-e trailer nao chalte pare (iframe block hoye jete pare).
     // Admin panel theke manually thumbnail set kora thakle sheita age priority pabe,
     // na thakle auto YouTube thumbnail fallback hishebe use hobe.
-    const thumbUrl = box.getAttribute('data-thumb') || `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg`;
+    const thumbUrl = box.getAttribute('data-thumb') || `https://img.youtube.com/vi/${encodeURIComponent(ytId)}/maxresdefault.jpg`;
     // background-e thumbnail rekhe dewa holo, tai iframe block/blank thakle o box-ta
     // kokhono khali/kalo dekhabe na - thumbnail-i poster hishebe thakbe.
     // NOTE: shudhu #trailerBoxBody-r content replace kora hoy (pura .trailer-box na),
@@ -2927,17 +2946,13 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
     // Download list-er row-gulor moto ekই style-e (purple header + ZIP-er moto
     // right-side badge) "Online Watch" row hishebe boshano hoy, jate ei button-o
     // download button-er moto-i dekhte lage - header-e click korle
-    // toggleAccordion() diye body show/hide (toggle) hoy, thik download row-er
-    // moto-i. Download link-e click korle jemon shathe shathe view count
-    // barano hoy, "⚡ Online Watch" header-e click korleo (accordion khulleও)
-    // ekই bhabe view count barano hoy - user "Watch Online" button-e engage
-    // korleই eta ekta view hishebe count hobe (video-r ▶ play button-e click
-    // korleo আলাদা bhabe view count-i thakবে, tai kono somoy dutoi kore fele
-    // ekei session-e duibar count hote pare - eta download link-er khetreo
-    // ekই rokom shadharon click-count hishebe rakha hoyeche).
+    // toggleAccordion() diye body shudhu show/hide (toggle) hoy, view count
+    // barano hoy na. View count শুধু video-r ▶ play button-e click korle-i
+    // (playModalWatch()) barbe, jate accordion-ta shudhu open kore dekhleই
+    // "view" count na hoye jay.
     container.innerHTML = `
         <div class="season-box-item watch-box" id="watchBox" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
-            <div class="season-box-header" onclick="incrementMovieViews(currentModalMovie); toggleAccordion('watchAccordionBody')">
+            <div class="season-box-header" onclick="toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
                     <span class="dropdown-arrow">▼</span>
@@ -3373,7 +3388,7 @@ async function changeModalTrailerSeason(selectEl) {
         box.setAttribute('data-thumb', manualSeasonTrailer.thumb);
         bodyEl.innerHTML = `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="${manualSeasonTrailer.thumb}" alt="Season ${seasonNumber} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
+                <img class="trailer-thumb-img" src="${manualSeasonTrailer.thumb}" data-ytid="${manualSeasonTrailer.key || ''}" data-thumb-tier="maxres" alt="Season ${seasonNumber} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
@@ -3407,12 +3422,12 @@ async function changeModalTrailerSeason(selectEl) {
         // Admin YouTube link na diyeও shudhu Thumbnail-i deya thakle (manualSeasonTrailer.thumb) -
         // video-r jonno upore-r auto (per-season) key-i use hobe, kintu
         // thumbnail-e admin-er deya custom-ta-i priority pabe.
-        const thumbUrl = (manualSeasonTrailer && manualSeasonTrailer.thumb) || `https://img.youtube.com/vi/${encodeURIComponent(newKey)}/hqdefault.jpg`;
+        const thumbUrl = (manualSeasonTrailer && manualSeasonTrailer.thumb) || `https://img.youtube.com/vi/${encodeURIComponent(newKey)}/maxresdefault.jpg`;
         box.setAttribute('data-ytid', newKey);
         box.setAttribute('data-thumb', thumbUrl);
         bodyEl.innerHTML = `
             <div class="trailer-thumb-wrap" onclick="playModalTrailer(this)">
-                <img class="trailer-thumb-img" src="${thumbUrl}" alt="Season ${seasonNumber} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
+                <img class="trailer-thumb-img" src="${thumbUrl}" data-ytid="${newKey}" data-thumb-tier="maxres" alt="Season ${seasonNumber} Trailer" loading="lazy" onload="handleTrailerThumbLoad(this)" onerror="handleTrailerThumbError(this)">
                 <button type="button" class="trailer-play-btn" aria-label="Play trailer">▶</button>
             </div>
             <div class="trailer-label">Watch Trailer</div>
