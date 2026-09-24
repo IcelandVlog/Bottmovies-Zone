@@ -514,7 +514,7 @@ const DOWNLOAD_HEADER_ICON = '⚡';
 //
 // !! endpoint FILL KORTE HOBE: API provider-er docs theke request URL boshao.
 // endpoint khali thakle Play button kokhono dekhano hoy na (site bhange na).
-const TERA_API_KEY = 'pk_3a5s3kcn48h1qb2vh7047i';
+const TERA_API_KEY = 'pk_2d9ri3ssttjak87cbshuvt';
 const TERA_API_CONFIG = {
     endpoint: '',            // e.g. 'https://api.example.com/v1/terabox'
     method: 'GET',           // 'GET' ba 'POST' (POST hole JSON body-te link jay)
