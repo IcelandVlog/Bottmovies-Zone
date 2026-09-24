@@ -3914,3 +3914,7 @@ html.light-mode .massive-watch-player .massive-watch-status { background-color: 
 html.light-mode .tera-play-status { color: #475569; }
 html.light-mode .tera-play-error { color: #b91c1c; }
 html.light-mode .btn-tera-play, html.light-mode .btn-tera-dl { color: #1a2b0a; }
+.tera-player-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.tera-player-body .tera-play-panel { width: 100%; }
+.tera-link-select { max-width: 100%; padding: 8px 10px; border-radius: 6px; background: #0e1017; color: #fff; border: 1.5px solid #8bc34a; font-size: 13px; }
+html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }

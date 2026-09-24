@@ -669,6 +669,52 @@ async function playTeraLink(btn) {
     }
 }
 
+
+// Content details modal-er upore-i (download accordion-er bahire) always-visible
+// "Terabox Player" box. Accordion-er bhitorer Play button khuje pawa lagbe na.
+function collectTeraLinks(movie) {
+    const out = [];
+    (Array.isArray(movie.downloadBlocks) ? movie.downloadBlocks : []).forEach(sec => {
+        const base = (sec.label || '').replace(/^⚡\s*/g, '').replace(/^Download Link\s*/i, '').replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+        if (Array.isArray(sec.items) && sec.items.length) {
+            sec.items.forEach(it => { if (isTeraboxLink(it.link)) out.push({ label: [base, it.quality].filter(Boolean).join(' ') || 'Video', link: it.link }); });
+        } else if (isTeraboxLink(sec.link)) {
+            out.push({ label: base || 'Video', link: sec.link });
+        }
+    });
+    return out;
+}
+function buildTeraPlayerBoxHTML(movie) {
+    if (!movie || movie.teraPlayEnabled !== true) return '';
+    const links = collectTeraLinks(movie);
+    if (!links.length) return '';
+    if (!TERA_API_CONFIG.endpoint || !TERA_API_KEY) {
+        console.warn('[Tera Play] TERA_API_CONFIG.endpoint khali - script.js-e fill korun.');
+        return isCurrentUserAdmin(currentAuthSession)
+            ? '<div class="season-accordion-group"><div class="season-box-item"><div class="season-box-header" style="cursor:default;"><span>📦 Terabox Player</span></div><div class="tera-play-status tera-play-error">⚠️ (Admin only) API endpoint set kora nei - script.js → TERA_API_CONFIG.endpoint fill korun.</div></div></div>'
+            : '';
+    }
+    const select = links.length > 1
+        ? `<select class="tera-link-select" onchange="teraBoxSelectChange(this)">${links.map((l, i) => `<option value="${i}" data-link="${escapeAttr(l.link)}">${escapeHtml(l.label)}</option>`).join('')}</select>`
+        : '';
+    return `<div class="season-accordion-group tera-player-group"><div class="season-box-item tera-player-box">
+        <div class="season-box-header" style="cursor:default;"><span>📦 Terabox Player</span></div>
+        <div class="tera-player-body">
+            ${select}
+            <button type="button" class="btn-tera-play tera-main-play" id="teraMainPlayBtn" data-link="${escapeAttr(links[0].link)}" data-panel="tera-panel-main" onclick="playTeraLink(this)">▶ Play</button>
+            <div class="tera-play-panel" id="tera-panel-main"></div>
+        </div></div></div>`;
+}
+function teraBoxSelectChange(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    const btn = document.getElementById('teraMainPlayBtn');
+    const panel = document.getElementById('tera-panel-main');
+    if (!btn || !opt) return;
+    closeTeraPanel(panel);
+    btn.textContent = '▶ Play';
+    btn.setAttribute('data-link', opt.getAttribute('data-link'));
+}
+
 function closeTeraPanel(panel) {
     if (!panel) return;
     const v = panel.querySelector('video');
@@ -2646,6 +2692,7 @@ fastServersList.forEach((fs, fIdx) => {
             </ul>
         </div>
         ${trailerHTML}
+        ${buildTeraPlayerBoxHTML(movie)}
         ${watchHTML}
         <div class="season-accordion-group">
             ${downloadHTML}
