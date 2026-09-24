@@ -512,16 +512,17 @@ const DOWNLOAD_HEADER_ICON = '⚡';
 // toggle (Admin -> Watch Button tab, column: movies."teraPlayEnabled") ON thakle
 // Terabox download link-er pashe "▶ Play" button ashe.
 //
-// !! endpoint FILL KORTE HOBE: API provider-er docs theke request URL boshao.
+// API: PlayTeraBox  ->  GET https://api.playterabox.com/api/proxy?url=<terabox link>  +  header  secret: <API KEY>
 // endpoint khali thakle Play button kokhono dekhano hoy na (site bhange na).
-const TERA_API_KEY = 'pk_2d9ri3ssttjak87cbshuvt';
+const TERA_API_KEY = 'pk_cltx4au47sqf03z97t9tl';
 const TERA_API_CONFIG = {
-    endpoint: '',            // e.g. 'https://api.example.com/v1/terabox'
+    endpoint: 'https://api.playterabox.com/api/proxy',   // PlayTeraBox API Playground: GET /api/proxy
     method: 'GET',           // 'GET' ba 'POST' (POST hole JSON body-te link jay)
-    linkParam: 'url',        // link-er param/field-er naam (docs onujayi: url / link / share_url)
+    linkParam: 'url',        // link-er param/field-er naam (docs: {"url": "terabox link"})
     keyMode: 'header',       // 'header' | 'query' | 'body'
-    keyName: 'x-api-key',    // header/query/body-te key-er naam
-    keyPrefix: ''            // Bearer token hole 'Bearer ' likho, keyName = 'Authorization'
+    keyName: 'secret',       // docs: header  secret: <API KEY>
+    keyPrefix: '',           // Bearer token hole 'Bearer ' likho, keyName = 'Authorization'
+    fallbackToPost: true     // GET fail korle (CORS/4xx) ekbar POST + JSON body diye try korbe
 };
 const TERA_LINK_REGEX = /(terabox|1024tera|teraboxapp|terafileshare|teraboxlink|4funbox|mirrobox|teraboxshare|momerybox|tibibox|nephobox|freeterabox)/i;
 const teraResolveCache = new Map(); // link -> { ts, data }  (stream URL expire hoy, tai 10 min TTL)
@@ -544,8 +545,8 @@ function teraPanelHTML(movie, link, panelId) {
 // API response shape provider-bhede alada hote pare, tai nested object-er moddhe
 // known key-gulo khuje stream + download URL ber kora hoy.
 function extractTeraUrls(payload) {
-    const streamKeys = ['stream_url', 'streaming_url', 'streamurl', 'stream', 'play_url', 'playurl', 'hls', 'hls_url', 'm3u8', 'm3u8_url', 'fast_stream_url', 'video_url', 'proxy_url'];
-    const dlKeys = ['download_link', 'download_url', 'downloadurl', 'dlink', 'direct_link', 'direct_url', 'dl_url'];
+    const streamKeys = ['stream_url', 'streaming_url', 'streamurl', 'stream', 'play_url', 'playurl', 'hls', 'hls_url', 'm3u8', 'm3u8_url', 'fast_stream_url', 'video_url', 'proxy_url', 'stream_link', 'streaming_link', 'play_link', 'fast_stream', 'fast_stream_link'];
+    const dlKeys = ['download_link', 'download_url', 'downloadurl', 'dlink', 'direct_link', 'direct_url', 'dl_url', 'download', 'fast_download_link', 'fast_download_url'];
     const out = { stream: null, download: null, title: null, thumb: null };
     const seen = new Set();
     (function walk(node, depth) {
@@ -567,16 +568,13 @@ function extractTeraUrls(payload) {
     return out;
 }
 
-async function resolveTeraLink(link) {
-    const cached = teraResolveCache.get(link);
-    if (cached && Date.now() - cached.ts < TERA_CACHE_TTL_MS) return cached.data;
-
+async function teraApiRequest(link, method) {
     const c = TERA_API_CONFIG;
     const headers = { 'Accept': 'application/json' };
-    let url = c.endpoint, init = { method: c.method, headers };
+    let url = c.endpoint, init = { method, headers };
     const keyVal = (c.keyPrefix || '') + TERA_API_KEY;
 
-    if (c.method === 'POST') {
+    if (method === 'POST') {
         const body = { [c.linkParam]: link };
         if (c.keyMode === 'body') body[c.keyName] = keyVal;
         headers['Content-Type'] = 'application/json';
@@ -594,11 +592,30 @@ async function resolveTeraLink(link) {
     try {
         const res = await fetch(url, { ...init, signal: ctrl.signal });
         if (!res.ok) throw new Error('API error ' + res.status);
-        const data = extractTeraUrls(await res.json());
-        if (!data.stream && !data.download) throw new Error('No playable URL returned');
-        teraResolveCache.set(link, { ts: Date.now(), data });
+        const json = await res.json();
+        const data = extractTeraUrls(json);
+        if (!data.stream && !data.download) {
+            console.warn('[Tera Play] API response-e playable URL pawa gelo na. Raw response:', json);
+            throw new Error('No playable URL returned');
+        }
         return data;
     } finally { clearTimeout(timer); }
+}
+
+async function resolveTeraLink(link) {
+    const cached = teraResolveCache.get(link);
+    if (cached && Date.now() - cached.ts < TERA_CACHE_TTL_MS) return cached.data;
+
+    let data;
+    try {
+        data = await teraApiRequest(link, TERA_API_CONFIG.method);
+    } catch (err) {
+        if (!TERA_API_CONFIG.fallbackToPost || TERA_API_CONFIG.method === 'POST') throw err;
+        console.warn('[Tera Play] GET fail, POST diye abar try korchi:', err);
+        data = await teraApiRequest(link, 'POST');
+    }
+    teraResolveCache.set(link, { ts: Date.now(), data });
+    return data;
 }
 
 function loadHlsJs() {

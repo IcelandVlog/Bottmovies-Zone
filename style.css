@@ -3918,3 +3918,8 @@ html.light-mode .btn-tera-play, html.light-mode .btn-tera-dl { color: #1a2b0a; }
 .tera-player-body .tera-play-panel { width: 100%; }
 .tera-link-select { max-width: 100%; padding: 8px 10px; border-radius: 6px; background: #0e1017; color: #fff; border: 1.5px solid #8bc34a; font-size: 13px; }
 html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
+
+/* Tera Play: file/quality selectors + meta */
+.tera-play-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.tera-play-controls .tera-link-select { flex: 1 1 160px; max-width: 100%; }
+.tera-play-meta { margin-top: 8px; font-size: 12px; opacity: 0.75; word-break: break-word; }
