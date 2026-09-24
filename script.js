@@ -634,7 +634,7 @@ async function teraApiRequest(link, method, viaProxy) {
         const res = await fetch(url, { ...init, signal: ctrl.signal });
         if (!res.ok) {
             let detail = '';
-            try { detail = (await res.text()).slice(0, 160); } catch (e) {}
+            try { detail = (await res.text()).slice(0, 500); } catch (e) {}
             throw new Error('HTTP ' + res.status + (detail ? ' - ' + detail : ''));
         }
         const ct = res.headers.get('content-type') || '';
