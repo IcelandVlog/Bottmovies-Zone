@@ -507,6 +507,184 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const DOWNLOAD_HEADER_ICON = '⚡';
 
+// ==================== TERABOX PLAY & DOWNLOAD API ====================
+// Terabox share link -> stream/download URL resolver. Content-er "Tera Play"
+// toggle (Admin -> Watch Button tab, column: movies."teraPlayEnabled") ON thakle
+// Terabox download link-er pashe "▶ Play" button ashe.
+//
+// !! endpoint FILL KORTE HOBE: API provider-er docs theke request URL boshao.
+// endpoint khali thakle Play button kokhono dekhano hoy na (site bhange na).
+const TERA_API_KEY = 'pk_3a5s3kcn48h1qb2vh7047i';
+const TERA_API_CONFIG = {
+    endpoint: '',            // e.g. 'https://api.example.com/v1/terabox'
+    method: 'GET',           // 'GET' ba 'POST' (POST hole JSON body-te link jay)
+    linkParam: 'url',        // link-er param/field-er naam (docs onujayi: url / link / share_url)
+    keyMode: 'header',       // 'header' | 'query' | 'body'
+    keyName: 'x-api-key',    // header/query/body-te key-er naam
+    keyPrefix: ''            // Bearer token hole 'Bearer ' likho, keyName = 'Authorization'
+};
+const TERA_LINK_REGEX = /(terabox|1024tera|teraboxapp|terafileshare|teraboxlink|4funbox|mirrobox|teraboxshare|momerybox|tibibox|nephobox|freeterabox)/i;
+const teraResolveCache = new Map(); // link -> { ts, data }  (stream URL expire hoy, tai 10 min TTL)
+const TERA_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function isTeraboxLink(link) {
+    return !!link && TERA_LINK_REGEX.test(String(link));
+}
+function isTeraPlayAvailable(movie, link) {
+    return !!(TERA_API_CONFIG.endpoint && TERA_API_KEY && movie && movie.teraPlayEnabled === true && isTeraboxLink(link));
+}
+function teraPlayButtonHTML(movie, link, panelId) {
+    if (!isTeraPlayAvailable(movie, link)) return '';
+    return `<button type="button" class="btn-tera-play" data-link="${escapeAttr(link)}" data-panel="${escapeAttr(panelId)}" onclick="playTeraLink(this)">▶ Play</button>`;
+}
+function teraPanelHTML(movie, link, panelId) {
+    return isTeraPlayAvailable(movie, link) ? `<div class="tera-play-panel" id="${escapeAttr(panelId)}"></div>` : '';
+}
+
+// API response shape provider-bhede alada hote pare, tai nested object-er moddhe
+// known key-gulo khuje stream + download URL ber kora hoy.
+function extractTeraUrls(payload) {
+    const streamKeys = ['stream_url', 'streaming_url', 'streamurl', 'stream', 'play_url', 'playurl', 'hls', 'hls_url', 'm3u8', 'm3u8_url', 'fast_stream_url', 'video_url', 'proxy_url'];
+    const dlKeys = ['download_link', 'download_url', 'downloadurl', 'dlink', 'direct_link', 'direct_url', 'dl_url'];
+    const out = { stream: null, download: null, title: null, thumb: null };
+    const seen = new Set();
+    (function walk(node, depth) {
+        if (!node || typeof node !== 'object' || depth > 5 || seen.has(node)) return;
+        seen.add(node);
+        if (Array.isArray(node)) { node.forEach(n => walk(n, depth + 1)); return; }
+        for (const k of Object.keys(node)) {
+            const v = node[k], lk = k.toLowerCase();
+            if (typeof v === 'string' && /^https?:\/\//i.test(v)) {
+                if (!out.stream && streamKeys.includes(lk)) out.stream = v;
+                else if (!out.download && dlKeys.includes(lk)) out.download = v;
+                else if (!out.thumb && (lk === 'thumbnail' || lk === 'thumb' || lk === 'thumbs')) out.thumb = v;
+            } else if (typeof v === 'string' && !out.title && (lk === 'file_name' || lk === 'filename' || lk === 'title' || lk === 'name')) {
+                out.title = v;
+            }
+        }
+        for (const k of Object.keys(node)) walk(node[k], depth + 1);
+    })(payload, 0);
+    return out;
+}
+
+async function resolveTeraLink(link) {
+    const cached = teraResolveCache.get(link);
+    if (cached && Date.now() - cached.ts < TERA_CACHE_TTL_MS) return cached.data;
+
+    const c = TERA_API_CONFIG;
+    const headers = { 'Accept': 'application/json' };
+    let url = c.endpoint, init = { method: c.method, headers };
+    const keyVal = (c.keyPrefix || '') + TERA_API_KEY;
+
+    if (c.method === 'POST') {
+        const body = { [c.linkParam]: link };
+        if (c.keyMode === 'body') body[c.keyName] = keyVal;
+        headers['Content-Type'] = 'application/json';
+        init.body = JSON.stringify(body);
+    } else {
+        const u = new URL(url);
+        u.searchParams.set(c.linkParam, link);
+        if (c.keyMode === 'query') u.searchParams.set(c.keyName, keyVal);
+        url = u.toString();
+    }
+    if (c.keyMode === 'header') headers[c.keyName] = keyVal;
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000);
+    try {
+        const res = await fetch(url, { ...init, signal: ctrl.signal });
+        if (!res.ok) throw new Error('API error ' + res.status);
+        const data = extractTeraUrls(await res.json());
+        if (!data.stream && !data.download) throw new Error('No playable URL returned');
+        teraResolveCache.set(link, { ts: Date.now(), data });
+        return data;
+    } finally { clearTimeout(timer); }
+}
+
+function loadHlsJs() {
+    if (window.Hls) return Promise.resolve(window.Hls);
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js';
+        s.onload = () => resolve(window.Hls);
+        s.onerror = () => reject(new Error('hls.js load failed'));
+        document.head.appendChild(s);
+    });
+}
+
+async function playTeraLink(btn) {
+    const link = btn.getAttribute('data-link');
+    const panel = document.getElementById(btn.getAttribute('data-panel'));
+    if (!link || !panel) return;
+
+    // Ekta panel-e already video cholle: toggle kore bondho
+    if (panel.classList.contains('open')) { closeTeraPanel(panel); btn.textContent = '▶ Play'; return; }
+
+    // Onno panel-er video thamano (ek shomoy ekta-i cholbe)
+    document.querySelectorAll('.tera-play-panel.open').forEach(p => {
+        closeTeraPanel(p);
+        const b = document.querySelector(`.btn-tera-play[data-panel="${p.id}"]`);
+        if (b) b.textContent = '▶ Play';
+    });
+
+    panel.classList.add('open');
+    panel.innerHTML = '<div class="tera-play-status"><span class="watch-loading-spinner" aria-hidden="true"></span> Loading video...</div>';
+    btn.disabled = true;
+    try {
+        const data = await resolveTeraLink(link);
+        if (!panel.classList.contains('open')) return; // ei shomoy user bondho kore diyeche
+        if (!data.stream && data.download) data.stream = data.download; // stream na thakle direct file-i chalao
+        panel.innerHTML = `
+            <div class="tera-video-wrap"><video controls playsinline autoplay preload="metadata" referrerpolicy="no-referrer"${data.thumb ? ` poster="${escapeAttr(data.thumb)}"` : ''}></video></div>
+            <div class="tera-play-actions">
+                ${data.download ? `<a href="${escapeAttr(data.download)}" target="_blank" rel="noopener" class="btn-tera-dl">⬇ Direct Download</a>` : ''}
+            </div>`;
+        const video = panel.querySelector('video');
+        if (/\.m3u8(\?|$)/i.test(data.stream)) {
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = data.stream;
+            } else {
+                const Hls = await loadHlsJs();
+                if (Hls && Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(data.stream);
+                    hls.attachMedia(video);
+                    panel._hls = hls;
+                } else { video.src = data.stream; }
+            }
+        } else {
+            video.src = data.stream;
+        }
+        video.addEventListener('error', () => {
+            const st = panel.querySelector('.tera-video-wrap');
+            if (st) st.insertAdjacentHTML('afterend', '<div class="tera-play-status tera-play-error">⚠️ Video play hocche na. Direct Download ba Download button use korun.</div>');
+        }, { once: true });
+        btn.textContent = '✖ Close';
+        incrementMovieViews(currentModalMovie);
+    } catch (err) {
+        console.error('Tera play error:', err);
+        panel.innerHTML = '<div class="tera-play-status tera-play-error">⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.</div>';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function closeTeraPanel(panel) {
+    if (!panel) return;
+    const v = panel.querySelector('video');
+    if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
+    if (panel._hls) { try { panel._hls.destroy(); } catch (e) {} panel._hls = null; }
+    panel.classList.remove('open');
+    panel.innerHTML = '';
+}
+
+// Admin: content-wise "Tera Play" On/Off toggle save
+async function saveTeraPlayToggle(movie, on) {
+    const { error } = await supabaseClient.from('movies').update({ teraPlayEnabled: on }).eq('id', movie.id);
+    if (error) throw error;
+    movie.teraPlayEnabled = on;
+}
+
 const DEFAULT_FAST_SERVERS = [
     { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://1024teradownloader.com/" },
     { label: "Server 02: Terabox Link To Fast Downloader WEB", link: "https://teraboxdl.site/" }
@@ -1364,6 +1542,7 @@ function stopModalTrailerPlayback() {
     const overlay = document.getElementById('movieModalOverlay');
     if (!overlay) return;
     overlay.querySelectorAll('.trailer-video-wrap, .watch-player-toolbar').forEach(el => el.remove());
+    overlay.querySelectorAll('.tera-play-panel.open').forEach(closeTeraPanel);
 }
 
 // Kono kono khetre trailerKey resolve hoy (tai trailer-box render hoye jay),
@@ -2205,7 +2384,9 @@ let downloadHTML = '';
                         <div class="download-button-group">
                             <a href="${it.link}" target="_blank" class="btn-zip-download" id="dl-link-${uid}" onclick="incrementMovieViews(currentModalMovie); logDownloadHistory(currentModalMovie, '${jsAttrStr(cleanHeaderLabel + sizeText)}')">Download ${fileTypeLabel}</a>
                             <button type="button" class="btn-copy-link" onclick="copyDownloadLink('dl-link-${uid}', this)">Copy Link</button>
+                            ${teraPlayButtonHTML(movie, it.link, 'tera-panel-' + uid)}
                         </div>
+                        ${teraPanelHTML(movie, it.link, 'tera-panel-' + uid)}
                     </div>
                 </div>
                 `;
@@ -2241,7 +2422,9 @@ let downloadHTML = '';
                         <div class="download-button-group">
                             <a href="${sec.link}" target="_blank" class="btn-zip-download" id="dl-link-${idx}" onclick="incrementMovieViews(currentModalMovie); logDownloadHistory(currentModalMovie, '${jsAttrStr(cleanLabel + sizeText)}')">Download ${fileTypeLabel}</a>
                             <button type="button" class="btn-copy-link" onclick="copyDownloadLink('dl-link-${idx}', this)">Copy Link</button>
+                            ${teraPlayButtonHTML(movie, sec.link, 'tera-panel-' + idx)}
                         </div>
+                        ${teraPanelHTML(movie, sec.link, 'tera-panel-' + idx)}
                     </div>
                 </div>
                 `;
@@ -7712,7 +7895,7 @@ async function submitAdminContent() {
         // ei column-gulo pathano hoy na, jate oi tab-e deya value overwrite hoye
         // na jay. Notun content add korar shomoy Watch Button auto "On" thake
         // (chaile pore Watch Button tab theke Off kora jabe).
-        if (!editingId) payload.watchEnabled = true;
+        if (!editingId) { payload.watchEnabled = true; payload.teraPlayEnabled = true; } // Notun content-e Tera Play auto ON
 
 
 
@@ -8917,6 +9100,7 @@ function renderAdminWatchList(filter) {
                         <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'}${movie.tmdbId ? ' • TMDB ' + escapeHtml(String(movie.tmdbId)) : ' • no TMDB match'}</div>
                     </div>
                     <button type="button" class="admin-watch-state-pill ${isOn ? 'on' : 'off'}" title="Watch Button On/Off toggle">${isOn ? '▶️ On' : '🚫 Off'}</button>
+                    <button type="button" class="admin-watch-state-pill admin-tera-state-pill ${movie.teraPlayEnabled === true ? 'on' : 'off'}" title="Terabox Play On/Off toggle">${movie.teraPlayEnabled === true ? '📦 Tera Play: On' : '📦 Tera Play: Off'}</button>
                     <span class="admin-watch-collapse-caret" aria-hidden="true">▾</span>
                 </div>
                 <button type="button" class="admin-watch-showhide-btn" aria-expanded="false">▾ Show</button>
@@ -9011,6 +9195,29 @@ function renderAdminWatchList(filter) {
             statePill.setAttribute('aria-pressed', on ? 'true' : 'false');
         };
         syncStatePill(watchOnState);
+
+        // ---------- Tera Play On/Off pill (Terabox link theke video play) ----------
+        const teraPill = card.querySelector('.admin-tera-state-pill');
+        const syncTeraPill = (on) => {
+            teraPill.textContent = on ? '📦 Tera Play: On' : '📦 Tera Play: Off';
+            teraPill.classList.toggle('on', !!on);
+            teraPill.classList.toggle('off', !on);
+            teraPill.setAttribute('aria-pressed', on ? 'true' : 'false');
+        };
+        teraPill.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const next = movie.teraPlayEnabled !== true;
+            syncTeraPill(next);
+            teraPill.disabled = true;
+            try {
+                await saveTeraPlayToggle(movie, next);
+                showToast('✅ Tera Play ' + (next ? 'ON' : 'OFF') + ' for "' + (movie.title || 'this item') + '"');
+            } catch (err) {
+                console.error('Tera Play toggle error:', err);
+                syncTeraPill(!next);
+                showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error') + ' (SUPABASE_TERA_PLAY.sql run korechen?)', 'error');
+            } finally { teraPill.disabled = false; }
+        });
 
         statePill.addEventListener('click', (e) => {
             // Pill-ta header-er BHITORE, tai stopPropagation na korle click-ta

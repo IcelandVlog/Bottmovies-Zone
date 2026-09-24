@@ -3897,3 +3897,20 @@ html.light-mode .massive-watch-player .massive-watch-status { background-color: 
 .admin-trailer-card.is-trailer-off .admin-db-info { opacity: 0.55; }
 .admin-trailer-card .admin-trailer-state-pill { align-self: center; }
 
+
+/* ==================== TERABOX PLAY (in-modal player) ==================== */
+.btn-tera-play { display: inline-block; background: linear-gradient(180deg, #1d2a12 0%, #101a08 100%); border: 1.5px solid #8bc34a; box-shadow: 0 0 10px rgba(139, 195, 74, 0.25); color: #ffffff; font-weight: 800; font-size: 13px; padding: 10px 24px; border-radius: 6px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; outline: none; }
+.btn-tera-play:hover { box-shadow: 0 0 15px rgba(139, 195, 74, 0.55); transform: translateY(-1px); }
+.btn-tera-play:disabled { opacity: 0.6; cursor: wait; transform: none; }
+.tera-play-panel { display: none; margin-top: 12px; }
+.tera-play-panel.open { display: block; }
+.tera-video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; }
+.tera-video-wrap video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
+.tera-play-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.btn-tera-dl { display: inline-block; padding: 8px 18px; border-radius: 6px; border: 1.5px solid #8bc34a; color: #fff; font-weight: 700; font-size: 13px; text-decoration: none; }
+.btn-tera-dl:hover { background: rgba(139, 195, 74, 0.15); }
+.tera-play-status { display: flex; align-items: center; gap: 8px; padding: 12px; font-size: 13px; color: #cbd5e1; }
+.tera-play-error { color: #fca5a5; }
+html.light-mode .tera-play-status { color: #475569; }
+html.light-mode .tera-play-error { color: #b91c1c; }
+html.light-mode .btn-tera-play, html.light-mode .btn-tera-dl { color: #1a2b0a; }
