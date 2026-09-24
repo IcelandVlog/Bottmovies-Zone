@@ -519,7 +519,7 @@ const TERA_API_CONFIG = {
     endpoint: 'https://api.playterabox.com/api/proxy',   // PlayTeraBox API Playground: GET /api/proxy
     method: 'GET',           // 'GET' ba 'POST' (POST hole JSON body-te link jay)
     linkParam: 'url',        // link-er param/field-er naam (docs: {"url": "terabox link"})
-    keyMode: 'header',       // 'header' | 'query' | 'body'
+    keyMode: 'query',        // 'header' | 'query' | 'body'  (API: ?url=...&secret=KEY)
     keyName: 'secret',       // docs: header  secret: <API KEY>
     keyPrefix: '',           // Bearer token hole 'Bearer ' likho, keyName = 'Authorization'
     fallbackToPost: true,    // GET fail korle (CORS/4xx) ekbar POST + JSON body diye try korbe

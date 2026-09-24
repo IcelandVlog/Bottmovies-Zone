@@ -32,13 +32,12 @@ module.exports = async function handler(req, res) {
   if (!link || !TERA_RE.test(String(link))) return res.status(400).json({ error: 'valid terabox url lagbe' });
   const key = process.env.TERA_API_KEY || FALLBACK_KEY;
   const headers = { secret: key, Accept: 'application/json' };
-  const payload = JSON.stringify({ url: link });
 
-  const attempts = [
-    ['GET ?url=',        () => rawRequest('GET',  API + '?url=' + encodeURIComponent(link), headers)],
-    ['GET json-body',    () => rawRequest('GET',  API, headers, payload)],
-    ['POST json-body',   () => rawRequest('POST', API, headers, payload)],
-  ];
+  // Docs: GET https://api.playterabox.com/api/proxy?secret=<KEY>&url=<terabox link>
+  const encoded = API + '?secret=' + encodeURIComponent(key) + '&url=' + encodeURIComponent(link);
+  const raw = API + '?secret=' + encodeURIComponent(key) + '&url=' + link; // docs example-er moto encode chhara
+  const attempts = [['GET (encoded url)', () => rawRequest('GET', encoded, headers)]];
+  if (raw !== encoded) attempts.push(['GET (raw url)', () => rawRequest('GET', raw, headers)]);
   const log = [];
   for (const [name, run] of attempts) {
     try {
