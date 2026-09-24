@@ -522,7 +522,9 @@ const TERA_API_CONFIG = {
     keyMode: 'header',       // 'header' | 'query' | 'body'
     keyName: 'secret',       // docs: header  secret: <API KEY>
     keyPrefix: '',           // Bearer token hole 'Bearer ' likho, keyName = 'Authorization'
-    fallbackToPost: true     // GET fail korle (CORS/4xx) ekbar POST + JSON body diye try korbe
+    fallbackToPost: true,    // GET fail korle (CORS/4xx) ekbar POST + JSON body diye try korbe
+    proxyEndpoint: '/api/tera', // Server-side proxy (api/tera.js). Age eta try hoy: CORS problem nei + key browser-e lage na. Na thakle direct API try hoy.
+    debug: true              // true thakle error-er asol karon panel-e dekhay. Sob thik hole false koro.
 };
 const TERA_LINK_REGEX = /(terabox|1024tera|teraboxapp|terafileshare|teraboxlink|4funbox|mirrobox|teraboxshare|momerybox|tibibox|nephobox|freeterabox)/i;
 const teraResolveCache = new Map(); // link -> { ts, data }  (stream URL expire hoy, tai 10 min TTL)
@@ -544,7 +546,7 @@ function teraPanelHTML(movie, link, panelId) {
 
 // API response shape provider-bhede alada hote pare, tai nested object-er moddhe
 // known key-gulo khuje stream + download URL ber kora hoy.
-function extractTeraUrls(payload) {
+function extractTeraUrlsGeneric(payload) {
     const streamKeys = ['stream_url', 'streaming_url', 'streamurl', 'stream', 'play_url', 'playurl', 'hls', 'hls_url', 'm3u8', 'm3u8_url', 'fast_stream_url', 'video_url', 'proxy_url', 'stream_link', 'streaming_link', 'play_link', 'fast_stream', 'fast_stream_link'];
     const dlKeys = ['download_link', 'download_url', 'downloadurl', 'dlink', 'direct_link', 'direct_url', 'dl_url', 'download', 'fast_download_link', 'fast_download_url'];
     const out = { stream: null, download: null, title: null, thumb: null };
@@ -568,30 +570,75 @@ function extractTeraUrls(payload) {
     return out;
 }
 
-async function teraApiRequest(link, method) {
+// PlayTeraBox response: { status, total_files, list: [ { name, size_formatted, duration, quality,
+//   download_link, fast_download_link, stream_url, fast_stream_url: {360p,480p,720p}, subtitle_url, thumbnail, is_dir, type } ] }
+function extractTeraUrls(payload) {
+    const list = payload && Array.isArray(payload.list) ? payload.list : null;
+    if (list) {
+        const files = list
+            .filter(f => f && String(f.is_dir) !== '1' && String(f.is_dir).toLowerCase() !== 'true')
+            .map(f => {
+                const fast = (f.fast_stream_url && typeof f.fast_stream_url === 'object') ? f.fast_stream_url : {};
+                const fastStr = typeof f.fast_stream_url === 'string' ? f.fast_stream_url : '';
+                const qualities = Object.keys(fast)
+                    .filter(k => typeof fast[k] === 'string' && /^https?:\/\//i.test(fast[k]))
+                    .sort((x, y) => (parseInt(x) || 0) - (parseInt(y) || 0));
+                return {
+                    name: f.name || 'Video',
+                    size: f.size_formatted || '',
+                    duration: f.duration || '',
+                    type: f.type || '',
+                    quality: f.quality || '',
+                    stream: f.stream_url || fastStr || (qualities.length ? fast[qualities[qualities.length - 1]] : null),
+                    fast: qualities.map(q => ({ q, url: fast[q] })),
+                    download: f.fast_download_link || f.download_link || null,
+                    subtitle: f.subtitle_url || null,
+                    thumb: f.thumbnail || null
+                };
+            })
+            .filter(f => f.stream || f.download);
+        // video file age, baki (image/zip etc.) pore
+        files.sort((x, y) => (y.type === 'video') - (x.type === 'video'));
+        if (files.length) {
+            return { files, stream: files[0].stream, download: files[0].download, thumb: files[0].thumb, title: files[0].name };
+        }
+    }
+    // Onno shape hole generic walker
+    const g = extractTeraUrlsGeneric(payload);
+    g.files = (g.stream || g.download) ? [{ name: g.title || 'Video', size: '', duration: '', type: 'video', quality: '', stream: g.stream, fast: [], download: g.download, subtitle: null, thumb: g.thumb }] : [];
+    return g;
+}
+
+async function teraApiRequest(link, method, viaProxy) {
     const c = TERA_API_CONFIG;
     const headers = { 'Accept': 'application/json' };
-    let url = c.endpoint, init = { method, headers };
+    let url = viaProxy ? new URL(c.proxyEndpoint, location.origin).toString() : c.endpoint, init = { method, headers };
     const keyVal = (c.keyPrefix || '') + TERA_API_KEY;
 
     if (method === 'POST') {
         const body = { [c.linkParam]: link };
-        if (c.keyMode === 'body') body[c.keyName] = keyVal;
+        if (!viaProxy && c.keyMode === 'body') body[c.keyName] = keyVal;
         headers['Content-Type'] = 'application/json';
         init.body = JSON.stringify(body);
     } else {
         const u = new URL(url);
         u.searchParams.set(c.linkParam, link);
-        if (c.keyMode === 'query') u.searchParams.set(c.keyName, keyVal);
+        if (!viaProxy && c.keyMode === 'query') u.searchParams.set(c.keyName, keyVal);
         url = u.toString();
     }
-    if (c.keyMode === 'header') headers[c.keyName] = keyVal;
+    if (!viaProxy && c.keyMode === 'header') headers[c.keyName] = keyVal;
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 25000);
     try {
         const res = await fetch(url, { ...init, signal: ctrl.signal });
-        if (!res.ok) throw new Error('API error ' + res.status);
+        if (!res.ok) {
+            let detail = '';
+            try { detail = (await res.text()).slice(0, 160); } catch (e) {}
+            throw new Error('HTTP ' + res.status + (detail ? ' - ' + detail : ''));
+        }
+        const ct = res.headers.get('content-type') || '';
+        if (!/json/i.test(ct)) throw new Error('JSON pai ni (content-type: ' + (ct || 'none') + ') - route ache ki?');
         const json = await res.json();
         const data = extractTeraUrls(json);
         if (!data.stream && !data.download) {
@@ -606,16 +653,27 @@ async function resolveTeraLink(link) {
     const cached = teraResolveCache.get(link);
     if (cached && Date.now() - cached.ts < TERA_CACHE_TTL_MS) return cached.data;
 
-    let data;
-    try {
-        data = await teraApiRequest(link, TERA_API_CONFIG.method);
-    } catch (err) {
-        if (!TERA_API_CONFIG.fallbackToPost || TERA_API_CONFIG.method === 'POST') throw err;
-        console.warn('[Tera Play] GET fail, POST diye abar try korchi:', err);
-        data = await teraApiRequest(link, 'POST');
+    const c = TERA_API_CONFIG;
+    const attempts = [];
+    if (c.proxyEndpoint) attempts.push({ name: 'proxy GET', run: () => teraApiRequest(link, 'GET', true) });
+    attempts.push({ name: 'direct ' + c.method, run: () => teraApiRequest(link, c.method, false) });
+    if (c.fallbackToPost && c.method !== 'POST') attempts.push({ name: 'direct POST', run: () => teraApiRequest(link, 'POST', false) });
+
+    const errors = [];
+    for (const at of attempts) {
+        try {
+            const data = await at.run();
+            teraResolveCache.set(link, { ts: Date.now(), data });
+            return data;
+        } catch (err) {
+            const msg = (err && err.name === 'AbortError') ? 'timeout' : (err && err.message) || String(err);
+            errors.push(at.name + ': ' + msg);
+            console.warn('[Tera Play] ' + at.name + ' fail:', err);
+        }
     }
-    teraResolveCache.set(link, { ts: Date.now(), data });
-    return data;
+    const e = new Error(errors.join(' | '));
+    e.teraDetails = errors;
+    throw e;
 }
 
 function loadHlsJs() {
@@ -627,6 +685,55 @@ function loadHlsJs() {
         s.onerror = () => reject(new Error('hls.js load failed'));
         document.head.appendChild(s);
     });
+}
+
+function teraSrtToVtt(text) {
+    if (/^\s*WEBVTT/i.test(text)) return text;
+    return 'WEBVTT\n\n' + text.replace(/\r+/g, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+}
+async function attachTeraSubtitle(video, url) {
+    if (!url) return;
+    let src = url;
+    try {
+        const r = await fetch(url);
+        if (r.ok) src = URL.createObjectURL(new Blob([teraSrtToVtt(await r.text())], { type: 'text/vtt' }));
+    } catch (e) { /* CORS hole direct url try hobe */ }
+    const t = document.createElement('track');
+    t.kind = 'subtitles'; t.label = 'Subtitle'; t.srclang = 'en'; t.src = src;
+    video.appendChild(t);
+}
+function teraShowError(panel, msg) {
+    if (panel.querySelector('.tera-play-error')) return;
+    const w = panel.querySelector('.tera-video-wrap');
+    const html = '<div class="tera-play-status tera-play-error">' + msg + '</div>';
+    if (w) w.insertAdjacentHTML('afterend', html); else panel.insertAdjacentHTML('beforeend', html);
+}
+// url attach: .m3u8 hole hls.js, na hole direct; direct fail korle ekbar hls.js try kore
+async function attachTeraSource(panel, video, url, resumeAt) {
+    if (panel._hls) { try { panel._hls.destroy(); } catch (e) {} panel._hls = null; }
+    panel._triedHls = false;
+    panel.querySelectorAll('.tera-play-error').forEach(e => e.remove());
+    const useHls = async () => {
+        if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = url; return true; }
+        const Hls = await loadHlsJs();
+        if (!(Hls && Hls.isSupported())) return false;
+        const h = new Hls();
+        h.on(Hls.Events.ERROR, (_, d) => { if (d && d.fatal) teraShowError(panel, '⚠️ Video play hocche na. Onno quality ba Direct Download try korun.'); });
+        h.loadSource(url); h.attachMedia(video);
+        panel._hls = h;
+        return true;
+    };
+    video.onerror = async () => {
+        if (!panel._triedHls) {
+            panel._triedHls = true;
+            try { if (await useHls()) return; } catch (e) {}
+        }
+        teraShowError(panel, '⚠️ Video play hocche na. Onno quality ba Direct Download try korun.');
+    };
+    if (resumeAt > 0) video.addEventListener('loadedmetadata', () => { try { video.currentTime = resumeAt; } catch (e) {} }, { once: true });
+    if (/\.m3u8(\?|$)/i.test(url)) { panel._triedHls = true; if (!(await useHls())) video.src = url; }
+    else video.src = url;
+    video.play().catch(() => {});
 }
 
 async function playTeraLink(btn) {
@@ -650,37 +757,51 @@ async function playTeraLink(btn) {
     try {
         const data = await resolveTeraLink(link);
         if (!panel.classList.contains('open')) return; // ei shomoy user bondho kore diyeche
-        if (!data.stream && data.download) data.stream = data.download; // stream na thakle direct file-i chalao
+        const files = data.files || [];
+        let cur = files[0];
+
+        const fileSel = files.length > 1
+            ? `<select class="tera-link-select tera-file-select">${files.map((f, i) => `<option value="${i}">${escapeHtml(f.name)}${f.size ? ' (' + escapeHtml(f.size) + ')' : ''}</option>`).join('')}</select>` : '';
         panel.innerHTML = `
-            <div class="tera-video-wrap"><video controls playsinline autoplay preload="metadata" referrerpolicy="no-referrer"${data.thumb ? ` poster="${escapeAttr(data.thumb)}"` : ''}></video></div>
-            <div class="tera-play-actions">
-                ${data.download ? `<a href="${escapeAttr(data.download)}" target="_blank" rel="noopener" class="btn-tera-dl">⬇ Direct Download</a>` : ''}
-            </div>`;
+            <div class="tera-play-controls">${fileSel}<select class="tera-link-select tera-quality-select" style="display:none"></select></div>
+            <div class="tera-video-wrap"><video controls playsinline autoplay preload="metadata"></video></div>
+            <div class="tera-play-meta"></div>
+            <div class="tera-play-actions"></div>`;
         const video = panel.querySelector('video');
-        if (/\.m3u8(\?|$)/i.test(data.stream)) {
-            if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = data.stream;
-            } else {
-                const Hls = await loadHlsJs();
-                if (Hls && Hls.isSupported()) {
-                    const hls = new Hls();
-                    hls.loadSource(data.stream);
-                    hls.attachMedia(video);
-                    panel._hls = hls;
-                } else { video.src = data.stream; }
-            }
-        } else {
-            video.src = data.stream;
-        }
-        video.addEventListener('error', () => {
-            const st = panel.querySelector('.tera-video-wrap');
-            if (st) st.insertAdjacentHTML('afterend', '<div class="tera-play-status tera-play-error">⚠️ Video play hocche na. Direct Download ba Download button use korun.</div>');
-        }, { once: true });
+        const qSel = panel.querySelector('.tera-quality-select');
+        const meta = panel.querySelector('.tera-play-meta');
+        const actions = panel.querySelector('.tera-play-actions');
+
+        const load = (file, keepTime) => {
+            cur = file;
+            if (file.thumb) video.poster = file.thumb;
+            meta.innerHTML = [file.name, file.duration, file.quality, file.size].filter(Boolean).map(escapeHtml).join(' · ');
+            const opts = [];
+            if (file.stream) opts.push({ label: file.quality ? 'Default (' + file.quality + ')' : 'Default', url: file.stream });
+            file.fast.forEach(f => opts.push({ label: f.q + ' (Fast)', url: f.url }));
+            qSel.innerHTML = opts.map((o, i) => `<option value="${i}">${escapeHtml(o.label)}</option>`).join('');
+            qSel.style.display = opts.length > 1 ? '' : 'none';
+            qSel._opts = opts;
+            actions.innerHTML = file.download ? `<a href="${escapeAttr(file.download)}" target="_blank" rel="noopener" class="btn-tera-dl">⬇ Direct Download</a>` : '';
+            video.querySelectorAll('track').forEach(t => t.remove());
+            const first = opts[0] ? opts[0].url : file.download;
+            attachTeraSource(panel, video, first, keepTime || 0);
+            attachTeraSubtitle(video, file.subtitle);
+        };
+        qSel.addEventListener('change', () => {
+            const o = qSel._opts[qSel.selectedIndex];
+            if (o) attachTeraSource(panel, video, o.url, video.currentTime || 0);
+        });
+        const fs = panel.querySelector('.tera-file-select');
+        if (fs) fs.addEventListener('change', () => load(files[fs.selectedIndex], 0));
+
+        load(cur, 0);
         btn.textContent = '✖ Close';
         incrementMovieViews(currentModalMovie);
     } catch (err) {
         console.error('Tera play error:', err);
-        panel.innerHTML = '<div class="tera-play-status tera-play-error">⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.</div>';
+        const why = (TERA_API_CONFIG.debug && err && err.message) ? '<br><small style="opacity:.85;word-break:break-all;">Reason: ' + escapeHtml(err.message) + '</small>' : '';
+        panel.innerHTML = '<div class="tera-play-status tera-play-error">⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
     } finally {
         btn.disabled = false;
     }
