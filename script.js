@@ -5949,6 +5949,8 @@ let categoryBannerLabels = {};
 let adminTmdbType = 'movie';
 let adminPosterMode = 'link';
 let adminOriginalPosterUrl = null; // Edit-er shomoy khali field-e save korleo ei poster-i use hobe
+let adminOriginalImdbId = null; // Edit load-er shomoy-kar IMDb ID - submit-e compare kore bujhte je ID change hoyeche kina
+let adminOriginalTmdbId = null; // Edit load-er shomoy-kar TMDB ID - upore-r moto-i use hoy
 let adminCategoriesLoaded = false;
 
 async function loadAdminExtraCategories() {
@@ -7480,6 +7482,8 @@ function resetAdminForm() {
     document.getElementById('adminPosterLink').value = '';
     document.getElementById('adminPosterLink').placeholder = 'https://... poster image link';
     adminOriginalPosterUrl = null;
+    adminOriginalImdbId = null;
+    adminOriginalTmdbId = null;
     const fileInput = document.getElementById('adminPosterFile');
     if (fileInput) fileInput.value = '';
     updateAdminPosterPreview();
@@ -7539,6 +7543,8 @@ function loadMovieIntoAdminForm(movie) {
     const posterLinkInput = document.getElementById('adminPosterLink');
     const isAutoTmdbPoster = !!(movie.poster && /image\.tmdb\.org/i.test(movie.poster));
     adminOriginalPosterUrl = movie.poster || null;
+    adminOriginalImdbId = movie.imdbId || null;
+    adminOriginalTmdbId = movie.tmdbId || null;
     if (isAutoTmdbPoster) {
         posterLinkInput.value = '';
         posterLinkInput.placeholder = '✓ Auto TMDB poster already set - khali rakhle eta-i thakbe, notun link dile replace hobe';
@@ -7620,7 +7626,29 @@ async function submitAdminContent() {
     submitBtn.textContent = 'Saving...';
 
     try {
-        let posterUrl = document.getElementById('adminPosterLink').value.trim() || adminOriginalPosterUrl || null;
+        const posterFieldValue = document.getElementById('adminPosterLink').value.trim();
+        let posterUrl = posterFieldValue || adminOriginalPosterUrl || null;
+        let posterRefreshFailed = false;
+
+        // Edit-er shomoy IMDb/TMDB ID change/remove/correct kora hoyeche kina check kora
+        // hocche. Age eta check hoto na - fole IMDb ID vul chilo bole delete/correct korleo,
+        // Poster Link field khali rakhle purono (bhul content-er) auto-TMDB poster-i silently
+        // reuse hoye jeto (adminOriginalPosterUrl theke), karon IMDb ID change-er sathe
+        // poster-er kono connection chilo na. Ekhon: ID actually change hole ar admin nijei
+        // notun poster link na dile, notun ID diye fresh poster re-fetch kora hoy - na paoa
+        // gele purono bhul poster rakha na hoye khali thake (jate ar bhul poster na dekhay).
+        const imdbIdChanged = (imdbId || '') !== (adminOriginalImdbId || '');
+        const tmdbIdChanged = String(tmdbId || '') !== String(adminOriginalTmdbId || '');
+        const wasAutoTmdbPoster = !!(adminOriginalPosterUrl && /image\.tmdb\.org/i.test(adminOriginalPosterUrl));
+
+        if (editingId && !posterFieldValue && wasAutoTmdbPoster && (imdbIdChanged || tmdbIdChanged) && adminPosterMode !== 'file') {
+            submitBtn.textContent = 'Refreshing poster...';
+            const freshPoster = await fetchFreshTmdbPoster({ imdbId, tmdbId, tmdbType: adminTmdbType, title, searchName }).catch(() => null);
+            posterUrl = freshPoster;
+            posterRefreshFailed = !freshPoster;
+            submitBtn.textContent = 'Saving...';
+        }
+
         if (adminPosterMode === 'file') {
             const fileInput = document.getElementById('adminPosterFile');
             if (fileInput && fileInput.files && fileInput.files[0]) {
@@ -7725,6 +7753,9 @@ async function submitAdminContent() {
         if (error) throw error;
 
         msgEl.textContent = editingId ? '✅ Content updated successfully!' : '✅ Content added successfully!';
+        if (posterRefreshFailed) {
+            msgEl.textContent += ' ⚠️ IMDb/TMDB ID change hoyeche - notun ID diye auto poster khuje paoa jayni, tai poster khali/purono thakte pare. Poster Link field-e manually shothik poster link/file din.';
+        }
         msgEl.className = 'admin-form-msg success';
 
         await fetchMoviesFromSupabase();
@@ -7811,6 +7842,69 @@ async function fetchTmdbPosterQuick(movie) {
     }
 
     if (cacheKey !== undefined) adminPosterCache[cacheKey] = posterUrl;
+    return posterUrl;
+}
+
+// Edit-er shomoy IMDb/TMDB ID change/correct korle purono (bhul) auto-TMDB poster
+// silently reuse na kore, notun ID diye fresh full-size poster fetch kora hoy.
+// fetchTmdbPosterQuick theke alada rakha hoyeche karon oi function movie.id diye
+// cache kore - shei cache use korle notun ID-r jonno abaro purono (id-based) cached
+// poster-i ferot ashto. Eta kono cache use kore na, always fresh fetch kore.
+async function fetchFreshTmdbPoster({ imdbId, tmdbId, tmdbType, title, searchName }) {
+    if (!TMDB_API_KEY) return null;
+    let posterUrl = null;
+    try {
+        const mediaType = tmdbType === 'tv' ? 'tv' : 'movie';
+        let matchId = tmdbId || null;
+        const cleanImdbId = extractImdbId(imdbId);
+
+        if (!matchId && cleanImdbId) {
+            const findRes = await fetchWithTimeout(`${TMDB_BASE_URL}/find/${cleanImdbId}?api_key=${TMDB_API_KEY}&external_source=imdb_id`, {}, 4000);
+            if (findRes.ok) {
+                const findData = await findRes.json();
+                const hit = (findData.movie_results && findData.movie_results[0]) || (findData.tv_results && findData.tv_results[0]);
+                if (hit) {
+                    matchId = hit.id;
+                    if (hit.poster_path) posterUrl = `https://image.tmdb.org/t/p/w500${hit.poster_path}`;
+                }
+            }
+        }
+
+        if (!posterUrl && matchId) {
+            const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/${mediaType}/${matchId}?api_key=${TMDB_API_KEY}`, {}, 4000);
+            if (detailRes.ok) {
+                const detailData = await detailRes.json();
+                if (detailData.poster_path) posterUrl = `https://image.tmdb.org/t/p/w500${detailData.poster_path}`;
+            }
+        }
+
+        if (!posterUrl && !matchId && (title || searchName)) {
+            const cleanQuery = (searchName || title).replace(/\s*\([\d\-]+\)/g, '').trim();
+            const searchRes = await fetchWithTimeout(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanQuery)}`, {}, 4000);
+            if (searchRes.ok) {
+                const searchData = await searchRes.json();
+                if (searchData && searchData.results && searchData.results.length > 0) {
+                    const match = searchData.results.find(item => item.media_type === 'movie' || item.media_type === 'tv') || searchData.results[0];
+                    if (match.poster_path) posterUrl = `https://image.tmdb.org/t/p/w500${match.poster_path}`;
+                }
+            }
+        }
+
+        if (!posterUrl && (cleanImdbId || title || searchName)) {
+            const omdbQuery = cleanImdbId
+                ? `i=${encodeURIComponent(cleanImdbId)}`
+                : `t=${encodeURIComponent((searchName || title).replace(/\s*\([\d\-]+\)/g, '').trim())}`;
+            const omdbRes = await fetchWithTimeout(`https://www.omdbapi.com/?${omdbQuery}&apikey=${OMDB_API_KEY}`, {}, 4000);
+            if (omdbRes.ok) {
+                const omdbData = await omdbRes.json();
+                if (omdbData && omdbData.Response === "True" && omdbData.Poster && omdbData.Poster !== "N/A") {
+                    posterUrl = omdbData.Poster;
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('fetchFreshTmdbPoster failed for', title, err);
+    }
     return posterUrl;
 }
 
