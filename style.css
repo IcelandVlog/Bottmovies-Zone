@@ -1234,6 +1234,13 @@ html.light-mode .season-accordion-group { background: #f7f8fa; border-color: #e5
 @keyframes watchLoadingSpin {
     to { transform: rotate(360deg); }
 }
+/* Video load hobar shomoy (tera-status-box) dekhano boro spinner - "Loading
+   video..." text soriye শুধু বড় ঘুরন্ত icon dekhano hoy */
+.watch-loading-spinner.spinner-lg {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+}
 
 .season-box-header { padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: 13px; color: #ffffff; user-select: none; }
 .season-box-header:hover { background: rgba(255, 255, 255, 0.08); }
@@ -3969,59 +3976,58 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 
 /* ---- Custom Tera video player: fullscreen / ±10s / progress / cc / quality / download ---- */
 .tera-video-wrap.tcp-player video { width: 100%; height: 100%; cursor: pointer; }
-.tcp-top-left-btn {
-    position: absolute; top: 8px; left: 8px; z-index: 3;
-    width: 28px; height: 28px; border-radius: 50%; border: none;
-    background: rgba(0, 0, 0, 0.6); color: #fff; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; opacity: 0; transition: opacity 0.2s ease, background 0.15s ease;
-}
-.tcp-top-left-btn svg { width: 14px; height: 14px; display: block; }
-.tcp-top-left-btn:hover { background: rgba(1, 180, 228, 0.85); }
-.tera-video-wrap.tcp-controls-visible .tcp-top-left-btn { opacity: 1; }
 
 .tcp-center-controls {
-    position: absolute; inset: 0; z-index: 2;
-    display: flex; align-items: center; justify-content: center; gap: 26px;
+    position: absolute; inset: 0; bottom: 40px; z-index: 2;
+    display: flex; align-items: center; justify-content: center; gap: 28px;
     opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
 }
 .tera-video-wrap.tcp-controls-visible .tcp-center-controls { opacity: 1; pointer-events: auto; }
 .tcp-center-btn {
-    width: 42px; height: 42px; border-radius: 50%; border: none; background: rgba(20, 20, 20, 0.55);
+    width: 48px; height: 48px; border-radius: 50%; border: none; background: rgba(0, 0, 0, 0.5);
     color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer;
     transition: background 0.15s ease, transform 0.15s ease;
 }
-.tcp-center-btn svg { width: 20px; height: 20px; display: block; }
-.tcp-play-btn { width: 56px; height: 56px; background: rgba(20, 20, 20, 0.65); }
-.tcp-play-btn svg { width: 24px; height: 24px; }
-.tcp-center-btn:hover { background: rgba(1, 180, 228, 0.75); transform: scale(1.06); }
+.tcp-center-btn svg { width: 22px; height: 22px; display: block; }
+.tcp-play-btn { width: 68px; height: 68px; background: rgba(255, 255, 255, 0.25); }
+.tcp-play-btn svg { width: 28px; height: 28px; }
+.tcp-center-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.06); }
 
+/* Progress bar + time - video-r upore fade-e hoy (control show/hide-er sathe) */
 .tcp-bottom-bar {
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
-    padding: 20px 10px 8px; background: linear-gradient(to top, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0));
+    position: absolute; left: 0; right: 0; bottom: 40px; z-index: 2;
+    padding: 20px 10px 8px; background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
     opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
 }
 .tera-video-wrap.tcp-controls-visible .tcp-bottom-bar { opacity: 1; pointer-events: auto; }
 .tcp-progress {
-    -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 4px;
-    background: rgba(255, 255, 255, 0.25); cursor: pointer; outline: none; margin: 0 0 8px; display: block;
+    -webkit-appearance: none; appearance: none; width: 100%; height: 3px; border-radius: 4px;
+    background: rgba(255, 255, 255, 0.3); cursor: pointer; outline: none; margin: 0 0 8px; display: block;
     --tcp-pct: 0%;
 }
-.tcp-progress::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, #01b4e4 var(--tcp-pct), rgba(255, 255, 255, 0.25) var(--tcp-pct)); }
-.tcp-progress::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #01b4e4; }
-.tcp-progress::-moz-range-track { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.25); }
-.tcp-progress::-moz-range-progress { height: 4px; border-radius: 4px; background: #01b4e4; }
-.tcp-progress::-moz-range-thumb { width: 12px; height: 12px; border: none; border-radius: 50%; background: #01b4e4; }
-.tcp-bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.tcp-time { font-size: 12px; color: #fff; opacity: 0.9; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tcp-icons { display: flex; align-items: center; gap: 14px; position: relative; }
-.tcp-icon-btn { background: none; border: none; padding: 2px; color: #fff; opacity: 0.85; cursor: pointer; display: flex; }
-.tcp-icon-btn svg { width: 20px; height: 20px; display: block; }
-.tcp-icon-btn:hover { opacity: 1; color: #01b4e4; }
+.tcp-progress::-webkit-slider-runnable-track { height: 3px; border-radius: 4px; background: linear-gradient(to right, #fff var(--tcp-pct), rgba(255, 255, 255, 0.3) var(--tcp-pct)); }
+.tcp-progress::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4.5px; border-radius: 50%; background: #fff; }
+.tcp-progress::-moz-range-track { height: 3px; border-radius: 4px; background: rgba(255, 255, 255, 0.3); }
+.tcp-progress::-moz-range-progress { height: 3px; border-radius: 4px; background: #fff; }
+.tcp-progress::-moz-range-thumb { width: 12px; height: 12px; border: none; border-radius: 50%; background: #fff; }
+.tcp-bottom-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.tcp-time { font-size: 12.5px; color: #fff; opacity: 0.95; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Icon row - video-r nichey ekta shomoy-e-dekha-jawa solid kalo bar (image reference-er moto), fade hoy na */
+.tcp-icons-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    height: 40px; background: #000;
+    display: flex; align-items: center; justify-content: center;
+}
+.tcp-icons { display: flex; align-items: center; gap: 20px; position: relative; }
+.tcp-icon-btn { background: none; border: none; padding: 2px; color: #fff; opacity: 0.9; cursor: pointer; display: flex; }
+.tcp-icon-btn svg { width: 18px; height: 18px; display: block; }
+.tcp-icon-btn:hover { opacity: 1; }
 .tcp-icon-btn.active { opacity: 1; color: #01b4e4; }
 .tcp-icon-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
 /* Boro device-e icon boro, choto (mobile) device-e icon choto */
 @media (max-width: 600px) {
-    .tcp-icons { gap: 10px; }
+    .tcp-icons { gap: 14px; }
     .tcp-icon-btn svg { width: 15px; height: 15px; }
 }
 .tcp-settings-menu {

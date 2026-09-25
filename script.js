@@ -850,7 +850,6 @@ function tcpFmtTime(s) {
 }
 function tcpCustomControlsHTML() {
     return `
-        <button type="button" class="tcp-top-left-btn tcp-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">${TCP_ICON.expand}</button>
         <div class="tcp-center-controls">
             <button type="button" class="tcp-center-btn tcp-skip-btn" data-skip="-10" title="-10s" aria-label="Back 10 seconds">${TCP_ICON.back10}</button>
             <button type="button" class="tcp-center-btn tcp-play-btn" title="Play/Pause" aria-label="Play/Pause">${TCP_ICON.play}</button>
@@ -860,22 +859,25 @@ function tcpCustomControlsHTML() {
             <input type="range" class="tcp-progress" min="0" max="100" step="0.1" value="0" aria-label="Seek">
             <div class="tcp-bottom-row">
                 <span class="tcp-time">0:00 / 0:00</span>
-                <div class="tcp-icons">
-                    <div class="tcp-settings-menu" hidden></div>
-                    <div class="tcp-speed-menu" hidden>
-                        <div class="tcp-speed-value">1.00x</div>
-                        <div class="tcp-speed-slider-row">
-                            <button type="button" class="tcp-speed-minus" aria-label="Decrease speed">${TCP_ICON.minus}</button>
-                            <input type="range" class="tcp-speed-range" min="0.25" max="3" step="0.05" value="1" aria-label="Playback speed">
-                            <button type="button" class="tcp-speed-plus" aria-label="Increase speed">${TCP_ICON.plus}</button>
-                        </div>
-                        <div class="tcp-speed-presets">${TCP_SPEEDS.map(s => `<button type="button" data-speed="${s}" class="${s === 1 ? 'active' : ''}">${s}x</button>`).join('')}</div>
+            </div>
+        </div>
+        <div class="tcp-icons-bar">
+            <div class="tcp-icons">
+                <div class="tcp-settings-menu" hidden></div>
+                <div class="tcp-speed-menu" hidden>
+                    <div class="tcp-speed-value">1.00x</div>
+                    <div class="tcp-speed-slider-row">
+                        <button type="button" class="tcp-speed-minus" aria-label="Decrease speed">${TCP_ICON.minus}</button>
+                        <input type="range" class="tcp-speed-range" min="0.25" max="3" step="0.05" value="1" aria-label="Playback speed">
+                        <button type="button" class="tcp-speed-plus" aria-label="Increase speed">${TCP_ICON.plus}</button>
                     </div>
-                    <button type="button" class="tcp-icon-btn tcp-cc-btn disabled" title="Subtitle" aria-label="Subtitle">${TCP_ICON.cc}</button>
-                    <button type="button" class="tcp-icon-btn tcp-speed-btn" title="Playback speed" aria-label="Playback speed">${TCP_ICON.speed}</button>
-                    <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Quality" aria-label="Quality" hidden>${TCP_ICON.gear}</button>
-                    <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
+                    <div class="tcp-speed-presets">${TCP_SPEEDS.map(s => `<button type="button" data-speed="${s}" class="${s === 1 ? 'active' : ''}">${s}x</button>`).join('')}</div>
                 </div>
+                <button type="button" class="tcp-icon-btn tcp-cc-btn disabled" title="Subtitle" aria-label="Subtitle">${TCP_ICON.cc}</button>
+                <button type="button" class="tcp-icon-btn tcp-speed-btn" title="Playback speed" aria-label="Playback speed">${TCP_ICON.speed}</button>
+                <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Quality" aria-label="Quality" hidden>${TCP_ICON.gear}</button>
+                <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
+                <button type="button" class="tcp-icon-btn tcp-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">${TCP_ICON.expand}</button>
             </div>
         </div>
         <div class="tcp-download-overlay">
@@ -1048,7 +1050,7 @@ async function playTeraLink(btn) {
 
     if (thumbWrap) thumbWrap.style.display = 'none';
     panel.classList.add('open');
-    panel.innerHTML = '<div class="tera-play-status tera-status-box">' + teraCloseBtnHTML(panel.id) + '<span class="watch-loading-spinner" aria-hidden="true"></span> Loading video...</div>';
+    panel.innerHTML = '<div class="tera-play-status tera-status-box">' + teraCloseBtnHTML(panel.id) + '<span class="watch-loading-spinner spinner-lg" aria-hidden="true"></span></div>';
     btn.disabled = true;
     try {
         const data = await resolveTeraLink(link);
