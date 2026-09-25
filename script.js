@@ -836,8 +836,12 @@ const TCP_ICON = {
     expand: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M4 4l6 6M20 9V4h-5M20 4l-6 6M4 15v5h5M4 20l6-6M20 15v5h-5M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     cc: '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="15.5" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor">CC</text></svg>',
     gear: '<svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.14 7.14 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.65l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.55-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L1.71 8.83a.5.5 0 0 0 .12.65l2.03 1.58a7.14 7.14 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.65l1.92 3.32c.14.24.42.32.6.22l2.39-.96c.49.39 1.03.7 1.62.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.55 1.62-.94l2.39.96c.24.1.46 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.65l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" fill="currentColor"/></svg>',
-    download: '<svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    download: '<svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l-4-4m4 4l4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    speed: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 13l4-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 3h6M9 3l1.2 2M15 3l-1.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
 };
+const TCP_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 function tcpFmtTime(s) {
     if (!isFinite(s) || s < 0) s = 0;
     s = Math.floor(s);
@@ -858,10 +862,26 @@ function tcpCustomControlsHTML() {
                 <span class="tcp-time">0:00 / 0:00</span>
                 <div class="tcp-icons">
                     <div class="tcp-settings-menu" hidden></div>
-                    <button type="button" class="tcp-icon-btn tcp-cc-btn" title="Subtitle" aria-label="Subtitle" hidden>${TCP_ICON.cc}</button>
+                    <div class="tcp-speed-menu" hidden>
+                        <div class="tcp-speed-value">1.00x</div>
+                        <div class="tcp-speed-slider-row">
+                            <button type="button" class="tcp-speed-minus" aria-label="Decrease speed">${TCP_ICON.minus}</button>
+                            <input type="range" class="tcp-speed-range" min="0.25" max="3" step="0.05" value="1" aria-label="Playback speed">
+                            <button type="button" class="tcp-speed-plus" aria-label="Increase speed">${TCP_ICON.plus}</button>
+                        </div>
+                        <div class="tcp-speed-presets">${TCP_SPEEDS.map(s => `<button type="button" data-speed="${s}" class="${s === 1 ? 'active' : ''}">${s}x</button>`).join('')}</div>
+                    </div>
+                    <button type="button" class="tcp-icon-btn tcp-cc-btn disabled" title="Subtitle" aria-label="Subtitle">${TCP_ICON.cc}</button>
+                    <button type="button" class="tcp-icon-btn tcp-speed-btn" title="Playback speed" aria-label="Playback speed">${TCP_ICON.speed}</button>
                     <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Quality" aria-label="Quality" hidden>${TCP_ICON.gear}</button>
                     <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
                 </div>
+            </div>
+        </div>
+        <div class="tcp-download-overlay">
+            <div class="tcp-download-box">
+                <div class="tcp-download-count">3</div>
+                <div class="tcp-download-label">Download shuru hocche...</div>
             </div>
         </div>`;
 }
@@ -874,6 +894,10 @@ function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl
     const settingsBtn = wrap.querySelector('.tcp-settings-btn');
     const settingsMenu = wrap.querySelector('.tcp-settings-menu');
     const dlBtn = wrap.querySelector('.tcp-download-btn');
+    const speedBtn = wrap.querySelector('.tcp-speed-btn');
+    const speedMenu = wrap.querySelector('.tcp-speed-menu');
+    const speedRange = wrap.querySelector('.tcp-speed-range');
+    const speedValueEl = wrap.querySelector('.tcp-speed-value');
 
     const syncPlayIcon = () => { playBtn.innerHTML = video.paused ? TCP_ICON.play : TCP_ICON.pause; };
     syncPlayIcon();
@@ -906,8 +930,10 @@ function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl
         else if (wrap.requestFullscreen) wrap.requestFullscreen().catch(() => {});
     });
 
+    // CC button shobshomoy dekhay - subtitle thakle (detect kore) active/clickable,
+    // na thakle disabled (dim) obosthay thake.
     if (hasSubtitle) {
-        ccBtn.hidden = false;
+        ccBtn.classList.remove('disabled');
         ccBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const track = video.textTracks && video.textTracks[0];
@@ -916,12 +942,16 @@ function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl
             track.mode = on ? 'hidden' : 'showing';
             ccBtn.classList.toggle('active', !on);
         });
+    } else {
+        ccBtn.classList.add('disabled');
+        ccBtn.setAttribute('aria-disabled', 'true');
+        ccBtn.title = 'No subtitle available';
     }
 
     if (opts && opts.length > 1) {
         settingsBtn.hidden = false;
         settingsMenu.innerHTML = opts.map((o, i) => `<button type="button" data-i="${i}" class="${i === 0 ? 'active' : ''}">${escapeHtml(o.label)}</button>`).join('');
-        settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); settingsMenu.hidden = !settingsMenu.hidden; });
+        settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); speedMenu.hidden = true; settingsMenu.hidden = !settingsMenu.hidden; });
         settingsMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', (e) => {
             e.stopPropagation();
             const o = opts[parseInt(b.getAttribute('data-i'), 10)];
@@ -935,8 +965,44 @@ function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl
 
     if (downloadUrl) {
         dlBtn.hidden = false;
-        dlBtn.addEventListener('click', (e) => { e.stopPropagation(); window.open(downloadUrl, '_blank', 'noopener'); });
+        const dlOverlay = wrap.querySelector('.tcp-download-overlay');
+        const dlCountEl = wrap.querySelector('.tcp-download-count');
+        let dlTimer = null;
+        dlBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dlTimer) return; // countdown already cholche
+            let n = 3;
+            dlCountEl.textContent = n;
+            dlOverlay.classList.add('show');
+            dlTimer = setInterval(() => {
+                n -= 1;
+                if (n <= 0) {
+                    clearInterval(dlTimer);
+                    dlTimer = null;
+                    dlOverlay.classList.remove('show');
+                    window.open(downloadUrl, '_blank', 'noopener');
+                } else {
+                    dlCountEl.textContent = n;
+                }
+            }, 1000);
+        });
     }
+
+    // Playback speed: -/+ buttons, drag slider, ba preset chip (0.5x..2x)
+    const setSpeed = (rate) => {
+        rate = Math.min(3, Math.max(0.25, Math.round(rate * 20) / 20));
+        video.playbackRate = rate;
+        speedRange.value = rate;
+        speedValueEl.textContent = rate.toFixed(2) + 'x';
+        speedMenu.querySelectorAll('.tcp-speed-presets button').forEach(b => b.classList.toggle('active', parseFloat(b.getAttribute('data-speed')) === rate));
+        speedBtn.classList.toggle('active', rate !== 1);
+    };
+    speedBtn.addEventListener('click', (e) => { e.stopPropagation(); settingsMenu.hidden = true; speedMenu.hidden = !speedMenu.hidden; });
+    speedRange.addEventListener('input', () => setSpeed(parseFloat(speedRange.value)));
+    wrap.querySelector('.tcp-speed-minus').addEventListener('click', (e) => { e.stopPropagation(); setSpeed(video.playbackRate - 0.25); });
+    wrap.querySelector('.tcp-speed-plus').addEventListener('click', (e) => { e.stopPropagation(); setSpeed(video.playbackRate + 0.25); });
+    speedMenu.querySelectorAll('.tcp-speed-presets button').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); setSpeed(parseFloat(b.getAttribute('data-speed'))); }));
+    document.addEventListener('click', (e) => { if (!speedMenu.hidden && !speedMenu.contains(e.target) && e.target !== speedBtn) speedMenu.hidden = true; });
 
     // Controls auto-hide (video chola obosthay mouse/touch na thakle lukiye jay)
     let hideTimer;

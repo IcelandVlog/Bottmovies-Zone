@@ -3923,8 +3923,6 @@ html.light-mode .btn-tera-play { color: #1a2b0a; }
 .tera-link-select { max-width: 100%; padding: 8px 10px; border-radius: 6px; background: #0e1017; color: #fff; border: 1.5px solid #8bc34a; font-size: 13px; }
 html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 
-/* Tera Play: meta line under the video */
-.tera-play-meta { margin-top: 8px; font-size: 12px; opacity: 0.75; word-break: break-word; }
 
 /* Admin: Terabox Watch API Settings box */
 .admin-tera-settings-box { background: rgba(139, 195, 74, 0.06); border: 1.5px solid rgba(139, 195, 74, 0.35); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
@@ -4017,9 +4015,15 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 .tcp-time { font-size: 12px; color: #fff; opacity: 0.9; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tcp-icons { display: flex; align-items: center; gap: 14px; position: relative; }
 .tcp-icon-btn { background: none; border: none; padding: 2px; color: #fff; opacity: 0.85; cursor: pointer; display: flex; }
-.tcp-icon-btn svg { width: 18px; height: 18px; display: block; }
+.tcp-icon-btn svg { width: 20px; height: 20px; display: block; }
 .tcp-icon-btn:hover { opacity: 1; color: #01b4e4; }
 .tcp-icon-btn.active { opacity: 1; color: #01b4e4; }
+.tcp-icon-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+/* Boro device-e icon boro, choto (mobile) device-e icon choto */
+@media (max-width: 600px) {
+    .tcp-icons { gap: 10px; }
+    .tcp-icon-btn svg { width: 15px; height: 15px; }
+}
 .tcp-settings-menu {
     position: absolute; bottom: 30px; right: 0; z-index: 4; min-width: 130px;
     background: #10151d; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px;
@@ -4031,6 +4035,43 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 }
 .tcp-settings-menu button:hover { background: rgba(1, 180, 228, 0.18); }
 .tcp-settings-menu button.active { color: #01b4e4; font-weight: 700; }
+
+.tcp-speed-menu {
+    position: absolute; bottom: 30px; right: -6px; z-index: 4; width: 210px;
+    background: #10151d; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px;
+    padding: 12px 14px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.tcp-speed-value { text-align: center; font-size: 15px; font-weight: 800; color: #fff; margin-bottom: 10px; }
+.tcp-speed-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tcp-speed-minus, .tcp-speed-plus {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.tcp-speed-minus svg, .tcp-speed-plus svg { width: 13px; height: 13px; }
+.tcp-speed-minus:hover, .tcp-speed-plus:hover { background: rgba(1, 180, 228, 0.5); }
+.tcp-speed-range {
+    -webkit-appearance: none; appearance: none; flex: 1 1 auto; height: 4px; border-radius: 4px;
+    background: rgba(255, 255, 255, 0.25); outline: none; cursor: pointer;
+}
+.tcp-speed-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #01b4e4; margin-top: -5px; }
+.tcp-speed-range::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: #01b4e4; }
+.tcp-speed-presets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.tcp-speed-presets button {
+    background: rgba(255, 255, 255, 0.08); border: none; color: #ddd; font-size: 11.5px; font-weight: 600;
+    padding: 5px 9px; border-radius: 20px; cursor: pointer;
+}
+.tcp-speed-presets button:hover { background: rgba(1, 180, 228, 0.3); }
+.tcp-speed-presets button.active { background: #01b4e4; color: #061018; }
+
+/* Download button e click korle 3 sec countdown popup, tarpor direct download shuru */
+.tcp-download-overlay {
+    position: absolute; inset: 0; z-index: 6; display: none; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.78);
+}
+.tcp-download-overlay.show { display: flex; }
+.tcp-download-box { text-align: center; color: #fff; }
+.tcp-download-count { font-size: 44px; font-weight: 800; color: #01b4e4; line-height: 1; }
+.tcp-download-label { margin-top: 8px; font-size: 13px; opacity: 0.85; }
 
 /* Video Player (Terabox) box: TMDb-style dark/blue theme (site pattern: .season-box-item.<type>) + fix emoji-inflated header height */
 .tera-player-group { border-radius: 10px; overflow: hidden; }
