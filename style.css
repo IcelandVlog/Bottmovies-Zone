@@ -3914,7 +3914,7 @@ html.light-mode .massive-watch-player .massive-watch-status { background-color: 
 /* Loading / initial-error state: eki box (16:9, fixed) je video-wrap use kore,
    jate video-r file size/duration-er upor depend na kore player box-er size
    sob somoy same thake, ar loading icon/spinner box-er thik center-e boshe. */
-.tera-status-box { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; }
+.tera-status-box { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; }
 .tera-status-box .watch-loading-spinner { margin: 0; }
 .tera-status-box small { display: block; max-width: 100%; }
 html.light-mode .tera-play-status { color: #475569; }
@@ -3926,9 +3926,7 @@ html.light-mode .btn-tera-play, html.light-mode .btn-tera-dl { color: #1a2b0a; }
 .tera-link-select { max-width: 100%; padding: 8px 10px; border-radius: 6px; background: #0e1017; color: #fff; border: 1.5px solid #8bc34a; font-size: 13px; }
 html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 
-/* Tera Play: file/quality selectors + meta */
-.tera-play-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.tera-play-controls .tera-link-select { flex: 1 1 160px; max-width: 100%; }
+/* Tera Play: meta line under the video */
 .tera-play-meta { margin-top: 8px; font-size: 12px; opacity: 0.75; word-break: break-word; }
 
 /* Admin: Terabox Watch API Settings box */
@@ -3970,14 +3968,13 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 .tera-thumb-play-btn:disabled { opacity: 0.6; cursor: default; transform: translate(-50%, -50%); }
 .tera-thumb-play-icon { display: block; width: 0; height: 0; border-style: solid; border-width: 11px 0 11px 19px; border-color: transparent transparent transparent #ffffff; margin-left: 4px; /* optical center */ }
 
-/* Video panel top bar with Close button (returns to thumbnail) */
-.tera-panel-topbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
-.tera-panel-close-btn { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.tera-panel-close-btn:hover { background: rgba(255,107,107,0.22); border-color: rgba(255,107,107,0.5); }
+/* Video/status box-er upore-right corner-e bheshe thaka choto {x} close button
+   (Online Watch box-er watch-close-btn style reuse kora - alada text bar nei). */
+.tera-close-btn { z-index: 3; }
 
 /* Video Player (Terabox) box: TMDb-style dark/blue theme (site pattern: .season-box-item.<type>) + fix emoji-inflated header height */
-.tera-player-group { border-radius: 0; }
-.season-box-item.tera-player-box { background: #0d253f; border: 1px solid #01b4e4; border-radius: 0; }
+.tera-player-group { border-radius: 10px; overflow: hidden; }
+.season-box-item.tera-player-box { background: #0d253f; border: 1px solid #01b4e4; border-radius: 10px; overflow: hidden; }
 .tera-player-box .season-box-header:hover { background: rgba(1, 180, 228, 0.15); }
 .tera-player-box .season-box-header .dropdown-arrow { color: #01b4e4; }
 .tera-header-icon { display: inline-block; font-size: 14px; line-height: 1; vertical-align: middle; }

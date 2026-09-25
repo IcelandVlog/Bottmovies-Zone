@@ -827,8 +827,10 @@ async function attachTeraSource(panel, video, url, resumeAt) {
     video.play().catch(() => {});
 }
 
-function teraPanelTopbarHTML(panelId) {
-    return `<div class="tera-panel-topbar"><button type="button" class="tera-panel-close-btn" onclick="closeTeraPlayerPanel('${panelId}')" title="Close player">✕ Close</button></div>`;
+// Choto gol {x} close button - video-r/status box-er thik upore-right corner-e
+// bheshe thake (Online Watch box-er watch-close-btn-er moto), alada text bar na.
+function teraCloseBtnHTML(panelId) {
+    return `<button type="button" class="watch-close-btn tera-close-btn" aria-label="Close video" title="Close video" onclick="closeTeraPlayerPanel('${panelId}')"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>`;
 }
 function closeTeraPlayerPanel(panelId) {
     const panel = document.getElementById(panelId);
@@ -856,55 +858,43 @@ async function playTeraLink(btn) {
 
     if (thumbWrap) thumbWrap.style.display = 'none';
     panel.classList.add('open');
-    panel.innerHTML = teraPanelTopbarHTML(panel.id) + '<div class="tera-play-status tera-status-box"><span class="watch-loading-spinner" aria-hidden="true"></span> Loading video...</div>';
+    panel.innerHTML = '<div class="tera-play-status tera-status-box">' + teraCloseBtnHTML(panel.id) + '<span class="watch-loading-spinner" aria-hidden="true"></span> Loading video...</div>';
     btn.disabled = true;
     try {
         const data = await resolveTeraLink(link);
         if (!panel.classList.contains('open')) return; // ei shomoy user bondho kore diyeche
         const files = data.files || [];
-        let cur = files[0];
+        const cur = files[0];
 
-        const fileSel = files.length > 1
-            ? `<select class="tera-link-select tera-file-select">${files.map((f, i) => `<option value="${i}">${escapeHtml(f.name)}${f.size ? ' (' + escapeHtml(f.size) + ')' : ''}</option>`).join('')}</select>` : '';
-        panel.innerHTML = teraPanelTopbarHTML(panel.id) + `
-            <div class="tera-play-controls">${fileSel}<select class="tera-link-select tera-quality-select" style="display:none"></select></div>
-            <div class="tera-video-wrap"><video controls playsinline autoplay preload="metadata"></video></div>
+        // Note: file/quality select dropdown-gulo r dekhano hoy na - shob shomoy
+        // default/best stream-ta shorasori auto-play hoy.
+        panel.innerHTML = `
+            <div class="tera-video-wrap">${teraCloseBtnHTML(panel.id)}<video controls playsinline autoplay preload="metadata"></video></div>
             <div class="tera-play-meta"></div>
             <div class="tera-play-actions"></div>`;
         const video = panel.querySelector('video');
-        const qSel = panel.querySelector('.tera-quality-select');
         const meta = panel.querySelector('.tera-play-meta');
         const actions = panel.querySelector('.tera-play-actions');
 
-        const load = (file, keepTime) => {
-            cur = file;
+        const load = (file) => {
             if (file.thumb) video.poster = file.thumb;
             meta.innerHTML = [file.name, file.duration, file.quality, file.size].filter(Boolean).map(escapeHtml).join(' · ');
             const opts = [];
             if (file.stream) opts.push({ label: file.quality ? 'Default (' + file.quality + ')' : 'Default', url: file.stream });
             file.fast.forEach(f => opts.push({ label: f.q + ' (Fast)', url: f.url }));
-            qSel.innerHTML = opts.map((o, i) => `<option value="${i}">${escapeHtml(o.label)}</option>`).join('');
-            qSel.style.display = opts.length > 1 ? '' : 'none';
-            qSel._opts = opts;
             actions.innerHTML = file.download ? `<a href="${escapeAttr(file.download)}" target="_blank" rel="noopener" class="btn-tera-dl">⬇ Direct Download</a>` : '';
             video.querySelectorAll('track').forEach(t => t.remove());
             const first = opts[0] ? opts[0].url : file.download;
-            attachTeraSource(panel, video, first, keepTime || 0);
+            attachTeraSource(panel, video, first, 0);
             attachTeraSubtitle(video, file.subtitle);
         };
-        qSel.addEventListener('change', () => {
-            const o = qSel._opts[qSel.selectedIndex];
-            if (o) attachTeraSource(panel, video, o.url, video.currentTime || 0);
-        });
-        const fs = panel.querySelector('.tera-file-select');
-        if (fs) fs.addEventListener('change', () => load(files[fs.selectedIndex], 0));
 
-        load(cur, 0);
+        load(cur);
         incrementMovieViews(currentModalMovie);
     } catch (err) {
         console.error('Tera play error:', err);
         const why = (TERA_API_CONFIG.debug && err && err.message) ? '<br><small style="opacity:.85;word-break:break-all;">Reason: ' + escapeHtml(err.message) + '</small>' : '';
-        panel.innerHTML = teraPanelTopbarHTML(panel.id) + '<div class="tera-play-status tera-play-error tera-status-box">⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
+        panel.innerHTML = '<div class="tera-play-status tera-play-error tera-status-box">' + teraCloseBtnHTML(panel.id) + '⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
     } finally {
         btn.disabled = false;
     }
