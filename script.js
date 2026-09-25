@@ -827,6 +827,130 @@ async function attachTeraSource(panel, video, url, resumeAt) {
     video.play().catch(() => {});
 }
 
+// ---------- Custom Tera video player (fullscreen / skip / progress / cc / quality / download) ----------
+const TCP_ICON = {
+    play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>',
+    pause: '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>',
+    fwd10: '<svg viewBox="0 0 24 24"><path d="M12 5V2l5 4-5 4V7a5 5 0 1 0 5 5h2a7 7 0 1 1-7-7z" fill="currentColor"/><text x="12" y="15" text-anchor="middle" font-size="6.5" font-weight="700" fill="currentColor">10</text></svg>',
+    back10: '<svg viewBox="0 0 24 24"><g transform="translate(24,0) scale(-1,1)"><path d="M12 5V2l5 4-5 4V7a5 5 0 1 0 5 5h2a7 7 0 1 1-7-7z" fill="currentColor"/></g><text x="12" y="15" text-anchor="middle" font-size="6.5" font-weight="700" fill="currentColor">10</text></svg>',
+    expand: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M4 4l6 6M20 9V4h-5M20 4l-6 6M4 15v5h5M4 20l6-6M20 15v5h-5M20 20l-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    cc: '<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><text x="12" y="15.5" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor">CC</text></svg>',
+    gear: '<svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.14 7.14 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.65l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.55-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L1.71 8.83a.5.5 0 0 0 .12.65l2.03 1.58a7.14 7.14 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.65l1.92 3.32c.14.24.42.32.6.22l2.39-.96c.49.39 1.03.7 1.62.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.55 1.62-.94l2.39.96c.24.1.46 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.65l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" fill="currentColor"/></svg>',
+    download: '<svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+function tcpFmtTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    s = Math.floor(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(sec).padStart(2, '0');
+}
+function tcpCustomControlsHTML() {
+    return `
+        <button type="button" class="tcp-top-left-btn tcp-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">${TCP_ICON.expand}</button>
+        <div class="tcp-center-controls">
+            <button type="button" class="tcp-center-btn tcp-skip-btn" data-skip="-10" title="-10s" aria-label="Back 10 seconds">${TCP_ICON.back10}</button>
+            <button type="button" class="tcp-center-btn tcp-play-btn" title="Play/Pause" aria-label="Play/Pause">${TCP_ICON.play}</button>
+            <button type="button" class="tcp-center-btn tcp-skip-btn" data-skip="10" title="+10s" aria-label="Forward 10 seconds">${TCP_ICON.fwd10}</button>
+        </div>
+        <div class="tcp-bottom-bar">
+            <input type="range" class="tcp-progress" min="0" max="100" step="0.1" value="0" aria-label="Seek">
+            <div class="tcp-bottom-row">
+                <span class="tcp-time">0:00 / 0:00</span>
+                <div class="tcp-icons">
+                    <div class="tcp-settings-menu" hidden></div>
+                    <button type="button" class="tcp-icon-btn tcp-cc-btn" title="Subtitle" aria-label="Subtitle" hidden>${TCP_ICON.cc}</button>
+                    <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Quality" aria-label="Quality" hidden>${TCP_ICON.gear}</button>
+                    <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
+                </div>
+            </div>
+        </div>`;
+}
+function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl) {
+    const playBtn = wrap.querySelector('.tcp-play-btn');
+    const progress = wrap.querySelector('.tcp-progress');
+    const timeEl = wrap.querySelector('.tcp-time');
+    const fsBtn = wrap.querySelector('.tcp-fullscreen-btn');
+    const ccBtn = wrap.querySelector('.tcp-cc-btn');
+    const settingsBtn = wrap.querySelector('.tcp-settings-btn');
+    const settingsMenu = wrap.querySelector('.tcp-settings-menu');
+    const dlBtn = wrap.querySelector('.tcp-download-btn');
+
+    const syncPlayIcon = () => { playBtn.innerHTML = video.paused ? TCP_ICON.play : TCP_ICON.pause; };
+    syncPlayIcon();
+    const togglePlay = () => { video.paused ? video.play().catch(() => {}) : video.pause(); };
+    playBtn.addEventListener('click', togglePlay);
+    video.addEventListener('click', togglePlay);
+    video.addEventListener('play', syncPlayIcon);
+    video.addEventListener('pause', () => { syncPlayIcon(); wrap.classList.add('tcp-controls-visible'); });
+
+    wrap.querySelectorAll('.tcp-skip-btn').forEach(b => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const d = parseFloat(b.getAttribute('data-skip'));
+        video.currentTime = Math.min(Math.max(0, (video.currentTime || 0) + d), video.duration || 1e9);
+    }));
+
+    const updateProgress = () => {
+        const dur = video.duration || 0;
+        const pct = dur ? (video.currentTime / dur) * 100 : 0;
+        if (!progress._dragging) { progress.value = pct; progress.style.setProperty('--tcp-pct', pct + '%'); }
+        timeEl.textContent = tcpFmtTime(video.currentTime) + ' / ' + tcpFmtTime(dur);
+    };
+    video.addEventListener('timeupdate', updateProgress);
+    video.addEventListener('loadedmetadata', updateProgress);
+    progress.addEventListener('input', () => { progress._dragging = true; progress.style.setProperty('--tcp-pct', progress.value + '%'); });
+    progress.addEventListener('change', () => { video.currentTime = (progress.value / 100) * (video.duration || 0); progress._dragging = false; });
+
+    fsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (document.fullscreenElement === wrap) document.exitFullscreen && document.exitFullscreen();
+        else if (wrap.requestFullscreen) wrap.requestFullscreen().catch(() => {});
+    });
+
+    if (hasSubtitle) {
+        ccBtn.hidden = false;
+        ccBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const track = video.textTracks && video.textTracks[0];
+            if (!track) return;
+            const on = track.mode === 'showing';
+            track.mode = on ? 'hidden' : 'showing';
+            ccBtn.classList.toggle('active', !on);
+        });
+    }
+
+    if (opts && opts.length > 1) {
+        settingsBtn.hidden = false;
+        settingsMenu.innerHTML = opts.map((o, i) => `<button type="button" data-i="${i}" class="${i === 0 ? 'active' : ''}">${escapeHtml(o.label)}</button>`).join('');
+        settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); settingsMenu.hidden = !settingsMenu.hidden; });
+        settingsMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const o = opts[parseInt(b.getAttribute('data-i'), 10)];
+            settingsMenu.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            settingsMenu.hidden = true;
+            attachTeraSource(panel, video, o.url, video.currentTime || 0);
+        }));
+        document.addEventListener('click', (e) => { if (!settingsMenu.hidden && !settingsMenu.contains(e.target) && e.target !== settingsBtn) settingsMenu.hidden = true; });
+    }
+
+    if (downloadUrl) {
+        dlBtn.hidden = false;
+        dlBtn.addEventListener('click', (e) => { e.stopPropagation(); window.open(downloadUrl, '_blank', 'noopener'); });
+    }
+
+    // Controls auto-hide (video chola obosthay mouse/touch na thakle lukiye jay)
+    let hideTimer;
+    const showControls = () => {
+        wrap.classList.add('tcp-controls-visible');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { if (!video.paused && settingsMenu.hidden) wrap.classList.remove('tcp-controls-visible'); }, 2800);
+    };
+    wrap.addEventListener('mousemove', showControls);
+    wrap.addEventListener('touchstart', showControls, { passive: true });
+    wrap.addEventListener('mouseleave', () => { if (!video.paused) wrap.classList.remove('tcp-controls-visible'); });
+    showControls();
+}
+
 // Choto gol {x} close button - video-r/status box-er thik upore-right corner-e
 // bheshe thake (Online Watch box-er watch-close-btn-er moto), alada text bar na.
 function teraCloseBtnHTML(panelId) {
@@ -866,15 +990,14 @@ async function playTeraLink(btn) {
         const files = data.files || [];
         const cur = files[0];
 
-        // Note: file/quality select dropdown-gulo r dekhano hoy na - shob shomoy
-        // default/best stream-ta shorasori auto-play hoy.
+        // Note: file/quality select dropdown-gulo r dekhano hoy na - custom player-er
+        // settings (⚙) icon-e quality option thake, download button-o icon hishebe.
         panel.innerHTML = `
-            <div class="tera-video-wrap">${teraCloseBtnHTML(panel.id)}<video controls playsinline autoplay preload="metadata"></video></div>
-            <div class="tera-play-meta"></div>
-            <div class="tera-play-actions"></div>`;
+            <div class="tera-video-wrap tcp-player">${teraCloseBtnHTML(panel.id)}<video playsinline autoplay preload="metadata"></video>${tcpCustomControlsHTML()}</div>
+            <div class="tera-play-meta"></div>`;
+        const wrap = panel.querySelector('.tera-video-wrap');
         const video = panel.querySelector('video');
         const meta = panel.querySelector('.tera-play-meta');
-        const actions = panel.querySelector('.tera-play-actions');
 
         const load = (file) => {
             if (file.thumb) video.poster = file.thumb;
@@ -882,11 +1005,11 @@ async function playTeraLink(btn) {
             const opts = [];
             if (file.stream) opts.push({ label: file.quality ? 'Default (' + file.quality + ')' : 'Default', url: file.stream });
             file.fast.forEach(f => opts.push({ label: f.q + ' (Fast)', url: f.url }));
-            actions.innerHTML = file.download ? `<a href="${escapeAttr(file.download)}" target="_blank" rel="noopener" class="btn-tera-dl">⬇ Direct Download</a>` : '';
             video.querySelectorAll('track').forEach(t => t.remove());
             const first = opts[0] ? opts[0].url : file.download;
             attachTeraSource(panel, video, first, 0);
             attachTeraSubtitle(video, file.subtitle);
+            initTeraCustomPlayer(panel, wrap, video, opts, !!file.subtitle, file.download || null);
         };
 
         load(cur);
