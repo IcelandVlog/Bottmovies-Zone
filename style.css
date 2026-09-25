@@ -3976,6 +3976,15 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 
 /* ---- Custom Tera video player: fullscreen / ±10s / progress / cc / quality / download ---- */
 .tera-video-wrap.tcp-player video { width: 100%; height: 100%; cursor: pointer; }
+.tcp-top-left-btn {
+    position: absolute; top: 8px; left: 8px; z-index: 3;
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    background: rgba(0, 0, 0, 0.6); color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity 0.2s ease, background 0.15s ease;
+}
+.tcp-top-left-btn svg { width: 14px; height: 14px; display: block; }
+.tcp-top-left-btn:hover { background: rgba(1, 180, 228, 0.85); }
+.tera-video-wrap.tcp-controls-visible .tcp-top-left-btn { opacity: 1; }
 
 .tcp-center-controls {
     position: absolute; inset: 0; bottom: 40px; z-index: 2;
@@ -4041,6 +4050,28 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 }
 .tcp-settings-menu button:hover { background: rgba(1, 180, 228, 0.18); }
 .tcp-settings-menu button.active { color: #01b4e4; font-weight: 700; }
+/* Gear menu-te "Quality" / "Audio" - group header label (HLS stream-e embedded
+   multiple audio track thakle eta dekhay) */
+.tcp-settings-group-label {
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: #8a93a6; padding: 6px 10px 3px;
+}
+.tcp-settings-group-label:not(:first-child) { margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 8px; }
+
+/* CC (subtitle) button-e click korle - jodi ekta-i subtitle track thake, direct
+   on/off hoy; jodi stream-e (embedded ba sidecar) ekadhik language thake, tahole
+   ei choto list-e pochondo-r bhasha bechhe newa jay (settings-menu-r moto style) */
+.tcp-cc-menu {
+    position: absolute; bottom: 30px; left: 0; z-index: 4; min-width: 130px;
+    background: #10151d; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px;
+    padding: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.tcp-cc-menu button {
+    display: block; width: 100%; text-align: left; background: none; border: none; color: #eee;
+    font-size: 12.5px; padding: 7px 10px; border-radius: 5px; cursor: pointer; white-space: nowrap;
+}
+.tcp-cc-menu button:hover { background: rgba(1, 180, 228, 0.18); }
+.tcp-cc-menu button.active { color: #01b4e4; font-weight: 700; }
 
 .tcp-speed-menu {
     position: absolute; bottom: 30px; right: -6px; z-index: 4; width: 210px;

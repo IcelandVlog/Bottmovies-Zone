@@ -808,8 +808,17 @@ async function attachTeraSource(panel, video, url, resumeAt) {
         if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = url; return true; }
         const Hls = await loadHlsJs();
         if (!(Hls && Hls.isSupported())) return false;
-        const h = new Hls();
+        const h = new Hls({ renderTextTracksNatively: true });
         h.on(Hls.Events.ERROR, (_, d) => { if (d && d.fatal) teraShowError(panel, '⚠️ Video play hocche na. Onno quality ba Direct Download try korun.'); });
+        // Stream-er (m3u8) manifest theke nijer embedded audio/subtitle track-gulo
+        // detect kore player UI-ke jananor jonne (CC button + Audio menu-r jonne)
+        h.on(Hls.Events.MANIFEST_PARSED, () => {
+            try {
+                h.subtitleDisplay = true;
+                video._teraTracks = { audio: h.audioTracks || [], subtitles: h.subtitleTracks || [] };
+                video.dispatchEvent(new CustomEvent('teratracks', { detail: video._teraTracks }));
+            } catch (e) {}
+        });
         h.loadSource(url); h.attachMedia(video);
         panel._hls = h;
         return true;
@@ -850,6 +859,7 @@ function tcpFmtTime(s) {
 }
 function tcpCustomControlsHTML() {
     return `
+        <button type="button" class="tcp-top-left-btn tcp-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">${TCP_ICON.expand}</button>
         <div class="tcp-center-controls">
             <button type="button" class="tcp-center-btn tcp-skip-btn" data-skip="-10" title="-10s" aria-label="Back 10 seconds">${TCP_ICON.back10}</button>
             <button type="button" class="tcp-center-btn tcp-play-btn" title="Play/Pause" aria-label="Play/Pause">${TCP_ICON.play}</button>
@@ -864,6 +874,7 @@ function tcpCustomControlsHTML() {
         <div class="tcp-icons-bar">
             <div class="tcp-icons">
                 <div class="tcp-settings-menu" hidden></div>
+                <div class="tcp-cc-menu" hidden></div>
                 <div class="tcp-speed-menu" hidden>
                     <div class="tcp-speed-value">1.00x</div>
                     <div class="tcp-speed-slider-row">
@@ -877,7 +888,6 @@ function tcpCustomControlsHTML() {
                 <button type="button" class="tcp-icon-btn tcp-speed-btn" title="Playback speed" aria-label="Playback speed">${TCP_ICON.speed}</button>
                 <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Quality" aria-label="Quality" hidden>${TCP_ICON.gear}</button>
                 <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
-                <button type="button" class="tcp-icon-btn tcp-fullscreen-btn" title="Fullscreen" aria-label="Fullscreen">${TCP_ICON.expand}</button>
             </div>
         </div>
         <div class="tcp-download-overlay">
@@ -887,12 +897,13 @@ function tcpCustomControlsHTML() {
             </div>
         </div>`;
 }
-function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl) {
+function initTeraCustomPlayer(panel, wrap, video, opts, downloadUrl) {
     const playBtn = wrap.querySelector('.tcp-play-btn');
     const progress = wrap.querySelector('.tcp-progress');
     const timeEl = wrap.querySelector('.tcp-time');
     const fsBtn = wrap.querySelector('.tcp-fullscreen-btn');
     const ccBtn = wrap.querySelector('.tcp-cc-btn');
+    const ccMenu = wrap.querySelector('.tcp-cc-menu');
     const settingsBtn = wrap.querySelector('.tcp-settings-btn');
     const settingsMenu = wrap.querySelector('.tcp-settings-menu');
     const dlBtn = wrap.querySelector('.tcp-download-btn');
@@ -932,38 +943,107 @@ function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl
         else if (wrap.requestFullscreen) wrap.requestFullscreen().catch(() => {});
     });
 
-    // CC button shobshomoy dekhay - subtitle thakle (detect kore) active/clickable,
-    // na thakle disabled (dim) obosthay thake.
-    if (hasSubtitle) {
-        ccBtn.classList.remove('disabled');
-        ccBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const track = video.textTracks && video.textTracks[0];
-            if (!track) return;
-            const on = track.mode === 'showing';
-            track.mode = on ? 'hidden' : 'showing';
-            ccBtn.classList.toggle('active', !on);
-        });
-    } else {
-        ccBtn.classList.add('disabled');
-        ccBtn.setAttribute('aria-disabled', 'true');
-        ccBtn.title = 'No subtitle available';
-    }
+    // ---- Subtitle: video/stream-e (HLS manifest-e embedded subtitle, ba sidecar
+    // file.subtitle theke attach kora <track>) je track-i pawa jak, video.textTracks-e
+    // eshe জমা hoy - tai easta shune dynamically CC button on/off + menu banano hoy,
+    // kono hardcoded "hasSubtitle" flag-er upor nirvor kore na.
+    let ccTracks = [];
+    const refreshCcState = () => {
+        const tt = video.textTracks || [];
+        ccTracks = [];
+        for (let i = 0; i < tt.length; i++) {
+            const t = tt[i];
+            if (t.kind === 'subtitles' || t.kind === 'captions') ccTracks.push(t);
+        }
+        if (ccTracks.length) {
+            ccBtn.classList.remove('disabled');
+            ccBtn.removeAttribute('aria-disabled');
+            ccBtn.title = 'Subtitle';
+        } else {
+            ccBtn.classList.add('disabled');
+            ccBtn.setAttribute('aria-disabled', 'true');
+            ccBtn.title = 'No subtitle available';
+            ccBtn.classList.remove('active');
+            ccMenu.hidden = true;
+        }
+    };
+    refreshCcState();
+    video.textTracks.addEventListener('addtrack', refreshCcState);
+    video.textTracks.addEventListener('removetrack', refreshCcState);
 
-    if (opts && opts.length > 1) {
-        settingsBtn.hidden = false;
-        settingsMenu.innerHTML = opts.map((o, i) => `<button type="button" data-i="${i}" class="${i === 0 ? 'active' : ''}">${escapeHtml(o.label)}</button>`).join('');
-        settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); speedMenu.hidden = true; settingsMenu.hidden = !settingsMenu.hidden; });
+    const renderCcMenu = () => {
+        const offActive = !ccTracks.some(t => t.mode === 'showing');
+        let html = `<button type="button" data-off="1" class="${offActive ? 'active' : ''}">Off</button>`;
+        html += ccTracks.map((t, i) => `<button type="button" data-i="${i}" class="${t.mode === 'showing' ? 'active' : ''}">${escapeHtml(t.label || t.language || ('Subtitle ' + (i + 1)))}</button>`).join('');
+        ccMenu.innerHTML = html;
+        ccMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (b.hasAttribute('data-off')) {
+                ccTracks.forEach(t => { t.mode = 'hidden'; });
+                ccBtn.classList.remove('active');
+            } else {
+                const idx = parseInt(b.getAttribute('data-i'), 10);
+                ccTracks.forEach((t, i) => { t.mode = i === idx ? 'showing' : 'hidden'; });
+                ccBtn.classList.add('active');
+            }
+            ccMenu.hidden = true;
+        }));
+    };
+    ccBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!ccTracks.length) return;
+        if (ccTracks.length === 1) {
+            const t = ccTracks[0];
+            const on = t.mode === 'showing';
+            t.mode = on ? 'hidden' : 'showing';
+            ccBtn.classList.toggle('active', !on);
+            return;
+        }
+        settingsMenu.hidden = true; speedMenu.hidden = true;
+        renderCcMenu();
+        ccMenu.hidden = !ccMenu.hidden;
+    });
+    document.addEventListener('click', (e) => { if (!ccMenu.hidden && !ccMenu.contains(e.target) && e.target !== ccBtn) ccMenu.hidden = true; });
+
+    // ---- Quality (opts, alada mirror/URL) + Audio (HLS stream-er nijer embedded
+    // audio track, jemon multiple language dub) - dutoi ekই gear/Settings menu-te.
+    let hlsAudioTracks = (video._teraTracks && video._teraTracks.audio) || [];
+    let activeAudioIdx = 0;
+    const renderSettingsMenu = () => {
+        let html = '';
+        const hasQuality = opts && opts.length > 1;
+        const hasAudio = hlsAudioTracks.length > 1;
+        if (hasQuality) {
+            html += '<div class="tcp-settings-group-label">Quality</div>';
+            html += opts.map((o, i) => `<button type="button" data-kind="q" data-i="${i}" class="${i === 0 ? 'active' : ''}">${escapeHtml(o.label)}</button>`).join('');
+        }
+        if (hasAudio) {
+            html += '<div class="tcp-settings-group-label">Audio</div>';
+            html += hlsAudioTracks.map((a, i) => `<button type="button" data-kind="a" data-i="${i}" class="${i === activeAudioIdx ? 'active' : ''}">${escapeHtml(a.name || a.lang || ('Audio ' + (i + 1)))}</button>`).join('');
+        }
+        settingsMenu.innerHTML = html;
+        settingsBtn.hidden = !(hasQuality || hasAudio);
         settingsMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', (e) => {
             e.stopPropagation();
-            const o = opts[parseInt(b.getAttribute('data-i'), 10)];
-            settingsMenu.querySelectorAll('button').forEach(x => x.classList.remove('active'));
-            b.classList.add('active');
+            const idx = parseInt(b.getAttribute('data-i'), 10);
             settingsMenu.hidden = true;
-            attachTeraSource(panel, video, o.url, video.currentTime || 0);
+            if (b.getAttribute('data-kind') === 'q') {
+                attachTeraSource(panel, video, opts[idx].url, video.currentTime || 0);
+            } else {
+                activeAudioIdx = idx;
+                if (panel._hls) { try { panel._hls.audioTrack = idx; } catch (e) {} }
+                renderSettingsMenu();
+            }
         }));
-        document.addEventListener('click', (e) => { if (!settingsMenu.hidden && !settingsMenu.contains(e.target) && e.target !== settingsBtn) settingsMenu.hidden = true; });
-    }
+    };
+    renderSettingsMenu();
+    video.addEventListener('teratracks', (e) => {
+        hlsAudioTracks = (e.detail && e.detail.audio) || [];
+        activeAudioIdx = 0;
+        renderSettingsMenu();
+    });
+    settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); speedMenu.hidden = true; ccMenu.hidden = true; settingsMenu.hidden = !settingsMenu.hidden; });
+    document.addEventListener('click', (e) => { if (!settingsMenu.hidden && !settingsMenu.contains(e.target) && e.target !== settingsBtn) settingsMenu.hidden = true; });
 
     if (downloadUrl) {
         dlBtn.hidden = false;
@@ -982,7 +1062,17 @@ function initTeraCustomPlayer(panel, wrap, video, opts, hasSubtitle, downloadUrl
                     clearInterval(dlTimer);
                     dlTimer = null;
                     dlOverlay.classList.remove('show');
-                    window.open(downloadUrl, '_blank', 'noopener');
+                    // window.open-er bodole ekta hidden <a download> click kore
+                    // - eta browser-ke video file save/download korte bole,
+                    // notun tab-e khule/play na kore (server cross-origin support korle).
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = (currentModalMovie && currentModalMovie.title ? currentModalMovie.title : 'video');
+                    a.rel = 'noopener';
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
                 } else {
                     dlCountEl.textContent = n;
                 }
@@ -1073,7 +1163,7 @@ async function playTeraLink(btn) {
             const first = opts[0] ? opts[0].url : file.download;
             attachTeraSource(panel, video, first, 0);
             attachTeraSubtitle(video, file.subtitle);
-            initTeraCustomPlayer(panel, wrap, video, opts, !!file.subtitle, file.download || null);
+            initTeraCustomPlayer(panel, wrap, video, opts, file.download || null);
         };
 
         load(cur);
