@@ -514,7 +514,7 @@ const DOWNLOAD_HEADER_ICON = '⚡';
 //
 // API: PlayTeraBox  ->  GET https://api.playterabox.com/api/proxy?url=<terabox link>  +  header  secret: <API KEY>
 // endpoint khali thakle Play button kokhono dekhano hoy na (site bhange na).
-const TERA_API_KEY = 'pk_cltx4au47sqf03z97t9tl';
+let TERA_API_KEY = 'pk_cltx4au47sqf03z97t9tl';
 const TERA_API_CONFIG = {
     endpoint: 'https://api.playterabox.com/api/proxy',   // PlayTeraBox API Playground: GET /api/proxy
     method: 'GET',           // 'GET' ba 'POST' (POST hole JSON body-te link jay)
@@ -526,6 +526,97 @@ const TERA_API_CONFIG = {
     proxyEndpoint: '/api/tera', // Server-side proxy (api/tera.js). Age eta try hoy: CORS problem nei + key browser-e lage na. Na thakle direct API try hoy.
     debug: true              // true thakle error-er asol karon panel-e dekhay. Sob thik hole false koro.
 };
+
+// ---- Multi-API pool (Supabase table: tera_apis) ----
+// Ekadhik Terabox-resolver API save rakha jay. Ekta-r credit/limit shesh hoye
+// gele (401/403/429/quota error) proxy (api/tera.js) automatic porer active
+// API-te switch kore dey - kono deploy/code change lage na. Admin -> Watch
+// Button tab-e pura list, current active API, ar remaining play count dekha jay.
+let teraApiPoolCache = null; // { ts, list } - list: sob API row, priority order-e
+
+async function fetchTeraApiPool(force) {
+    if (!force && teraApiPoolCache && Date.now() - teraApiPoolCache.ts < 15000) return teraApiPoolCache.list;
+    const { data, error } = await supabaseClient
+        .from('tera_apis')
+        .select('*')
+        .order('priority', { ascending: true })
+        .order('created_at', { ascending: true });
+    if (error) { console.warn('[Tera Play] tera_apis load fail (SUPABASE_TERA_API_SETTINGS.sql run kora hoyeche to?):', error); return teraApiPoolCache ? teraApiPoolCache.list : []; }
+    teraApiPoolCache = { ts: Date.now(), list: data || [] };
+    return teraApiPoolCache.list;
+}
+
+// Client-side direct-fallback (proxy pura fail korle) er jonno shobcheye upore
+// thaka "active" API-take TERA_API_CONFIG/TERA_API_KEY-e boshiye dey.
+async function loadTeraApiConfig() {
+    try {
+        const list = await fetchTeraApiPool(true);
+        const active = list.find(a => a.status === 'active');
+        if (!active) return;
+        TERA_API_CONFIG.endpoint = active.endpoint;
+        TERA_API_CONFIG.keyName = active.key_name || 'secret';
+        TERA_API_KEY = active.api_key;
+        teraResolveCache.clear();
+    } catch (e) {
+        console.warn('[Tera Play] config load fail:', e);
+    }
+}
+
+// Admin-only CRUD - notun API add, edit, delete, priority move, reset/reactivate
+async function adminAddTeraApi({ name, endpoint, key, keyName, limit }) {
+    if (!isCurrentUserAdmin(currentAuthSession)) throw new Error('Admin only');
+    const list = await fetchTeraApiPool(true);
+    const maxPriority = list.reduce((m, a) => Math.max(m, a.priority || 0), -1);
+    const { error } = await supabaseClient.from('tera_apis').insert({
+        name: (name || '').trim() || 'API', endpoint: (endpoint || '').trim(),
+        api_key: (key || '').trim(), key_name: (keyName || '').trim() || 'secret',
+        credit_limit: limit ? parseInt(limit, 10) : null, priority: maxPriority + 1, status: 'active'
+    });
+    if (error) throw error;
+    teraApiPoolCache = null; teraResolveCache.clear();
+}
+async function adminUpdateTeraApi(id, { name, endpoint, key, keyName, limit }) {
+    if (!isCurrentUserAdmin(currentAuthSession)) throw new Error('Admin only');
+    const { error } = await supabaseClient.from('tera_apis').update({
+        name: (name || '').trim() || 'API', endpoint: (endpoint || '').trim(),
+        api_key: (key || '').trim(), key_name: (keyName || '').trim() || 'secret',
+        credit_limit: limit ? parseInt(limit, 10) : null
+    }).eq('id', id);
+    if (error) throw error;
+    teraApiPoolCache = null; teraResolveCache.clear();
+}
+async function adminDeleteTeraApi(id) {
+    if (!isCurrentUserAdmin(currentAuthSession)) throw new Error('Admin only');
+    const { error } = await supabaseClient.from('tera_apis').delete().eq('id', id);
+    if (error) throw error;
+    teraApiPoolCache = null; teraResolveCache.clear();
+}
+// Exhausted API abar chalu (naya credit kine thakle) + used_count 0 kore dey
+async function adminReactivateTeraApi(id) {
+    if (!isCurrentUserAdmin(currentAuthSession)) throw new Error('Admin only');
+    const { error } = await supabaseClient.from('tera_apis').update({ status: 'active', used_count: 0 }).eq('id', id);
+    if (error) throw error;
+    teraApiPoolCache = null; teraResolveCache.clear();
+}
+async function adminToggleTeraApiDisabled(id, disable) {
+    if (!isCurrentUserAdmin(currentAuthSession)) throw new Error('Admin only');
+    const { error } = await supabaseClient.from('tera_apis').update({ status: disable ? 'disabled' : 'active' }).eq('id', id);
+    if (error) throw error;
+    teraApiPoolCache = null; teraResolveCache.clear();
+}
+async function adminMoveTeraApiPriority(id, dir) {
+    if (!isCurrentUserAdmin(currentAuthSession)) throw new Error('Admin only');
+    const list = await fetchTeraApiPool(true);
+    const idx = list.findIndex(a => a.id === id);
+    const swapIdx = idx + dir;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= list.length) return;
+    const a = list[idx], b = list[swapIdx];
+    const { error: e1 } = await supabaseClient.from('tera_apis').update({ priority: b.priority }).eq('id', a.id);
+    const { error: e2 } = await supabaseClient.from('tera_apis').update({ priority: a.priority }).eq('id', b.id);
+    if (e1 || e2) throw (e1 || e2);
+    teraApiPoolCache = null; teraResolveCache.clear();
+}
+
 const TERA_LINK_REGEX = /(terabox|1024tera|teraboxapp|terafileshare|teraboxlink|4funbox|mirrobox|teraboxshare|momerybox|tibibox|nephobox|freeterabox)/i;
 const teraResolveCache = new Map(); // link -> { ts, data }  (stream URL expire hoy, tai 10 min TTL)
 const TERA_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -736,23 +827,36 @@ async function attachTeraSource(panel, video, url, resumeAt) {
     video.play().catch(() => {});
 }
 
+function teraPanelTopbarHTML(panelId) {
+    return `<div class="tera-panel-topbar"><button type="button" class="tera-panel-close-btn" onclick="closeTeraPlayerPanel('${panelId}')" title="Close player">✕ Close</button></div>`;
+}
+function closeTeraPlayerPanel(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    closeTeraPanel(panel);
+    const body = panel.closest('.tera-player-body');
+    const tw = body ? body.querySelector('.tera-thumb-wrap') : null;
+    if (tw) tw.style.display = '';
+}
+
 async function playTeraLink(btn) {
     const link = btn.getAttribute('data-link');
     const panel = document.getElementById(btn.getAttribute('data-panel'));
+    const thumbWrap = document.getElementById(btn.getAttribute('data-thumb'));
     if (!link || !panel) return;
 
-    // Ekta panel-e already video cholle: toggle kore bondho
-    if (panel.classList.contains('open')) { closeTeraPanel(panel); btn.textContent = '▶ Play'; return; }
-
-    // Onno panel-er video thamano (ek shomoy ekta-i cholbe)
+    // Onno panel-er video thamano (ek shomoy ekta-i cholbe) + oigulor thumbnail abar dekhano
     document.querySelectorAll('.tera-play-panel.open').forEach(p => {
+        if (p === panel) return;
         closeTeraPanel(p);
-        const b = document.querySelector(`.btn-tera-play[data-panel="${p.id}"]`);
-        if (b) b.textContent = '▶ Play';
+        const body = p.closest('.tera-player-body');
+        const tw = body ? body.querySelector('.tera-thumb-wrap') : null;
+        if (tw) tw.style.display = '';
     });
 
+    if (thumbWrap) thumbWrap.style.display = 'none';
     panel.classList.add('open');
-    panel.innerHTML = '<div class="tera-play-status"><span class="watch-loading-spinner" aria-hidden="true"></span> Loading video...</div>';
+    panel.innerHTML = teraPanelTopbarHTML(panel.id) + '<div class="tera-play-status tera-status-box"><span class="watch-loading-spinner" aria-hidden="true"></span> Loading video...</div>';
     btn.disabled = true;
     try {
         const data = await resolveTeraLink(link);
@@ -762,7 +866,7 @@ async function playTeraLink(btn) {
 
         const fileSel = files.length > 1
             ? `<select class="tera-link-select tera-file-select">${files.map((f, i) => `<option value="${i}">${escapeHtml(f.name)}${f.size ? ' (' + escapeHtml(f.size) + ')' : ''}</option>`).join('')}</select>` : '';
-        panel.innerHTML = `
+        panel.innerHTML = teraPanelTopbarHTML(panel.id) + `
             <div class="tera-play-controls">${fileSel}<select class="tera-link-select tera-quality-select" style="display:none"></select></div>
             <div class="tera-video-wrap"><video controls playsinline autoplay preload="metadata"></video></div>
             <div class="tera-play-meta"></div>
@@ -796,20 +900,20 @@ async function playTeraLink(btn) {
         if (fs) fs.addEventListener('change', () => load(files[fs.selectedIndex], 0));
 
         load(cur, 0);
-        btn.textContent = '✖ Close';
         incrementMovieViews(currentModalMovie);
     } catch (err) {
         console.error('Tera play error:', err);
         const why = (TERA_API_CONFIG.debug && err && err.message) ? '<br><small style="opacity:.85;word-break:break-all;">Reason: ' + escapeHtml(err.message) + '</small>' : '';
-        panel.innerHTML = '<div class="tera-play-status tera-play-error">⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
+        panel.innerHTML = teraPanelTopbarHTML(panel.id) + '<div class="tera-play-status tera-play-error tera-status-box">⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
     } finally {
         btn.disabled = false;
     }
 }
 
 
-// Content details modal-er upore-i (download accordion-er bahire) always-visible
-// "Terabox Player" box. Accordion-er bhitorer Play button khuje pawa lagbe na.
+// Content details modal-er upore-i (download accordion-er bahire) "🎬 Video
+// Player" box - onno accordion-gulor moto-i show/hide (collapse) kora jay,
+// header-e click korle.
 function collectTeraLinks(movie) {
     const out = [];
     (Array.isArray(movie.downloadBlocks) ? movie.downloadBlocks : []).forEach(sec => {
@@ -829,17 +933,24 @@ function buildTeraPlayerBoxHTML(movie) {
     if (!TERA_API_CONFIG.endpoint || !TERA_API_KEY) {
         console.warn('[Tera Play] TERA_API_CONFIG.endpoint khali - script.js-e fill korun.');
         return isCurrentUserAdmin(currentAuthSession)
-            ? '<div class="season-accordion-group"><div class="season-box-item"><div class="season-box-header" style="cursor:default;"><span>📦 Terabox Player</span></div><div class="tera-play-status tera-play-error">⚠️ (Admin only) API endpoint set kora nei - script.js → TERA_API_CONFIG.endpoint fill korun.</div></div></div>'
+            ? '<div class="season-accordion-group"><div class="season-box-item"><div class="season-box-header" style="cursor:default;"><span>🎬 Video Player</span></div><div class="tera-play-status tera-play-error">⚠️ (Admin only) API endpoint set kora nei - script.js → TERA_API_CONFIG.endpoint fill korun.</div></div></div>'
             : '';
     }
     const select = links.length > 1
         ? `<select class="tera-link-select" onchange="teraBoxSelectChange(this)">${links.map((l, i) => `<option value="${i}" data-link="${escapeAttr(l.link)}">${escapeHtml(l.label)}</option>`).join('')}</select>`
         : '';
+    const thumbSrc = movie.poster || POSTER_PLACEHOLDER_MISSING;
     return `<div class="season-accordion-group tera-player-group"><div class="season-box-item tera-player-box">
-        <div class="season-box-header" style="cursor:default;"><span>📦 Terabox Player</span></div>
-        <div class="tera-player-body">
+        <div class="season-box-header" onclick="toggleAccordion('tera-player-accordion-body')"><span><span class="tera-header-icon">🎬</span> Video Player</span><span class="dropdown-arrow">▼</span></div>
+        <div class="season-download-body tera-player-body" id="tera-player-accordion-body">
             ${select}
-            <button type="button" class="btn-tera-play tera-main-play" id="teraMainPlayBtn" data-link="${escapeAttr(links[0].link)}" data-panel="tera-panel-main" onclick="playTeraLink(this)">▶ Play</button>
+            <div class="tera-thumb-wrap" id="teraThumbWrap">
+                <img class="tera-thumb-img" src="${escapeAttr(thumbSrc)}" alt="${escapeAttr(movie.title || 'Thumbnail')}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
+                <div class="tera-thumb-overlay"></div>
+                <button type="button" class="btn-tera-play tera-thumb-play-btn" id="teraMainPlayBtn" data-link="${escapeAttr(links[0].link)}" data-panel="tera-panel-main" data-thumb="teraThumbWrap" onclick="playTeraLink(this)" title="Play">
+                    <span class="tera-thumb-play-icon"></span>
+                </button>
+            </div>
             <div class="tera-play-panel" id="tera-panel-main"></div>
         </div></div></div>`;
 }
@@ -848,10 +959,10 @@ function teraBoxSelectChange(sel) {
     const btn = document.getElementById('teraMainPlayBtn');
     const panel = document.getElementById('tera-panel-main');
     if (!btn || !opt) return;
-    closeTeraPanel(panel);
-    btn.textContent = '▶ Play';
+    closeTeraPlayerPanel(panel.id);
     btn.setAttribute('data-link', opt.getAttribute('data-link'));
 }
+
 
 function closeTeraPanel(panel) {
     if (!panel) return;
@@ -867,6 +978,161 @@ async function saveTeraPlayToggle(movie, on) {
     const { error } = await supabaseClient.from('movies').update({ teraPlayEnabled: on }).eq('id', movie.id);
     if (error) throw error;
     movie.teraPlayEnabled = on;
+}
+
+// ---- Admin Watch Button tab: API pool manager (list + summary + add/edit/delete/reorder) ----
+function toggleTeraSettingsBox() {
+    const box = document.getElementById('adminTeraSettingsBox');
+    const collapsible = document.getElementById('adminTeraSettingsCollapsible');
+    const chevron = document.getElementById('adminTeraSettingsChevron');
+    if (!box || !collapsible) return;
+    const collapsed = box.classList.toggle('collapsed');
+    collapsible.style.display = collapsed ? 'none' : '';
+    if (chevron) chevron.textContent = collapsed ? '▸' : '▾';
+    try { localStorage.setItem('adminTeraSettingsCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+}
+
+function escapeTeraAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+async function loadAdminTeraApiStats() {
+    let list = [];
+    try { list = await fetchTeraApiPool(false); } catch (e) {}
+    setAdminStat('adminStatTeraApis', list.length);
+
+    const totalRequests = list.reduce((sum, a) => sum + (Number(a.used_count) || 0), 0);
+    setAdminStat('adminStatTeraRequests', totalRequests.toLocaleString());
+
+    const activeApis = list.filter(a => a.status === 'active');
+    const hasUnlimited = activeApis.some(a => !a.credit_limit);
+    const remainingSum = activeApis.reduce((sum, a) => a.credit_limit ? sum + Math.max(0, a.credit_limit - (Number(a.used_count) || 0)) : sum, 0);
+    setAdminStat('adminStatTeraRemaining', hasUnlimited ? (remainingSum ? remainingSum.toLocaleString() + ' + ∞' : '∞') : remainingSum.toLocaleString());
+}
+
+async function renderAdminTeraApiPool() {
+    // Admin-er age-r choice (open/collapsed) mone rakhe
+    try {
+        const box = document.getElementById('adminTeraSettingsBox');
+        const collapsible = document.getElementById('adminTeraSettingsCollapsible');
+        const chevron = document.getElementById('adminTeraSettingsChevron');
+        if (box && collapsible && localStorage.getItem('adminTeraSettingsCollapsed') === '1') {
+            box.classList.add('collapsed'); collapsible.style.display = 'none'; if (chevron) chevron.textContent = '▸';
+        }
+    } catch (e) {}
+    const summaryEl = document.getElementById('adminTeraApiSummary');
+    const listEl = document.getElementById('adminTeraApiList');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="admin-tera-api-loading">Loading...</div>';
+    let list = [];
+    try { list = await fetchTeraApiPool(true); } catch (e) { /* fetchTeraApiPool nijei warn kore */ }
+
+    const active = list.find(a => a.status === 'active');
+    if (summaryEl) {
+        if (!list.length) {
+            summaryEl.innerHTML = '⚠️ Kono API add kora nei. Neeche "+ Add New API" diye ekta add korun.';
+        } else if (!active) {
+            summaryEl.innerHTML = `❌ Total <b>${list.length}</b> API add kora ache, kintu <b>sob-guloi exhausted/disabled</b> — Play button kaj korbe na. Notun API add korun ba kono ekta reactivate korun.`;
+        } else {
+            const usedTxt = active.credit_limit
+                ? `${active.used_count || 0} / ${active.credit_limit} use hoyeche (baki ${Math.max(0, active.credit_limit - (active.used_count || 0))})`
+                : `${active.used_count || 0} bar use hoyeche (limit set kora nei)`;
+            summaryEl.innerHTML = `✅ Ekhon active: <b>${escapeHtml(active.name)}</b> — ${usedTxt}<br><span style="opacity:.75">Total <b>${list.length}</b> API add kora ache eikhane.</span>`;
+        }
+    }
+
+    if (!list.length) { listEl.innerHTML = ''; return; }
+    listEl.innerHTML = list.map((a, i) => {
+        const badge = a.status === 'active' ? '<span class="tera-api-badge active">● Active</span>'
+            : a.status === 'exhausted' ? '<span class="tera-api-badge exhausted">✖ Exhausted</span>'
+            : '<span class="tera-api-badge disabled">⏸ Disabled</span>';
+        const usedTxt = a.credit_limit ? `${a.used_count || 0} / ${a.credit_limit} used` : `${a.used_count || 0} used`;
+        const inUseTxt = (a.status === 'active' && list.find(x => x.status === 'active') && list.find(x => x.status === 'active').id === a.id) ? ' <small style="opacity:.7">(currently serving)</small>' : '';
+        return `
+        <div class="admin-tera-api-row" data-id="${a.id}">
+            <div class="admin-tera-api-row-main">
+                <div class="admin-tera-api-row-title">${i + 1}. ${escapeHtml(a.name)} ${badge}${inUseTxt}</div>
+                <div class="admin-tera-api-row-meta">${escapeHtml(a.endpoint)}<br>Key param: <code>${escapeHtml(a.key_name || 'secret')}</code> · ${usedTxt}</div>
+            </div>
+            <div class="admin-tera-api-row-actions">
+                <button type="button" class="admin-mini-btn" onclick="moveTeraApiUI('${a.id}', -1)" title="Priority up">▲</button>
+                <button type="button" class="admin-mini-btn" onclick="moveTeraApiUI('${a.id}', 1)" title="Priority down">▼</button>
+                <button type="button" class="admin-mini-btn" onclick="editTeraApiUI('${a.id}')">✏️ Edit</button>
+                ${a.status !== 'active' ? `<button type="button" class="admin-mini-btn" onclick="reactivateTeraApiUI('${a.id}')">♻️ Reactivate</button>` : `<button type="button" class="admin-mini-btn" onclick="toggleDisableTeraApiUI('${a.id}', true)">⏸ Disable</button>`}
+                <button type="button" class="admin-mini-btn admin-mini-btn-danger" onclick="deleteTeraApiUI('${a.id}', '${escapeTeraAttr(a.name)}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function clearTeraApiForm() {
+    ['adminTeraApiEditId', 'adminTeraApiName', 'adminTeraEndpoint', 'adminTeraKey', 'adminTeraKeyName', 'adminTeraLimit'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const knEl = document.getElementById('adminTeraKeyName'); if (knEl) knEl.value = 'secret';
+    const saveBtn = document.getElementById('adminTeraSettingsSaveBtn'); if (saveBtn) saveBtn.textContent = '➕ Add API';
+    const cancelBtn = document.getElementById('adminTeraApiCancelBtn'); if (cancelBtn) cancelBtn.style.display = 'none';
+    const statusEl = document.getElementById('adminTeraSettingsStatus'); if (statusEl) statusEl.textContent = '';
+}
+
+async function editTeraApiUI(id) {
+    const list = await fetchTeraApiPool(false);
+    const a = list.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('adminTeraApiEditId').value = a.id;
+    document.getElementById('adminTeraApiName').value = a.name || '';
+    document.getElementById('adminTeraEndpoint').value = a.endpoint || '';
+    document.getElementById('adminTeraKey').value = a.api_key || '';
+    document.getElementById('adminTeraKeyName').value = a.key_name || 'secret';
+    document.getElementById('adminTeraLimit').value = a.credit_limit || '';
+    document.getElementById('adminTeraSettingsSaveBtn').textContent = '💾 Update API';
+    document.getElementById('adminTeraApiCancelBtn').style.display = '';
+    document.getElementById('adminTeraApiName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function saveAdminTeraSettings() {
+    const editId = document.getElementById('adminTeraApiEditId').value;
+    const name = document.getElementById('adminTeraApiName').value;
+    const endpoint = document.getElementById('adminTeraEndpoint').value.trim();
+    const key = document.getElementById('adminTeraKey').value.trim();
+    const keyName = document.getElementById('adminTeraKeyName').value;
+    const limit = document.getElementById('adminTeraLimit').value;
+    const statusEl = document.getElementById('adminTeraSettingsStatus');
+    const btn = document.getElementById('adminTeraSettingsSaveBtn');
+    if (!endpoint || !key) {
+        if (statusEl) { statusEl.textContent = '⚠️ Endpoint ar API Key khali rakha jabe na.'; statusEl.className = 'admin-tera-settings-status err'; }
+        return;
+    }
+    if (btn) btn.disabled = true;
+    if (statusEl) { statusEl.textContent = 'Saving...'; statusEl.className = 'admin-tera-settings-status'; }
+    try {
+        if (editId) await adminUpdateTeraApi(editId, { name, endpoint, key, keyName, limit });
+        else await adminAddTeraApi({ name, endpoint, key, keyName, limit });
+        clearTeraApiForm();
+        if (statusEl) { statusEl.textContent = '✅ Saved!'; statusEl.className = 'admin-tera-settings-status ok'; }
+        await loadTeraApiConfig();
+        renderAdminTeraApiPool();
+    } catch (err) {
+        console.error('Tera API save error:', err);
+        if (statusEl) { statusEl.textContent = '❌ Save fail holo: ' + (err && err.message ? err.message : 'Unknown error') + ' (SUPABASE_TERA_API_SETTINGS.sql run kora hoyeche to?)'; statusEl.className = 'admin-tera-settings-status err'; }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+async function deleteTeraApiUI(id, name) {
+    if (!confirm(`"${name}" API-ta delete korte chan?`)) return;
+    try { await adminDeleteTeraApi(id); await loadTeraApiConfig(); renderAdminTeraApiPool(); }
+    catch (e) { alert('Delete fail: ' + (e && e.message)); }
+}
+async function reactivateTeraApiUI(id) {
+    try { await adminReactivateTeraApi(id); await loadTeraApiConfig(); renderAdminTeraApiPool(); }
+    catch (e) { alert('Reactivate fail: ' + (e && e.message)); }
+}
+async function toggleDisableTeraApiUI(id, disable) {
+    try { await adminToggleTeraApiDisabled(id, disable); await loadTeraApiConfig(); renderAdminTeraApiPool(); }
+    catch (e) { alert('Fail: ' + (e && e.message)); }
+}
+async function moveTeraApiUI(id, dir) {
+    try { await adminMoveTeraApiPriority(id, dir); renderAdminTeraApiPool(); }
+    catch (e) { alert('Fail: ' + (e && e.message)); }
 }
 
 const DEFAULT_FAST_SERVERS = [
@@ -3090,6 +3356,10 @@ function toggleAccordion(id) {
             const watchBox = item.closest('.watch-box');
             if (watchBox) resetWatchBoxToThumbnail(watchBox);
         }
+        // Video Player (Terabox) box hide/collapse hoile - video/hls thamiye
+        // abar thumbnail-e ferot niye asha, noile background-e chalu thakto.
+        const teraPanel = item.querySelector('.tera-play-panel.open');
+        if (teraPanel) closeTeraPlayerPanel(teraPanel.id);
     });
     if (!isOpen) {
         el.classList.add('open');
@@ -4266,6 +4536,7 @@ function initApp() {
     renderCustomNavItems();
     setupHeroBannerControls();
 
+    loadTeraApiConfig();
     fetchMoviesFromSupabase();
 
     const modalOverlay = document.getElementById('movieModalOverlay');
@@ -6459,6 +6730,8 @@ function switchAdminTab(tab) {
     } else if (validTab === 'watch') {
         const searchInput = document.getElementById('adminWatchSearchInput');
         renderAdminWatchList(searchInput ? searchInput.value.trim() : '');
+        clearTeraApiForm();
+        renderAdminTeraApiPool();
     } else if (validTab === 'banner') {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -6512,6 +6785,7 @@ async function loadAdminDashboardStats() {
     setAdminStat('adminStatAlerts', Array.isArray(allLinkAlerts) ? allLinkAlerts.length : '…');
     setAdminStat('adminStatRequests', Array.isArray(allAdminRequests) ? allAdminRequests.length : '…');
     setAdminStat('adminStatMessages', Array.isArray(allAdminMessages) ? allAdminMessages.length : '…');
+    loadAdminTeraApiStats();
 
     // Recently Added (top 5 by created_at)
     const recentEl = document.getElementById('adminDashRecent');

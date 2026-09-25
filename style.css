@@ -3911,10 +3911,17 @@ html.light-mode .massive-watch-player .massive-watch-status { background-color: 
 .btn-tera-dl:hover { background: rgba(139, 195, 74, 0.15); }
 .tera-play-status { display: flex; align-items: center; gap: 8px; padding: 12px; font-size: 13px; color: #cbd5e1; }
 .tera-play-error { color: #fca5a5; }
+/* Loading / initial-error state: eki box (16:9, fixed) je video-wrap use kore,
+   jate video-r file size/duration-er upor depend na kore player box-er size
+   sob somoy same thake, ar loading icon/spinner box-er thik center-e boshe. */
+.tera-status-box { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; }
+.tera-status-box .watch-loading-spinner { margin: 0; }
+.tera-status-box small { display: block; max-width: 100%; }
 html.light-mode .tera-play-status { color: #475569; }
 html.light-mode .tera-play-error { color: #b91c1c; }
 html.light-mode .btn-tera-play, html.light-mode .btn-tera-dl { color: #1a2b0a; }
-.tera-player-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.tera-player-body { padding: 0; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.tera-player-body.open { padding: 14px; }
 .tera-player-body .tera-play-panel { width: 100%; }
 .tera-link-select { max-width: 100%; padding: 8px 10px; border-radius: 6px; background: #0e1017; color: #fff; border: 1.5px solid #8bc34a; font-size: 13px; }
 html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
@@ -3923,3 +3930,54 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 .tera-play-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .tera-play-controls .tera-link-select { flex: 1 1 160px; max-width: 100%; }
 .tera-play-meta { margin-top: 8px; font-size: 12px; opacity: 0.75; word-break: break-word; }
+
+/* Admin: Terabox Watch API Settings box */
+.admin-tera-settings-box { background: rgba(139, 195, 74, 0.06); border: 1.5px solid rgba(139, 195, 74, 0.35); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
+.admin-tera-settings-header { font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+.admin-tera-settings-note { font-size: 12.5px; opacity: 0.75; margin-bottom: 12px; line-height: 1.5; }
+.admin-tera-settings-body { display: flex; flex-direction: column; gap: 10px; }
+.admin-tera-settings-body .admin-field label small { opacity: 0.65; font-weight: 400; }
+.admin-tera-settings-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-tera-settings-status { font-size: 13px; font-weight: 600; }
+.admin-tera-settings-status.ok { color: #8bc34a; }
+.admin-tera-settings-status.err { color: #ff6b6b; }
+
+/* Admin: Terabox API pool list rows + badges */
+.admin-tera-api-summary { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; line-height: 1.6; margin-bottom: 12px; }
+.admin-tera-api-list { margin-bottom: 16px; max-height: 320px; overflow-y: auto; }
+.admin-tera-api-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.admin-tera-api-row-title { font-weight: 700; font-size: 13.5px; margin-bottom: 4px; }
+.admin-tera-api-row-meta { font-size: 12px; opacity: 0.7; word-break: break-all; }
+.admin-tera-api-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.tera-api-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+.tera-api-badge.active { background: rgba(139, 195, 74, 0.18); color: #8bc34a; }
+.tera-api-badge.exhausted { background: rgba(255, 107, 107, 0.18); color: #ff6b6b; }
+.tera-api-badge.disabled { background: rgba(255, 255, 255, 0.12); color: #aaa; }
+.admin-mini-btn-danger { color: #ff6b6b; border-color: rgba(255,107,107,0.4) !important; }
+
+/* Admin: Terabox API Pool box show/hide toggle */
+.admin-tera-settings-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.admin-tera-settings-chevron { font-size: 14px; opacity: 0.75; transition: transform 0.15s ease; }
+.admin-tera-settings-box.collapsed .admin-tera-settings-header { margin-bottom: 0; }
+.admin-tera-settings-box.collapsed { padding-bottom: 16px; }
+
+/* Terabox Player: thumbnail + centered play button (online-watch style) */
+.tera-thumb-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 0; overflow: hidden; background: #0a0a0a; margin-top: 4px; }
+.tera-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tera-thumb-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.15) 100%); pointer-events: none; }
+.tera-thumb-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 68px; height: 48px; padding: 0; border-radius: 12px; background: rgba(20, 20, 20, 0.75); border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+.tera-thumb-play-btn:hover { border-color: #ff0000; transform: translate(-50%, -50%) scale(1.06); }
+.tera-thumb-play-btn:disabled { opacity: 0.6; cursor: default; transform: translate(-50%, -50%); }
+.tera-thumb-play-icon { display: block; width: 0; height: 0; border-style: solid; border-width: 11px 0 11px 19px; border-color: transparent transparent transparent #ffffff; margin-left: 4px; /* optical center */ }
+
+/* Video panel top bar with Close button (returns to thumbnail) */
+.tera-panel-topbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.tera-panel-close-btn { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.tera-panel-close-btn:hover { background: rgba(255,107,107,0.22); border-color: rgba(255,107,107,0.5); }
+
+/* Video Player (Terabox) box: TMDb-style dark/blue theme (site pattern: .season-box-item.<type>) + fix emoji-inflated header height */
+.tera-player-group { border-radius: 0; }
+.season-box-item.tera-player-box { background: #0d253f; border: 1px solid #01b4e4; border-radius: 0; }
+.tera-player-box .season-box-header:hover { background: rgba(1, 180, 228, 0.15); }
+.tera-player-box .season-box-header .dropdown-arrow { color: #01b4e4; }
+.tera-header-icon { display: inline-block; font-size: 14px; line-height: 1; vertical-align: middle; }
