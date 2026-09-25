@@ -672,7 +672,7 @@ function extractTeraUrls(payload) {
                 const fast = (f.fast_stream_url && typeof f.fast_stream_url === 'object') ? f.fast_stream_url : {};
                 const fastStr = typeof f.fast_stream_url === 'string' ? f.fast_stream_url : '';
                 const qualities = Object.keys(fast)
-                    .filter(k => typeof fast[k] === 'string' && /^https?:\/\//i.test(fast[k]))
+                    .filter(k => typeof fast[k] === 'string' && /^https?:\/\//i.test(fast[k]) && parseInt(k, 10) !== 360) // 360p link kaj kore na, tai list-e dekhano hoy na
                     .sort((x, y) => (parseInt(x) || 0) - (parseInt(y) || 0));
                 return {
                     name: f.name || 'Video',
@@ -992,16 +992,12 @@ async function playTeraLink(btn) {
 
         // Note: file/quality select dropdown-gulo r dekhano hoy na - custom player-er
         // settings (⚙) icon-e quality option thake, download button-o icon hishebe.
-        panel.innerHTML = `
-            <div class="tera-video-wrap tcp-player">${teraCloseBtnHTML(panel.id)}<video playsinline autoplay preload="metadata"></video>${tcpCustomControlsHTML()}</div>
-            <div class="tera-play-meta"></div>`;
+        panel.innerHTML = `<div class="tera-video-wrap tcp-player">${teraCloseBtnHTML(panel.id)}<video playsinline autoplay preload="metadata"></video>${tcpCustomControlsHTML()}</div>`;
         const wrap = panel.querySelector('.tera-video-wrap');
         const video = panel.querySelector('video');
-        const meta = panel.querySelector('.tera-play-meta');
 
         const load = (file) => {
             if (file.thumb) video.poster = file.thumb;
-            meta.innerHTML = [file.name, file.duration, file.quality, file.size].filter(Boolean).map(escapeHtml).join(' · ');
             const opts = [];
             if (file.stream) opts.push({ label: file.quality ? 'Default (' + file.quality + ')' : 'Default', url: file.stream });
             file.fast.forEach(f => opts.push({ label: f.q + ' (Fast)', url: f.url }));
