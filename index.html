@@ -576,18 +576,6 @@
                             <div class="admin-stat-icon">🗑</div>
                             <div><div class="admin-stat-value" id="adminStatTrash">—</div><div class="admin-stat-label">Recycle Bin</div></div>
                         </div>
-                        <div class="admin-stat-card">
-                            <div class="admin-stat-icon">🔌</div>
-                            <div><div class="admin-stat-value" id="adminStatTeraApis">—</div><div class="admin-stat-label">Terabox APIs Added</div></div>
-                        </div>
-                        <div class="admin-stat-card">
-                            <div class="admin-stat-icon">📡</div>
-                            <div><div class="admin-stat-value" id="adminStatTeraRequests">—</div><div class="admin-stat-label">API Requests Sent</div></div>
-                        </div>
-                        <div class="admin-stat-card">
-                            <div class="admin-stat-icon">⏳</div>
-                            <div><div class="admin-stat-value" id="adminStatTeraRemaining">—</div><div class="admin-stat-label">API Requests Remaining</div></div>
-                        </div>
                     </div>
 
                     <div class="admin-dash-panels">
@@ -724,47 +712,6 @@
 
                 <!-- WATCH BUTTON TAB (quickly On/Off toggle the "Online Watch" button + set a custom embed link for any movie/series, without opening the full Add/Edit Content form) -->
                 <div class="admin-tab-content" id="adminTabWatch" style="display:none;">
-                    <!-- TERABOX WATCH API POOL: ekadhik API save rakha jay, ekta-r limit shesh hole automatic
-                         porer ta-te switch hoy (proxy: api/tera.js). Code change lage na. -->
-                    <div class="admin-tera-settings-box" id="adminTeraSettingsBox">
-                        <div class="admin-tera-settings-header" id="adminTeraSettingsToggle" onclick="toggleTeraSettingsBox()">
-                            <span>🔌 Terabox Watch API Pool</span>
-                            <span class="admin-tera-settings-chevron" id="adminTeraSettingsChevron">▾</span>
-                        </div>
-                        <div class="admin-tera-settings-collapsible" id="adminTeraSettingsCollapsible">
-                        <div class="admin-tera-settings-note">Ekadhik API eikhane add kora jay. Ekta-r credit/limit shesh hole (401/403/429 error) system automatic porer active API-te switch kore dey — kono deploy lagbe na.</div>
-                        <div class="admin-tera-api-summary" id="adminTeraApiSummary">Loading...</div>
-                        <div class="admin-database-list admin-tera-api-list" id="adminTeraApiList"></div>
-                        <div class="admin-tera-settings-body">
-                            <input type="hidden" id="adminTeraApiEditId" value="">
-                            <div class="admin-field">
-                                <label>API Name <small>(shudhu tomar chinbar jonno)</small></label>
-                                <input type="text" id="adminTeraApiName" placeholder="e.g. PlayTeraBox #1">
-                            </div>
-                            <div class="admin-field">
-                                <label>API Endpoint</label>
-                                <input type="text" id="adminTeraEndpoint" placeholder="https://api.playterabox.com/api/proxy">
-                            </div>
-                            <div class="admin-field">
-                                <label>API Key</label>
-                                <input type="text" id="adminTeraKey" placeholder="pk_...">
-                            </div>
-                            <div class="admin-field">
-                                <label>Key Parameter Name <small>(advanced, na chinle default rakhun)</small></label>
-                                <input type="text" id="adminTeraKeyName" placeholder="secret" value="secret">
-                            </div>
-                            <div class="admin-field">
-                                <label>Credit Limit <small>(optional — number, jokhon set thake tokhon limit-e pouche gele automatic exhausted mark hoy)</small></label>
-                                <input type="text" id="adminTeraLimit" placeholder="e.g. 998">
-                            </div>
-                            <div class="admin-tera-settings-actions">
-                                <button type="button" class="admin-banner-save-btn" id="adminTeraSettingsSaveBtn" onclick="saveAdminTeraSettings()">➕ Add API</button>
-                                <button type="button" class="admin-mini-btn" id="adminTeraApiCancelBtn" onclick="clearTeraApiForm()" style="display:none;">✕ Cancel Edit</button>
-                                <span id="adminTeraSettingsStatus" class="admin-tera-settings-status"></span>
-                            </div>
-                        </div>
-                        </div>
-                    </div>
                     <div class="admin-manage-search">
                         <input type="text" id="adminWatchSearchInput" placeholder="🔍 Search content to add/edit Watch Button...">
                     </div>
