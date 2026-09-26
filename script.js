@@ -988,7 +988,7 @@ function renderHeroSlides() {
             if (i === N - 1) targetIds.push('cloneLast');
             targetIds.forEach(id => {
                 const bgEl = document.getElementById(`heroBg-${id}`);
-                if (bgEl && data && data.backdrop) bgEl.style.backgroundImage = `url('${data.backdrop}')`;
+                if (bgEl && data && data.backdrop) bgEl.style.backgroundImage = `url('${upgradePosterQuality(data.backdrop)}')`;
                 const dateEl = document.getElementById(`heroDate-${id}`);
                 if (dateEl) {
                     const label = formatHeroDateLabel(movie, data && data.releaseDate);
@@ -2086,7 +2086,7 @@ function renderMoviesByPage(movies, page) {
 
         const resolvedPoster = movie.poster || (tmdb && tmdb.poster) || (omdb && omdb.poster) || null;
         if (imgEl && resolvedPoster) {
-            imgEl.src = resolvedPoster;
+            imgEl.src = upgradePosterQuality(resolvedPoster);
         }
 
         const finalRating = getSmartRating(tmdb, omdb);
