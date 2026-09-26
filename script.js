@@ -848,7 +848,8 @@ const TCP_ICON = {
     download: '<svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l-4-4m4 4l4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     speed: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 13l4-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 3h6M9 3l1.2 2M15 3l-1.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
-    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
+    plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
 };
 const TCP_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 function tcpFmtTime(s) {
@@ -873,9 +874,25 @@ function tcpCustomControlsHTML() {
         </div>
         <div class="tcp-icons-bar">
             <div class="tcp-icons">
-                <div class="tcp-settings-menu" hidden></div>
-                <div class="tcp-cc-menu" hidden></div>
-                <div class="tcp-speed-menu" hidden>
+                <button type="button" class="tcp-icon-btn tcp-cc-btn disabled" title="Subtitle" aria-label="Subtitle">${TCP_ICON.cc}</button>
+                <button type="button" class="tcp-icon-btn tcp-speed-btn" title="Playback speed" aria-label="Playback speed">${TCP_ICON.speed}</button>
+                <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Settings" aria-label="Settings">${TCP_ICON.gear}</button>
+                <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
+            </div>
+        </div>
+        <div class="tcp-settings-panel" hidden>
+            <div class="tcp-settings-tabs">
+                <button type="button" class="tcp-tab-btn active" data-tab="quality">Quality</button>
+                <button type="button" class="tcp-tab-btn" data-tab="subtitles">Subtitles</button>
+                <button type="button" class="tcp-tab-btn" data-tab="audio">Audio</button>
+                <button type="button" class="tcp-tab-btn" data-tab="speed">Speed</button>
+                <button type="button" class="tcp-settings-close" aria-label="Close">${TCP_ICON.close}</button>
+            </div>
+            <div class="tcp-settings-body">
+                <div class="tcp-tab-pane" data-pane="quality"></div>
+                <div class="tcp-tab-pane" data-pane="subtitles" hidden></div>
+                <div class="tcp-tab-pane" data-pane="audio" hidden></div>
+                <div class="tcp-tab-pane" data-pane="speed" hidden>
                     <div class="tcp-speed-value">1.00x</div>
                     <div class="tcp-speed-slider-row">
                         <button type="button" class="tcp-speed-minus" aria-label="Decrease speed">${TCP_ICON.minus}</button>
@@ -884,10 +901,6 @@ function tcpCustomControlsHTML() {
                     </div>
                     <div class="tcp-speed-presets">${TCP_SPEEDS.map(s => `<button type="button" data-speed="${s}" class="${s === 1 ? 'active' : ''}">${s}x</button>`).join('')}</div>
                 </div>
-                <button type="button" class="tcp-icon-btn tcp-cc-btn disabled" title="Subtitle" aria-label="Subtitle">${TCP_ICON.cc}</button>
-                <button type="button" class="tcp-icon-btn tcp-speed-btn" title="Playback speed" aria-label="Playback speed">${TCP_ICON.speed}</button>
-                <button type="button" class="tcp-icon-btn tcp-settings-btn" title="Quality" aria-label="Quality" hidden>${TCP_ICON.gear}</button>
-                <button type="button" class="tcp-icon-btn tcp-download-btn" title="Download" aria-label="Download" hidden>${TCP_ICON.download}</button>
             </div>
         </div>
         <div class="tcp-download-overlay">
@@ -903,12 +916,18 @@ function initTeraCustomPlayer(panel, wrap, video, opts, downloadUrl) {
     const timeEl = wrap.querySelector('.tcp-time');
     const fsBtn = wrap.querySelector('.tcp-fullscreen-btn');
     const ccBtn = wrap.querySelector('.tcp-cc-btn');
-    const ccMenu = wrap.querySelector('.tcp-cc-menu');
     const settingsBtn = wrap.querySelector('.tcp-settings-btn');
-    const settingsMenu = wrap.querySelector('.tcp-settings-menu');
+    const settingsPanel = wrap.querySelector('.tcp-settings-panel');
+    const settingsClose = wrap.querySelector('.tcp-settings-close');
+    const tabBtns = wrap.querySelectorAll('.tcp-tab-btn');
+    const panes = {
+        quality: wrap.querySelector('.tcp-tab-pane[data-pane="quality"]'),
+        subtitles: wrap.querySelector('.tcp-tab-pane[data-pane="subtitles"]'),
+        audio: wrap.querySelector('.tcp-tab-pane[data-pane="audio"]'),
+        speed: wrap.querySelector('.tcp-tab-pane[data-pane="speed"]')
+    };
     const dlBtn = wrap.querySelector('.tcp-download-btn');
     const speedBtn = wrap.querySelector('.tcp-speed-btn');
-    const speedMenu = wrap.querySelector('.tcp-speed-menu');
     const speedRange = wrap.querySelector('.tcp-speed-range');
     const speedValueEl = wrap.querySelector('.tcp-speed-value');
 
@@ -943,9 +962,58 @@ function initTeraCustomPlayer(panel, wrap, video, opts, downloadUrl) {
         else if (wrap.requestFullscreen) wrap.requestFullscreen().catch(() => {});
     });
 
-    // ---- Subtitle: video/stream-e (HLS manifest-e embedded subtitle, ba sidecar
-    // file.subtitle theke attach kora <track>) je track-i pawa jak, video.textTracks-e
-    // eshe জমা hoy - tai easta shune dynamically CC button on/off + menu banano hoy,
+    // ---- Ekta unified tabbed Settings panel (Quality / Subtitles / Audio /
+    // Speed) - gear, CC ba Speed icon-e click korle eki panel khole,
+    // sudhu tab ta alada (image reference-er moto).
+    const openSettingsPanel = (tab) => {
+        settingsPanel.hidden = false;
+        switchTab(tab);
+    };
+    const closeSettingsPanel = () => { settingsPanel.hidden = true; };
+    const switchTab = (tab) => {
+        tabBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tab));
+        Object.keys(panes).forEach(k => { panes[k].hidden = (k !== tab); });
+        if (tab === 'quality') renderQualityPane();
+        else if (tab === 'subtitles') renderSubtitlesPane();
+        else if (tab === 'audio') renderAudioPane();
+    };
+    tabBtns.forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); switchTab(b.getAttribute('data-tab')); }));
+    settingsClose.addEventListener('click', (e) => { e.stopPropagation(); closeSettingsPanel(); });
+    settingsPanel.addEventListener('click', (e) => e.stopPropagation());
+    settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); openSettingsPanel('quality'); });
+
+    const rowHTML = (label, badge, active, dataAttrs) => (
+        `<div class="tcp-settings-row${active ? ' active' : ''}" ${dataAttrs}>` +
+        `<span class="tcp-settings-row-label">${label}</span>` +
+        (badge ? `<span class="tcp-settings-badge${active ? ' active' : ''}">${badge}</span>` : '') +
+        `</div>`
+    );
+    const emptyRow = (msg) => `<div class="tcp-settings-empty">${msg}</div>`;
+
+    // ---- Quality tab: alada mirror/URL (Default/Fast) - existing opts[] theke ----
+    let activeQualityIdx = 0;
+    const qualityBadge = (label, active) => {
+        const m = /(\d{3,4})p/i.exec(label || '');
+        if (!m) return active ? 'Selected' : '';
+        if (!active) return m[1] + 'p';
+        const n = parseInt(m[1], 10);
+        return n >= 1080 ? 'Full HD' : n >= 720 ? 'HD' : n >= 480 ? 'SD' : m[1] + 'p';
+    };
+    const renderQualityPane = () => {
+        if (!opts || !opts.length) { panes.quality.innerHTML = emptyRow('Kono quality option nei.'); return; }
+        panes.quality.innerHTML = opts.map((o, i) => rowHTML(escapeHtml(o.label), qualityBadge(o.label, i === activeQualityIdx), i === activeQualityIdx, `data-i="${i}"`)).join('');
+        panes.quality.querySelectorAll('.tcp-settings-row').forEach(r => r.addEventListener('click', () => {
+            const idx = parseInt(r.getAttribute('data-i'), 10);
+            if (idx === activeQualityIdx) { closeSettingsPanel(); return; }
+            activeQualityIdx = idx;
+            attachTeraSource(panel, video, opts[idx].url, video.currentTime || 0);
+            closeSettingsPanel();
+        }));
+    };
+
+    // ---- Subtitles tab: video/stream-e (HLS manifest-e embedded subtitle, ba
+    // sidecar file.subtitle theke attach kora <track>) je track pawa jak,
+    // video.textTracks-e eshe জমা hoy - tai eta shune dynamically CC on/off hoy,
     // kono hardcoded "hasSubtitle" flag-er upor nirvor kore na.
     let ccTracks = [];
     const refreshCcState = () => {
@@ -964,86 +1032,52 @@ function initTeraCustomPlayer(panel, wrap, video, opts, downloadUrl) {
             ccBtn.setAttribute('aria-disabled', 'true');
             ccBtn.title = 'No subtitle available';
             ccBtn.classList.remove('active');
-            ccMenu.hidden = true;
         }
+        if (!settingsPanel.hidden && !panes.subtitles.hidden) renderSubtitlesPane();
     };
     refreshCcState();
     video.textTracks.addEventListener('addtrack', refreshCcState);
     video.textTracks.addEventListener('removetrack', refreshCcState);
-
-    const renderCcMenu = () => {
+    const renderSubtitlesPane = () => {
         const offActive = !ccTracks.some(t => t.mode === 'showing');
-        let html = `<button type="button" data-off="1" class="${offActive ? 'active' : ''}">Off</button>`;
-        html += ccTracks.map((t, i) => `<button type="button" data-i="${i}" class="${t.mode === 'showing' ? 'active' : ''}">${escapeHtml(t.label || t.language || ('Subtitle ' + (i + 1)))}</button>`).join('');
-        ccMenu.innerHTML = html;
-        ccMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (b.hasAttribute('data-off')) {
+        let html = rowHTML('Off', '', offActive, 'data-off="1"');
+        html += ccTracks.map((t, i) => rowHTML(escapeHtml(t.label || t.language || ('Subtitle ' + (i + 1))), t.mode === 'showing' ? 'On' : '', t.mode === 'showing', `data-i="${i}"`)).join('');
+        panes.subtitles.innerHTML = ccTracks.length ? html : emptyRow('Ei video-te kono subtitle nei.');
+        panes.subtitles.querySelectorAll('.tcp-settings-row').forEach(r => r.addEventListener('click', () => {
+            if (r.hasAttribute('data-off')) {
                 ccTracks.forEach(t => { t.mode = 'hidden'; });
                 ccBtn.classList.remove('active');
             } else {
-                const idx = parseInt(b.getAttribute('data-i'), 10);
+                const idx = parseInt(r.getAttribute('data-i'), 10);
                 ccTracks.forEach((t, i) => { t.mode = i === idx ? 'showing' : 'hidden'; });
                 ccBtn.classList.add('active');
             }
-            ccMenu.hidden = true;
+            renderSubtitlesPane();
+            closeSettingsPanel();
         }));
     };
-    ccBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!ccTracks.length) return;
-        if (ccTracks.length === 1) {
-            const t = ccTracks[0];
-            const on = t.mode === 'showing';
-            t.mode = on ? 'hidden' : 'showing';
-            ccBtn.classList.toggle('active', !on);
-            return;
-        }
-        settingsMenu.hidden = true; speedMenu.hidden = true;
-        renderCcMenu();
-        ccMenu.hidden = !ccMenu.hidden;
-    });
-    document.addEventListener('click', (e) => { if (!ccMenu.hidden && !ccMenu.contains(e.target) && e.target !== ccBtn) ccMenu.hidden = true; });
+    ccBtn.addEventListener('click', (e) => { e.stopPropagation(); openSettingsPanel('subtitles'); });
 
-    // ---- Quality (opts, alada mirror/URL) + Audio (HLS stream-er nijer embedded
-    // audio track, jemon multiple language dub) - dutoi ekই gear/Settings menu-te.
+    // ---- Audio tab: HLS stream-er nijer embedded audio track (jemon multiple
+    // language dub) - manifest parse howar por 'teratracks' event-e detect hoy ----
     let hlsAudioTracks = (video._teraTracks && video._teraTracks.audio) || [];
     let activeAudioIdx = 0;
-    const renderSettingsMenu = () => {
-        let html = '';
-        const hasQuality = opts && opts.length > 1;
-        const hasAudio = hlsAudioTracks.length > 1;
-        if (hasQuality) {
-            html += '<div class="tcp-settings-group-label">Quality</div>';
-            html += opts.map((o, i) => `<button type="button" data-kind="q" data-i="${i}" class="${i === 0 ? 'active' : ''}">${escapeHtml(o.label)}</button>`).join('');
-        }
-        if (hasAudio) {
-            html += '<div class="tcp-settings-group-label">Audio</div>';
-            html += hlsAudioTracks.map((a, i) => `<button type="button" data-kind="a" data-i="${i}" class="${i === activeAudioIdx ? 'active' : ''}">${escapeHtml(a.name || a.lang || ('Audio ' + (i + 1)))}</button>`).join('');
-        }
-        settingsMenu.innerHTML = html;
-        settingsBtn.hidden = !(hasQuality || hasAudio);
-        settingsMenu.querySelectorAll('button').forEach(b => b.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const idx = parseInt(b.getAttribute('data-i'), 10);
-            settingsMenu.hidden = true;
-            if (b.getAttribute('data-kind') === 'q') {
-                attachTeraSource(panel, video, opts[idx].url, video.currentTime || 0);
-            } else {
-                activeAudioIdx = idx;
-                if (panel._hls) { try { panel._hls.audioTrack = idx; } catch (e) {} }
-                renderSettingsMenu();
-            }
+    const renderAudioPane = () => {
+        if (!hlsAudioTracks.length) { panes.audio.innerHTML = emptyRow('Ei video-te ekadhik audio track detect hoyni.'); return; }
+        panes.audio.innerHTML = hlsAudioTracks.map((a, i) => rowHTML(escapeHtml(a.name || a.lang || ('Audio ' + (i + 1))), i === activeAudioIdx ? 'Selected' : '', i === activeAudioIdx, `data-i="${i}"`)).join('');
+        panes.audio.querySelectorAll('.tcp-settings-row').forEach(r => r.addEventListener('click', () => {
+            const idx = parseInt(r.getAttribute('data-i'), 10);
+            activeAudioIdx = idx;
+            if (panel._hls) { try { panel._hls.audioTrack = idx; } catch (e) {} }
+            renderAudioPane();
+            closeSettingsPanel();
         }));
     };
-    renderSettingsMenu();
     video.addEventListener('teratracks', (e) => {
         hlsAudioTracks = (e.detail && e.detail.audio) || [];
         activeAudioIdx = 0;
-        renderSettingsMenu();
+        if (!settingsPanel.hidden && !panes.audio.hidden) renderAudioPane();
     });
-    settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); speedMenu.hidden = true; ccMenu.hidden = true; settingsMenu.hidden = !settingsMenu.hidden; });
-    document.addEventListener('click', (e) => { if (!settingsMenu.hidden && !settingsMenu.contains(e.target) && e.target !== settingsBtn) settingsMenu.hidden = true; });
 
     if (downloadUrl) {
         dlBtn.hidden = false;
@@ -1086,22 +1120,21 @@ function initTeraCustomPlayer(panel, wrap, video, opts, downloadUrl) {
         video.playbackRate = rate;
         speedRange.value = rate;
         speedValueEl.textContent = rate.toFixed(2) + 'x';
-        speedMenu.querySelectorAll('.tcp-speed-presets button').forEach(b => b.classList.toggle('active', parseFloat(b.getAttribute('data-speed')) === rate));
+        panes.speed.querySelectorAll('.tcp-speed-presets button').forEach(b => b.classList.toggle('active', parseFloat(b.getAttribute('data-speed')) === rate));
         speedBtn.classList.toggle('active', rate !== 1);
     };
-    speedBtn.addEventListener('click', (e) => { e.stopPropagation(); settingsMenu.hidden = true; speedMenu.hidden = !speedMenu.hidden; });
+    speedBtn.addEventListener('click', (e) => { e.stopPropagation(); openSettingsPanel('speed'); });
     speedRange.addEventListener('input', () => setSpeed(parseFloat(speedRange.value)));
     wrap.querySelector('.tcp-speed-minus').addEventListener('click', (e) => { e.stopPropagation(); setSpeed(video.playbackRate - 0.25); });
     wrap.querySelector('.tcp-speed-plus').addEventListener('click', (e) => { e.stopPropagation(); setSpeed(video.playbackRate + 0.25); });
-    speedMenu.querySelectorAll('.tcp-speed-presets button').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); setSpeed(parseFloat(b.getAttribute('data-speed'))); }));
-    document.addEventListener('click', (e) => { if (!speedMenu.hidden && !speedMenu.contains(e.target) && e.target !== speedBtn) speedMenu.hidden = true; });
+    panes.speed.querySelectorAll('.tcp-speed-presets button').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); setSpeed(parseFloat(b.getAttribute('data-speed'))); }));
 
     // Controls auto-hide (video chola obosthay mouse/touch na thakle lukiye jay)
     let hideTimer;
     const showControls = () => {
         wrap.classList.add('tcp-controls-visible');
         clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => { if (!video.paused && settingsMenu.hidden) wrap.classList.remove('tcp-controls-visible'); }, 2800);
+        hideTimer = setTimeout(() => { if (!video.paused && settingsPanel.hidden) wrap.classList.remove('tcp-controls-visible'); }, 2800);
     };
     wrap.addEventListener('mousemove', showControls);
     wrap.addEventListener('touchstart', showControls, { passive: true });
@@ -1123,6 +1156,41 @@ function closeTeraPlayerPanel(panelId) {
     if (tw) tw.style.display = '';
 }
 
+// Ekta link resolve kore player-e load+play kora
+async function teraLoadAndPlay(panel, link) {
+    if (!panel || !link) return;
+    panel.innerHTML = '<div class="tera-play-status tera-status-box">' + teraCloseBtnHTML(panel.id) + '<span class="watch-loading-spinner spinner-lg" aria-hidden="true"></span></div>';
+    try {
+        const data = await resolveTeraLink(link);
+        if (!panel.classList.contains('open')) return; // ei shomoy user bondho kore diyeche
+        const files = data.files || [];
+        const cur = files[0];
+
+        // Note: file/quality select dropdown-gulo r dekhano hoy na - custom player-er
+        // Settings (⚙) panel-e Quality/Subtitles/Audio/Speed - shob ekhane.
+        panel.innerHTML = `<div class="tera-video-wrap tcp-player">${teraCloseBtnHTML(panel.id)}<video playsinline autoplay preload="metadata"></video>${tcpCustomControlsHTML()}</div>`;
+        const wrap = panel.querySelector('.tera-video-wrap');
+        const video = panel.querySelector('video');
+
+        const load = (file) => {
+            if (file.thumb) video.poster = file.thumb;
+            const opts = [];
+            if (file.stream) opts.push({ label: file.quality ? 'Default (' + file.quality + ')' : 'Default', url: file.stream });
+            (file.fast || []).forEach(f => opts.push({ label: f.q + ' (Fast)', url: f.url }));
+            video.querySelectorAll('track').forEach(t => t.remove());
+            const first = opts[0] ? opts[0].url : file.download;
+            attachTeraSource(panel, video, first, 0);
+            attachTeraSubtitle(video, file.subtitle);
+            initTeraCustomPlayer(panel, wrap, video, opts, file.download || null);
+        };
+
+        load(cur);
+    } catch (err) {
+        console.error('Tera play error:', err);
+        const why = (TERA_API_CONFIG.debug && err && err.message) ? '<br><small style="opacity:.85;word-break:break-all;">Reason: ' + escapeHtml(err.message) + '</small>' : '';
+        panel.innerHTML = '<div class="tera-play-status tera-play-error tera-status-box">' + teraCloseBtnHTML(panel.id) + '⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
+    }
+}
 async function playTeraLink(btn) {
     const link = btn.getAttribute('data-link');
     const panel = document.getElementById(btn.getAttribute('data-panel'));
@@ -1140,38 +1208,12 @@ async function playTeraLink(btn) {
 
     if (thumbWrap) thumbWrap.style.display = 'none';
     panel.classList.add('open');
-    panel.innerHTML = '<div class="tera-play-status tera-status-box">' + teraCloseBtnHTML(panel.id) + '<span class="watch-loading-spinner spinner-lg" aria-hidden="true"></span></div>';
     btn.disabled = true;
     try {
-        const data = await resolveTeraLink(link);
-        if (!panel.classList.contains('open')) return; // ei shomoy user bondho kore diyeche
-        const files = data.files || [];
-        const cur = files[0];
-
-        // Note: file/quality select dropdown-gulo r dekhano hoy na - custom player-er
-        // settings (⚙) icon-e quality option thake, download button-o icon hishebe.
-        panel.innerHTML = `<div class="tera-video-wrap tcp-player">${teraCloseBtnHTML(panel.id)}<video playsinline autoplay preload="metadata"></video>${tcpCustomControlsHTML()}</div>`;
-        const wrap = panel.querySelector('.tera-video-wrap');
-        const video = panel.querySelector('video');
-
-        const load = (file) => {
-            if (file.thumb) video.poster = file.thumb;
-            const opts = [];
-            if (file.stream) opts.push({ label: file.quality ? 'Default (' + file.quality + ')' : 'Default', url: file.stream });
-            file.fast.forEach(f => opts.push({ label: f.q + ' (Fast)', url: f.url }));
-            video.querySelectorAll('track').forEach(t => t.remove());
-            const first = opts[0] ? opts[0].url : file.download;
-            attachTeraSource(panel, video, first, 0);
-            attachTeraSubtitle(video, file.subtitle);
-            initTeraCustomPlayer(panel, wrap, video, opts, file.download || null);
-        };
-
-        load(cur);
+        await teraLoadAndPlay(panel, link);
         incrementMovieViews(currentModalMovie);
     } catch (err) {
         console.error('Tera play error:', err);
-        const why = (TERA_API_CONFIG.debug && err && err.message) ? '<br><small style="opacity:.85;word-break:break-all;">Reason: ' + escapeHtml(err.message) + '</small>' : '';
-        panel.innerHTML = '<div class="tera-play-status tera-play-error tera-status-box">' + teraCloseBtnHTML(panel.id) + '⚠️ Ei mohurte video load kora gelo na. Pore abar try korun ba Download button use korun.' + why + '</div>';
     } finally {
         btn.disabled = false;
     }

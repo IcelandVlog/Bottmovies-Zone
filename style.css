@@ -4039,45 +4039,48 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
     .tcp-icons { gap: 14px; }
     .tcp-icon-btn svg { width: 15px; height: 15px; }
 }
-.tcp-settings-menu {
-    position: absolute; bottom: 30px; right: 0; z-index: 4; min-width: 130px;
-    background: #10151d; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px;
-    padding: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+/* ---- Unified tabbed Settings panel (Quality / Subtitles / Audio / Servers /
+   Speed) - gear, CC ba Speed icon-e click korle eki panel khole (reference
+   image-er moto): top-e pill-style tabs + close (X), niche selectable row-list. */
+.tcp-settings-panel {
+    display: none; position: absolute; inset: 0; z-index: 5; flex-direction: column;
+    background: rgba(8, 8, 11, 0.97); padding: 14px 14px 10px;
 }
-.tcp-settings-menu button {
-    display: block; width: 100%; text-align: left; background: none; border: none; color: #eee;
-    font-size: 12.5px; padding: 7px 10px; border-radius: 5px; cursor: pointer;
+.tcp-settings-panel:not([hidden]) { display: flex; }
+.tcp-settings-tabs { display: flex; align-items: center; gap: 2px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+.tcp-settings-tabs::-webkit-scrollbar { display: none; }
+.tcp-tab-btn {
+    flex: 0 0 auto; background: none; border: none; color: #83838d; font-size: 13px; font-weight: 700;
+    padding: 8px 14px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: background .15s ease, color .15s ease;
 }
-.tcp-settings-menu button:hover { background: rgba(1, 180, 228, 0.18); }
-.tcp-settings-menu button.active { color: #01b4e4; font-weight: 700; }
-/* Gear menu-te "Quality" / "Audio" - group header label (HLS stream-e embedded
-   multiple audio track thakle eta dekhay) */
-.tcp-settings-group-label {
-    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-    color: #8a93a6; padding: 6px 10px 3px;
+.tcp-tab-btn:hover { color: #ccc; }
+.tcp-tab-btn.active { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.tcp-settings-close {
+    flex: 0 0 auto; margin-left: auto; width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12); border: none; color: #ccc;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.tcp-settings-group-label:not(:first-child) { margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 8px; }
+.tcp-settings-close svg { width: 14px; height: 14px; }
+.tcp-settings-close:hover { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.tcp-settings-body { flex: 1 1 auto; overflow-y: auto; }
+.tcp-settings-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: #141127; border-left: 3px solid transparent; border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: background .15s ease;
+}
+.tcp-settings-row:hover { background: #1a1730; }
+.tcp-settings-row.active { border-left-color: #a29bfe; }
+.tcp-settings-row-label { font-size: 14px; font-weight: 700; color: #fff; }
+.tcp-settings-row.active .tcp-settings-row-label { color: #a29bfe; }
+.tcp-settings-badge {
+    flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #aaa; background: rgba(255, 255, 255, 0.12);
+    padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+}
+.tcp-settings-badge.active { color: #a29bfe; background: rgba(162, 155, 254, 0.12); border: 1px solid rgba(162, 155, 254, 0.55); }
+.tcp-settings-empty { color: #888; font-size: 13px; text-align: center; padding: 34px 10px; }
 
-/* CC (subtitle) button-e click korle - jodi ekta-i subtitle track thake, direct
-   on/off hoy; jodi stream-e (embedded ba sidecar) ekadhik language thake, tahole
-   ei choto list-e pochondo-r bhasha bechhe newa jay (settings-menu-r moto style) */
-.tcp-cc-menu {
-    position: absolute; bottom: 30px; left: 0; z-index: 4; min-width: 130px;
-    background: #10151d; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px;
-    padding: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-}
-.tcp-cc-menu button {
-    display: block; width: 100%; text-align: left; background: none; border: none; color: #eee;
-    font-size: 12.5px; padding: 7px 10px; border-radius: 5px; cursor: pointer; white-space: nowrap;
-}
-.tcp-cc-menu button:hover { background: rgba(1, 180, 228, 0.18); }
-.tcp-cc-menu button.active { color: #01b4e4; font-weight: 700; }
-
-.tcp-speed-menu {
-    position: absolute; bottom: 30px; right: -6px; z-index: 4; width: 210px;
-    background: #10151d; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px;
-    padding: 12px 14px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-}
+/* Speed tab-er content - onno tab-er moto card style-e boshano */
+.tcp-tab-pane[data-pane="speed"] { background: #141127; border-radius: 10px; padding: 16px; }
 .tcp-speed-value { text-align: center; font-size: 15px; font-weight: 800; color: #fff; margin-bottom: 10px; }
 .tcp-speed-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .tcp-speed-minus, .tcp-speed-plus {
@@ -4085,20 +4088,20 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
     background: rgba(255, 255, 255, 0.1); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .tcp-speed-minus svg, .tcp-speed-plus svg { width: 13px; height: 13px; }
-.tcp-speed-minus:hover, .tcp-speed-plus:hover { background: rgba(1, 180, 228, 0.5); }
+.tcp-speed-minus:hover, .tcp-speed-plus:hover { background: rgba(162, 155, 254, 0.5); }
 .tcp-speed-range {
     -webkit-appearance: none; appearance: none; flex: 1 1 auto; height: 4px; border-radius: 4px;
     background: rgba(255, 255, 255, 0.25); outline: none; cursor: pointer;
 }
-.tcp-speed-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #01b4e4; margin-top: -5px; }
-.tcp-speed-range::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: #01b4e4; }
+.tcp-speed-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #a29bfe; margin-top: -5px; }
+.tcp-speed-range::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: #a29bfe; }
 .tcp-speed-presets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .tcp-speed-presets button {
     background: rgba(255, 255, 255, 0.08); border: none; color: #ddd; font-size: 11.5px; font-weight: 600;
     padding: 5px 9px; border-radius: 20px; cursor: pointer;
 }
-.tcp-speed-presets button:hover { background: rgba(1, 180, 228, 0.3); }
-.tcp-speed-presets button.active { background: #01b4e4; color: #061018; }
+.tcp-speed-presets button:hover { background: rgba(162, 155, 254, 0.3); }
+.tcp-speed-presets button.active { background: #a29bfe; color: #0d0b1a; }
 
 /* Download button e click korle 3 sec countdown popup, tarpor direct download shuru */
 .tcp-download-overlay {
@@ -4109,6 +4112,7 @@ html.light-mode .tera-link-select { background: #fff; color: #1a2b0a; }
 .tcp-download-box { text-align: center; color: #fff; }
 .tcp-download-count { font-size: 44px; font-weight: 800; color: #01b4e4; line-height: 1; }
 .tcp-download-label { margin-top: 8px; font-size: 13px; opacity: 0.85; }
+
 
 /* Video Player (Terabox) box: TMDb-style dark/blue theme (site pattern: .season-box-item.<type>) + fix emoji-inflated header height */
 .tera-player-group { border-radius: 10px; overflow: hidden; }
