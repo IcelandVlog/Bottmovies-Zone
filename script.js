@@ -584,6 +584,32 @@ function makePosterPlaceholder(label) {
 const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
 const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
 
+// OMDb (IMDb-r Amazon CDN) theke asha poster URL default-e onek choto/cropped
+// size-e ashe (jemon "..._V1_SX300.jpg" ba "..._V1_UY268_CR61,0,182,268_AL_.jpg").
+// TMDB match na paoa (obscure/kom-jana) movie-gulor khetre eituku-i final poster
+// hishebe use hoy, tai shudhu shei few movie-r poster-i details page-e boro
+// box-e stretch hoye blurry/pixelated dekhay - shob movie-r na. Amazon-er CDN-e
+// URL-er size/crop token-take ekta boro fix value diye replace korle-i shei
+// same original image-r onek boro/sharp version paoa jay, kono extra API call
+// chara-i. Admin-er nijer deya link ba TMDB-r poster (jegula ei pattern-e na)
+// eta chhuye-o dekhe na - tader jonno eta no-op.
+function upgradePosterQuality(url) {
+    if (!url || typeof url !== 'string') return url;
+    if (url.includes('media-amazon.com') || url.includes('images-amazon.com')) {
+        return url.replace(/\._V1_.*?(\.jpg|\.jpeg|\.png)(\?.*)?$/i, '._V1_FMjpg_UX1000_$1');
+    }
+    // Kichu purono/legacy DB record-e (ba age-r kono code version theke) TMDB poster
+    // choto size-e (w92/w154/w185/w200/w300 - eigula shudhu admin-er list-view thumbnail-er
+    // jonno banano, boro poster box-er jonno na) save hoye gechilo - "Auto TMDB poster"
+    // hoyeo tai details page-e stretch hoye blurry dekhay. URL-er size segment-take boro
+    // (w780) size diye replace korle same image-erই boro/sharp version paoa jay, kono
+    // notun DB update chara-i - legacy record shoho shob khetre kaj korbe.
+    if (url.includes('image.tmdb.org')) {
+        return url.replace(/\/t\/p\/w\d+\//i, '/t/p/w780/');
+    }
+    return url;
+}
+
 // A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
 // warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
 // host) even though the URL is perfectly valid - a plain reload fixes it
@@ -881,7 +907,7 @@ function renderHeroSlides() {
         slide.className = 'hero-slide';
         if (isClone) slide.setAttribute('aria-hidden', 'true');
         slide.innerHTML = `
-            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${movie.poster || POSTER_PLACEHOLDER_LOADING}')"></div>
+            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}')"></div>
             <div class="hero-slide-shade"></div>
             <div class="hero-slide-top">
                 <span class="hero-badge hero-badge-featured">Featured</span>
@@ -2033,7 +2059,7 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
-            <img src="${movie.poster || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
+            <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;
@@ -2401,7 +2427,7 @@ fastServersList.forEach((fs, fIdx) => {
                     <span class="star-icon">★</span>
                     <span id="modalRatingVal">${finalRating}</span>/10
                 </div>
-                <img src="${poster}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
+                <img src="${upgradePosterQuality(poster)}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
             </div>
             <div class="card-header-info">
                 <h1 class="card-movie-title">${title}</h1>
@@ -7196,7 +7222,7 @@ function updateAdminPosterPreview() {
     // taholeo original poster-tar preview thumbnail dekhano hoy (link text chara).
     const link = linkInput.value.trim() || adminOriginalPosterUrl || '';
     if (link) {
-        prev.src = link;
+        prev.src = upgradePosterQuality(link);
         wrap.style.display = 'block';
     } else {
         wrap.style.display = 'none';
