@@ -508,8 +508,8 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const DOWNLOAD_HEADER_ICON = '⚡';
 
 const DEFAULT_FAST_SERVERS = [
-    { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://1024teradownloader.com/" },
-    { label: "Server 02: Terabox Link To Fast Downloader WEB", link: "https://teraboxdl.site/" }
+    // { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://1024teradownloader.com/" },
+    { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://teraboxdl.site/" }
 ];
 
 const CATEGORY_ALIAS_MAP = {
