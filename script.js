@@ -610,6 +610,38 @@ function upgradePosterQuality(url) {
     return url;
 }
 
+// Download link/label theke quality (480p/720p/1080p/4K) khuje ber kora -
+// admin-panel-e quality field na thakle (purono record) label text theke
+// backward-compatible bhabe detect kore.
+function extractQualityFromText(text) {
+    const m = String(text || '').match(/(2160p|4k|1080p|720p|480p|360p)/i);
+    return m ? m[1].toUpperCase().replace('4K', '4K') : null;
+}
+const QUALITY_SORT_ORDER = ['360P', '480P', '720P', '1080P', '2160P', '4K'];
+
+// Details page-er "Quality" badge-e age shob shomoy hardcoded "720p" dekhato,
+// admin 1080p link dileo. Ekhon movie-r shob download link/season item ghure
+// asholeh quality(gula) ber kore dekhay (jemon "720p / 1080p"), na paile
+// default "720p" dekhay.
+function getMovieQualityBadge(movie) {
+    const blocks = Array.isArray(movie && movie.downloadBlocks) ? movie.downloadBlocks : [];
+    const found = new Set();
+    blocks.forEach(sec => {
+        if (Array.isArray(sec.items) && sec.items.length > 0) {
+            sec.items.forEach(it => {
+                const q = (it.quality && it.quality.toUpperCase()) || extractQualityFromText(`${sec.label || ''} ${it.quality || ''}`);
+                if (q) found.add(q);
+            });
+        } else {
+            const q = (sec.quality && sec.quality.toUpperCase()) || extractQualityFromText(sec.label || '');
+            if (q) found.add(q);
+        }
+    });
+    if (found.size === 0) return '720p';
+    const sorted = Array.from(found).sort((a, b) => QUALITY_SORT_ORDER.indexOf(a) - QUALITY_SORT_ORDER.indexOf(b));
+    return sorted.map(q => q.replace('P', 'p')).join(' / ');
+}
+
 // A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
 // warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
 // host) even though the URL is perfectly valid - a plain reload fixes it
@@ -2209,7 +2241,13 @@ let downloadHTML = '';
                 const uid = `${idx}-${iIdx}`;
                 
                 const seasonLabel = sec.label || `Season ${sec.season || idx + 1} Complete 720p`;
-                const rawHeader = it.quality ? `${seasonLabel} ${it.quality}` : seasonLabel;
+                // Season label-e (jemon "Season 1 Complete 720p") already quality
+                // thakte pare - item-er nijer quality dropdown theke asha quality
+                // jog korar age label theke purono quality token soriye newa hocche,
+                // na hole "720p 720p" er moto duplicate dekhabe. Ekhi season-er
+                // vinno vinno file-e vinno quality thakleo eta thik moto dekhabe.
+                const seasonLabelNoQuality = seasonLabel.replace(/\b(360p|480p|720p|1080p|2160p|4k)\b/gi, '').replace(/\s+/g, ' ').trim();
+                const rawHeader = it.quality ? `${seasonLabelNoQuality} ${it.quality}`.trim() : seasonLabel;
                 
                 // Strip any size already baked into the label (e.g. "...720p [350MB]") so it can't be shown twice
                 // Also strip a leading "Download Link" prefix — series/season headers shouldn't show it
@@ -2485,7 +2523,7 @@ fastServersList.forEach((fs, fIdx) => {
                     <div class="clamped-text-box" id="subsLangText">• <strong>Subtitles:</strong> ${movie.Subtitles || movie.subtitles || 'N/A'}</div>
                     <button type="button" class="toggle-more-btn" id="subsLangToggleBtn" onclick="toggleMoreLess('subsLangText','subsLangToggleBtn')">More</button>
                 </li>
-                <li>• <strong>Quality:</strong> <span class="badge-quality">720p</span></li>
+                <li>• <strong>Quality:</strong> <span class="badge-quality">${getMovieQualityBadge(movie)}</span></li>
             </ul>
         </div>
         ${trailerHTML}
@@ -7238,10 +7276,20 @@ function addMovieLinkRow(data) {
     const list = document.getElementById('adminMovieLinksList');
     if (!list) return;
     const row = document.createElement('div');
-    row.className = 'admin-link-row';
+    row.className = 'admin-link-row admin-movie-link-row';
+
+    // Purono record-e sudhu label text-e "720p"/"1080p" lekha thakto, kono
+    // shara quality field chhilo na. Notun quality dropdown-e purono record
+    // edit korte gele label theke quality auto-detect kore select kore dey,
+    // notun row-e default 720p thake.
+    const quality = data.quality || (data.label && /1080p/i.test(data.label) ? '1080p' : '720p');
 
     row.innerHTML = `
         <input type="text" class="admin-link-url" placeholder="Download link" value="${escapeAttr(data.link)}">
+        <select class="admin-link-quality" title="Quality">
+            <option value="720p"${quality === '720p' ? ' selected' : ''}>720p</option>
+            <option value="1080p"${quality === '1080p' ? ' selected' : ''}>1080p</option>
+        </select>
         <input type="text" class="admin-link-size" placeholder="Size (e.g. 1.2GB)" value="${escapeAttr(data.size)}">
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
@@ -7257,9 +7305,11 @@ function collectMovieLinks() {
         const link = row.querySelector('.admin-link-url').value.trim();
         if (!link) return;
         const size = row.querySelector('.admin-link-size').value.trim();
-        
-        const label = size ? `Download Link 720p [${size}]` : 'Download Link 720p';
-        result.push({ label, link, size });
+        const qualitySelect = row.querySelector('.admin-link-quality');
+        const quality = qualitySelect ? qualitySelect.value : '720p';
+
+        const label = size ? `Download Link ${quality} [${size}]` : `Download Link ${quality}`;
+        result.push({ label, link, size, quality });
     });
     return result;
 }
@@ -7327,9 +7377,14 @@ function addSeasonBlock(data) {
 function addSeasonLinkRow(container, data) {
     data = data || {};
     const row = document.createElement('div');
-    row.className = 'admin-link-row';
+    row.className = 'admin-link-row admin-movie-link-row';
+    const quality = data.quality || '720p';
     row.innerHTML = `
         <input type="text" class="admin-link-url" placeholder="Download link" value="${escapeAttr(data.link)}">
+        <select class="admin-link-quality" title="Quality">
+            <option value="720p"${quality === '720p' ? ' selected' : ''}>720p</option>
+            <option value="1080p"${quality === '1080p' ? ' selected' : ''}>1080p</option>
+        </select>
         <input type="text" class="admin-link-size" placeholder="Size (e.g. 350MB)" value="${escapeAttr(data.size)}">
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
@@ -7414,7 +7469,9 @@ function collectSeasons() {
             const link = row.querySelector('.admin-link-url').value.trim();
             if (!link) return;
             const size = row.querySelector('.admin-link-size').value.trim();
-            items.push({ link, size });
+            const qualitySelect = row.querySelector('.admin-link-quality');
+            const quality = qualitySelect ? qualitySelect.value : '720p';
+            items.push({ link, size, quality });
         });
         if (items.length > 0) result.push({ label, season: idx + 1, items });
     });
