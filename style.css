@@ -4830,3 +4830,139 @@ html:not(.light-mode) .main-footer a:hover { color: #b6f36a !important; }
 /* Light mode: poster placeholder (Loading... / No Poster) is white, so hide the dark bottom fade on top of it */
 html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"])::after { display: none; }
 html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"]) { background-color: #ffffff !important; }
+
+/* =====================================================================
+   Dropdown rows that have a ▾ toggle (English Movies, English Series, Disney+ Hotstar):
+   when active, the WHOLE row (link + ▾ button) is one highlighted box.
+   ===================================================================== */
+.main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) {
+    border-radius: 8px;
+    background-color: rgba(126, 211, 33, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
+}
+.main-nav .dropdown-menu li.sub-dropdown > a.nav-link.active {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 8px 0 0 8px;
+    color: var(--g2);
+}
+.main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) > .sub-dropdown-toggle {
+    color: var(--g2);
+    border-color: rgba(126, 211, 33, 0.55);
+}
+
+/* light mode = orange */
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) {
+    background-color: rgba(249, 115, 22, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45);
+}
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown > a.nav-link.active { color: #ea580c; }
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) > .sub-dropdown-toggle {
+    color: #ea580c;
+    border-color: rgba(234, 88, 12, 0.55);
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* =====================================================================
+   Parent row stays active when one of its sub-items (German / Spanish / Marvel / DC ...)
+   is active, and every active dropdown item uses the same box style.
+   ===================================================================== */
+.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) {
+    border-radius: 8px;
+    background-color: rgba(126, 211, 33, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
+}
+.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > a.nav-link,
+.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
+    color: var(--g2);
+}
+.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
+    border-color: rgba(126, 211, 33, 0.55);
+}
+/* active sub-item = same box (8px, not a pill) */
+.main-nav .sub-menu li > a.nav-link.active {
+    border-radius: 8px;
+    background-color: rgba(126, 211, 33, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
+    color: var(--g2);
+}
+
+/* light mode = orange */
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) {
+    background-color: rgba(249, 115, 22, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45);
+}
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > a.nav-link,
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
+    color: #ea580c;
+}
+html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
+    border-color: rgba(234, 88, 12, 0.55);
+    background-color: rgba(255, 255, 255, 0.5);
+}
+html.light-mode .main-nav .sub-menu li > a.nav-link.active {
+    background-color: rgba(249, 115, 22, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45);
+    color: #ea580c;
+}
+
+/* =====================================================================
+   NOTICE BANNER (category note) - bookmark icon + big bold text on dark card
+   ===================================================================== */
+.notice-banner {
+    background: linear-gradient(90deg, #08080a 0%, #111014 55%, #1d1115 100%);
+    color: #ffffff;
+    text-align: left;
+    padding: 14px 52px 14px 18px;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.35;
+    letter-spacing: 0.1px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.notice-banner::before {
+    content: "";
+    display: inline-block;
+    width: 20px;
+    height: 24px;
+    margin-right: 14px;
+    vertical-align: -5px;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z'/></svg>") center / contain no-repeat;
+            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z'/></svg>") center / contain no-repeat;
+}
+.notice-banner .close-banner { right: 16px; font-size: 15px; color: #9aa3b2; transition: color 0.15s ease; }
+.notice-banner .close-banner:hover { color: #ffffff; }
+
+/* light mode */
+html.light-mode .notice-banner {
+    background: linear-gradient(90deg, #ffffff 0%, #fafbfc 60%, #fff4ec 100%);
+    color: #14161c;
+    border-color: #e5e8ee;
+    box-shadow: 0 6px 16px rgba(20, 22, 28, 0.08);
+}
+html.light-mode .notice-banner::before { background-color: #ea580c; }
+html.light-mode .notice-banner .close-banner { color: #8891a0; }
+html.light-mode .notice-banner .close-banner:hover { color: #14161c; }
+
+@media (max-width: 600px) {
+    .notice-banner { font-size: 14.5px; padding: 12px 44px 12px 14px; }
+    .notice-banner::before { width: 17px; height: 21px; margin-right: 10px; vertical-align: -4px; }
+}
+
+/* Notice banner: visible border + centered text */
+.notice-banner {
+    text-align: center;
+    padding-left: 52px;
+    border: 1.5px solid rgba(255, 255, 255, 0.28);
+}
+html.light-mode .notice-banner { border: 1.5px solid #cfd5df; }
+@media (max-width: 600px) {
+    .notice-banner { padding-left: 44px; }
+}
+
+/* Notice banner border: green in dark mode, orange in light mode */
+.notice-banner { border: 1.5px solid rgba(126, 211, 33, 0.7); }
+html.light-mode .notice-banner { border: 1.5px solid #f97316; }
