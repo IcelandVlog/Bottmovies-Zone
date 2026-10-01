@@ -575,14 +575,38 @@ const ADMIN_POSTER_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent
 
 // via.placeholder.com is dead/unreliable in 2026 (SSL/DNS issues) - use a local SVG instead
 // so poster boxes never end up blank when there's no real poster to show.
-function makePosterPlaceholder(label) {
+function makePosterPlaceholder(label, light) {
     const safeLabel = escapeHtml(label || 'No Poster');
+    // dark: original look. light: white background with soft grey icon/text.
+    const bg = light ? '#ffffff' : '#1a1c23';
+    const icon = light ? '#cbd5e1' : '#475569';
+    const text = light ? '#94a3b8' : '#64748b';
     return "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#1a1c23"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="#475569" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="#475569"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${safeLabel}</text></svg>`
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="${bg}"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="${icon}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="${icon}"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="${text}" text-anchor="middle">${safeLabel}</text></svg>`
     );
 }
-const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
-const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
+const POSTER_PLACEHOLDER_LOADING_DARK = makePosterPlaceholder('Loading...', false);
+const POSTER_PLACEHOLDER_MISSING_DARK = makePosterPlaceholder('No Poster', false);
+const POSTER_PLACEHOLDER_LOADING_LIGHT = makePosterPlaceholder('Loading...', true);
+const POSTER_PLACEHOLDER_MISSING_LIGHT = makePosterPlaceholder('No Poster', true);
+function posterPlaceholderLoading() {
+    return document.documentElement.classList.contains('light-mode') ? POSTER_PLACEHOLDER_LOADING_LIGHT : POSTER_PLACEHOLDER_LOADING_DARK;
+}
+function posterPlaceholderMissing() {
+    return document.documentElement.classList.contains('light-mode') ? POSTER_PLACEHOLDER_MISSING_LIGHT : POSTER_PLACEHOLDER_MISSING_DARK;
+}
+// theme toggle korle jei placeholder gulo ekhono dekhano hocche segulo sathe sathe notun theme er version e swap hobe
+function swapPosterPlaceholdersForTheme(isLight) {
+    const pairs = isLight
+        ? [[POSTER_PLACEHOLDER_LOADING_DARK, POSTER_PLACEHOLDER_LOADING_LIGHT], [POSTER_PLACEHOLDER_MISSING_DARK, POSTER_PLACEHOLDER_MISSING_LIGHT]]
+        : [[POSTER_PLACEHOLDER_LOADING_LIGHT, POSTER_PLACEHOLDER_LOADING_DARK], [POSTER_PLACEHOLDER_MISSING_LIGHT, POSTER_PLACEHOLDER_MISSING_DARK]];
+    document.querySelectorAll('img[src^="data:image/svg+xml"]').forEach(img => {
+        const cur = img.getAttribute('src');
+        for (const [from, to] of pairs) {
+            if (cur === from) { img.setAttribute('src', to); break; }
+        }
+    });
+}
 
 // OMDb (IMDb-r Amazon CDN) theke asha poster URL default-e onek choto/cropped
 // size-e ashe (jemon "..._V1_SX300.jpg" ba "..._V1_UY268_CR61,0,182,268_AL_.jpg").
@@ -651,7 +675,7 @@ function handlePosterImgError(imgEl) {
     if (!imgEl) return;
     if (imgEl.dataset.posterRetried === '1') {
         imgEl.onerror = null;
-        imgEl.src = POSTER_PLACEHOLDER_MISSING;
+        imgEl.src = posterPlaceholderMissing();
         return;
     }
     imgEl.dataset.posterRetried = '1';
@@ -939,7 +963,7 @@ function renderHeroSlides() {
         slide.className = 'hero-slide';
         if (isClone) slide.setAttribute('aria-hidden', 'true');
         slide.innerHTML = `
-            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}')"></div>
+            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${upgradePosterQuality(movie.poster) || posterPlaceholderLoading()}')"></div>
             <div class="hero-slide-shade"></div>
             <div class="hero-slide-top">
                 <span class="hero-badge hero-badge-featured">Featured</span>
@@ -2091,7 +2115,7 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
-            <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
+            <img src="${upgradePosterQuality(movie.poster) || posterPlaceholderLoading()}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;
@@ -2171,7 +2195,7 @@ async function openMovieModal(movie) {
     `;
 
     let title = movie.title || "N/A";
-    let poster = movie.poster || POSTER_PLACEHOLDER_MISSING;
+    let poster = movie.poster || posterPlaceholderMissing();
     let year = movie.year || "N/A";
     let genre = movie.genre || "Drama";
     let plot = movie.plot || "No plot description available.";
@@ -4256,6 +4280,7 @@ function setThemeMode(mode) {
     document.documentElement.classList.toggle('light-mode', isLight);
     try { localStorage.setItem(THEME_STORAGE_KEY, isLight ? 'light' : 'dark'); } catch (e) {}
     applyThemeToggleIcon();
+    swapPosterPlaceholdersForTheme(isLight);
 }
 
 function toggleThemeMode() {

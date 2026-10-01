@@ -4333,7 +4333,12 @@ html.light-mode .btn-auth-signin, html.light-mode .btn-auth-signout, html.light-
 html.light-mode .btn-auth-signin:hover, html.light-mode .btn-auth-signout:hover { background-color: rgba(126, 211, 33, 0.14); border-color: #5fb41a; }
 html.light-mode .poster-wrapper { border-color: #dfe3ea; box-shadow: 0 6px 16px rgba(20, 22, 28, 0.12); }
 html.light-mode .movie-title { color: #1b1f27; }
-html.light-mode .movie-card:hover .movie-title { color: #3f8a0c; }
+html.light-mode .movie-card:hover .movie-title { color: #ea580c; }
+html.light-mode .movie-card:hover .poster-wrapper {
+    border-color: #f97316 !important;
+    box-shadow: 0 10px 22px rgba(20, 22, 28, 0.12), 0 0 0 2px rgba(249, 115, 22, 0.35);
+}
+html.light-mode .movie-card:hover { background: transparent; }
 html.light-mode .massive-watch-section { background: radial-gradient(600px 200px at 50% 0%, rgba(126, 211, 33, 0.14), transparent 70%), #ffffff; border-color: rgba(94, 170, 20, 0.3); box-shadow: 0 10px 30px rgba(20, 22, 28, 0.08); }
 html.light-mode .massive-watch-heading h2 { background: linear-gradient(90deg, #14161c 0%, #3f8a0c 100%); -webkit-background-clip: text; background-clip: text; }
 html.light-mode .massive-watch-input { background-color: #f7f8fa; border-color: #dde1e8; color: #14161c; }
@@ -4661,3 +4666,167 @@ html.light-mode .watch-server-label, html.light-mode .watch-server-hint { color:
 @media (max-width: 270px) {
     .btn-auth-icon-mobile::before { display: none; }
 }
+
+/* ==================== Country badge: black outline (readable on light + dark) ==================== */
+.logo-country-badge {
+    color: #7ed321;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.6px;
+    -webkit-text-stroke: 3px #000000;
+    paint-order: stroke fill;               /* outline stays outside, letters stay full size */
+    text-shadow: 0 0 1px #000, 0 1px 0 #000;  /* fallback / extra crispness */
+}
+@media (max-width: 480px) { .logo .logo-country-badge { font-size: 10px; } }
+@media (max-width: 300px) { .logo .logo-country-badge { font-size: 9px; } }
+
+/* Country badge sits a bit higher, above the logo's top edge */
+.logo .logo-country-badge,
+.auth-brand-logo .logo-country-badge { top: -9px; margin-left: 3px; }
+.admin-sidebar-brand .logo-country-badge { top: -5px; }
+@media (max-width: 480px) {
+    .logo .logo-country-badge { top: -7px; }
+}
+
+
+/* ==================== Country badge: smooth round black outline ==================== */
+/* -webkit-text-stroke makes sharp/jagged corners, so the outline is drawn with a
+   ring of tiny soft shadows instead (round + anti-aliased, like the logo outline). */
+.logo-country-badge {
+    -webkit-text-stroke: 0;
+    paint-order: normal;
+    color: #7ed321;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-shadow:
+        1.00px 0.00px 0.3px #000,
+        0.92px 0.38px 0.3px #000,
+        0.71px 0.71px 0.3px #000,
+        0.38px 0.92px 0.3px #000,
+        0.00px 1.00px 0.3px #000,
+        -0.38px 0.92px 0.3px #000,
+        -0.71px 0.71px 0.3px #000,
+        -0.92px 0.38px 0.3px #000,
+        -1.00px 0.00px 0.3px #000,
+        -0.92px -0.38px 0.3px #000,
+        -0.71px -0.71px 0.3px #000,
+        -0.38px -0.92px 0.3px #000,
+        -0.00px -1.00px 0.3px #000,
+        0.38px -0.92px 0.3px #000,
+        0.71px -0.71px 0.3px #000,
+        0.92px -0.38px 0.3px #000,
+        0.50px 0.00px 0.25px #000,
+        0.35px 0.35px 0.25px #000,
+        0.00px 0.50px 0.25px #000,
+        -0.35px 0.35px 0.25px #000,
+        -0.50px 0.00px 0.25px #000,
+        -0.35px -0.35px 0.25px #000,
+        -0.00px -0.50px 0.25px #000,
+        0.35px -0.35px 0.25px #000;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: geometricPrecision;
+    /* own compositing layer => grayscale anti-aliasing (no coloured LCD fringes on the edges) */
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* ==================== Hero badges (Featured / Category) - green, hover works in light mode too ==================== */
+.hero-badge-cat { transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, transform 0.18s ease; }
+.hero-badge-cat:hover { transform: translateY(-1px); }
+
+/* light mode */
+html.light-mode .hero-badge-featured { color: #3f8a0c; border-color: rgba(94, 170, 20, 0.55); }
+html.light-mode .hero-badge-cat:hover {
+    color: #3f8a0c;
+    background-color: #ffffff;
+    border-color: rgba(94, 170, 20, 0.7);
+}
+/* dark mode hover (keeps green, adds border) */
+html:not(.light-mode) .hero-badge-cat:hover { color: var(--g2, #b6f36a); border-color: rgba(126, 211, 33, 0.55); }
+
+
+/* =====================================================================
+   LIGHT MODE: ORANGE ACCENT (replaces green everywhere in light mode)
+   Dark mode is untouched. Logo / country badge keep their own colors.
+   ===================================================================== */
+html.light-mode {
+    --g1: #f97316;
+    --g2: #fb923c;
+    --g3: #ea580c;
+    --brand-green: #f97316;
+    --brand-green-soft: rgba(249, 115, 22, 0.22);
+}
+html.light-mode body { background-image: radial-gradient(1100px 380px at 50% -140px, rgba(249, 115, 22, 0.14), transparent 70%); }
+
+/* search bars */
+html.light-mode .search-container:hover,
+html.light-mode .massive-watch-search-wrap:hover,
+html.light-mode .massive-watch-input:hover { border-color: rgba(234, 88, 12, 0.55); }
+html.light-mode .search-container:focus-within,
+html.light-mode .massive-watch-search-wrap:focus-within { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
+html.light-mode .massive-watch-input:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
+html.light-mode .search-container button#searchBtn:hover { background-color: rgba(249, 115, 22, 0.12); color: #ea580c; }
+html.light-mode .search-container button.search-clear-btn:hover,
+html.light-mode .massive-watch-clear-btn:hover { background-color: #f97316; background: #f97316; color: #fff; }
+html.light-mode .search-suggestions,
+html.light-mode .massive-watch-suggestions { border-color: rgba(234, 88, 12, 0.45); }
+html.light-mode .suggestion-item:hover,
+html.light-mode .massive-watch-suggestion-item:hover { background-color: rgba(249, 115, 22, 0.14); color: #14161c; box-shadow: inset 3px 0 0 #f97316; }
+html.light-mode .search-suggestions::-webkit-scrollbar-thumb { background-color: rgba(249, 115, 22, 0.4); }
+html.light-mode .search-suggestions::-webkit-scrollbar-thumb:hover { background-color: #f97316; }
+
+/* header buttons, nav, dropdown */
+html.light-mode .btn-auth-signin:hover,
+html.light-mode .btn-auth-signout:hover,
+html.light-mode .btn-auth-icon-mobile:hover { background-color: rgba(249, 115, 22, 0.14); border-color: #f97316; }
+html.light-mode .main-nav ul li a.active { color: #ea580c; background-color: rgba(249, 115, 22, 0.16); box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45); }
+html.light-mode .dropdown-menu li a:hover { background-color: rgba(249, 115, 22, 0.12); }
+/* Anime/Flix box keeps its original green (variables are orange in light mode, so pin them) */
+html.light-mode .btn-top-anime { background: linear-gradient(135deg, #b6f36a 0%, #7ed321 45%, #5fb41a 100%); color: #0b1a02; box-shadow: 0 4px 14px rgba(126, 211, 33, 0.30), inset 0 1px 0 rgba(255,255,255,0.35); }
+html.light-mode .btn-top-anime:hover { box-shadow: 0 8px 20px rgba(126, 211, 33, 0.45), inset 0 1px 0 rgba(255,255,255,0.4); }
+html.light-mode .main-footer { border-top-color: rgba(249, 115, 22, 0.2); }
+
+/* hero slider */
+html.light-mode .hero-badge-featured { color: #ea580c; border-color: rgba(234, 88, 12, 0.55); }
+html.light-mode .hero-badge-cat:hover { color: #ea580c; background-color: #ffffff; border-color: rgba(234, 88, 12, 0.7); }
+html.light-mode .hero-meta-hd,
+html.light-mode .hero-meta-date { border-color: rgba(249, 115, 22, 0.55); background-color: rgba(249, 115, 22, 0.14); }
+html.light-mode .hero-watch-btn { background: linear-gradient(135deg, #fb923c, #f97316); color: #fff; box-shadow: 0 6px 18px rgba(249, 115, 22, 0.35); }
+html.light-mode .hero-watch-btn:hover { background: linear-gradient(135deg, #fdba74, #ea580c); box-shadow: 0 10px 24px rgba(249, 115, 22, 0.5); }
+html.light-mode .hero-nav-btn { border-color: rgba(249, 115, 22, 0.7); }
+html.light-mode .hero-nav-btn:hover { background-color: #f97316; color: #fff; }
+
+/* "500K+ Movies" panel */
+html.light-mode .massive-watch-section { background: radial-gradient(600px 200px at 50% 0%, rgba(249, 115, 22, 0.14), transparent 70%), #ffffff; border-color: rgba(234, 88, 12, 0.3); }
+html.light-mode .massive-watch-heading h2 { background: linear-gradient(90deg, #14161c 0%, #ea580c 100%); -webkit-background-clip: text; background-clip: text; }
+
+/* pagination */
+html.light-mode .page-num:hover:not(.disabled) { border-color: rgba(234, 88, 12, 0.55); color: #ea580c; }
+html.light-mode .page-num.active { background: linear-gradient(135deg, #fb923c, #f97316) !important; border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(249, 115, 22, 0.3); }
+
+/* watch page server buttons */
+html.light-mode .watch-server-btn:hover { border-color: rgba(234, 88, 12, 0.6); color: #ea580c; }
+html.light-mode .watch-server-btn.active { background: linear-gradient(135deg, #fb923c, #f97316); color: #fff; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3); }
+html.light-mode .watch-server-btn.active .watch-server-dot { background-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25); }
+
+
+/* Footer links (How to Download | Report Broken Links): visible hover in both themes */
+.footer-link { color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s; }
+.footer-link:hover { color: #b6f36a; }
+.footer-link-sep { color: #3a3f4a; margin: 0 10px; }
+html.light-mode .footer-link { color: #5b6472; }
+html.light-mode .footer-link:hover { color: #ea580c; }
+html.light-mode .footer-link-sep { color: #c2c8d1; }
+
+/* Footer links in light mode: !important so it wins even over old inline styles / onmouseover handlers */
+html.light-mode .main-footer a { color: #5b6472 !important; }
+html.light-mode .main-footer a:hover { color: #ea580c !important; }
+html.light-mode .main-footer span { color: #c2c8d1 !important; }
+
+/* Footer links in dark mode: green on hover (!important so it also beats old inline styles) */
+html:not(.light-mode) .main-footer a:hover { color: #b6f36a !important; }
+
+/* Light mode: poster placeholder (Loading... / No Poster) is white, so hide the dark bottom fade on top of it */
+html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"])::after { display: none; }
+html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"]) { background-color: #ffffff !important; }
