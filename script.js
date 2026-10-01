@@ -4403,13 +4403,17 @@ function updateAuthUI(session) {
         // Admin এর জন্য "Dashboard" (Admin Panel), সাধারণ ইউজারের জন্য "My Dashboard" — যাতে দুটো আলাদা বোঝা যায়
         const dashboardLabel = isCurrentUserAdmin(session) ? 'Dashboard' : 'My Dashboard';
         if (dashboardBtn) dashboardBtn.textContent = dashboardLabel;
-        if (mobileLabel) mobileLabel.textContent = dashboardLabel;
+        if (mobileLabel) mobileLabel.textContent = 'Dashboard'; // mobile-e choto rakhar jonno shobar jonno ek-i label
+        const mobileAuthBtn = document.getElementById('authIconMobile');
+        if (mobileAuthBtn) mobileAuthBtn.classList.add('is-logged-in');
         loadUserFavoriteIds(); // heart আইকনগুলো ঠিকমতো দেখানোর জন্য সাইনইন করার সাথে সাথেই favorites লোড করে নাও
     } else {
         loggedOutBox.style.display = 'flex';
         loggedInBox.style.display = 'none';
         if (emailLabel) emailLabel.textContent = '';
         if (mobileLabel) mobileLabel.textContent = 'Login';
+        const mobileAuthBtnOut = document.getElementById('authIconMobile');
+        if (mobileAuthBtnOut) mobileAuthBtnOut.classList.remove('is-logged-in');
         // sign out হয়ে গেলে dashboard/admin panel খোলা থাকলে বন্ধ করে দাও
         closeAdminPanel();
         closeUserDashboard();
@@ -10994,41 +10998,95 @@ document.addEventListener('click', (e) => {
 });
 
 // ==================== VISITOR COUNTRY BADGE (auto, above logo) ====================
-// Logo-r upore YouTube-style chhoto country badge dekhায়, visitor-er IP theke
-// automatically desh detect kore. Fail hole ba API slow hole badge simply hidden
-// thake - eta kono blocking call na, tai page/logo load-e kono delay hoy na.
+// Logo-r pashe chhoto country badge, visitor-er IP theke desh detect kore.
+// Fail hole ba API slow hole badge simply hidden/ager moto thake - eta kono
+// blocking call na, tai page/logo load-e kono delay hoy na.
+//
+// VPN / proxy bodlale-o badge ager moto fixed thake na: page load-er por-o
+// abar check kora hoy -
+//   - tab-e fire ashle / window focus pele (VPN extension popup bondho korle-i)
+//   - network bodlale (online / connection change)
+//   - tab khola thakle protibar 15 second-e
+// Notun country pele-i badge bodle jay. Check fail korle ager badge-ta thake.
 (function () {
+    var currentCode = null;
+    var inFlight = false;
+    var checkCount = 0;
+
+    var providers = [
+        { url: 'https://get.geojs.io/v1/ip/country.json', extract: function (d) { return d && d.country; } },
+        { url: 'https://ipwho.is/', extract: function (d) { return d && d.country_code; } },
+        { url: 'https://ipapi.co/json/', extract: function (d) { return d && d.country_code; } }
+    ];
+
     function showBadge(countryCode) {
-        // header-er logo + auth page-er logo - দুই জায়গাতেই একইসাথে বসিয়ে দেওয়া হয়
-        const badges = document.querySelectorAll('.logo-country-badge');
+        // header-er logo + auth page-er logo
+        var badges = document.querySelectorAll('.logo-country-badge');
         if (!badges.length || !countryCode) return;
+        var code = String(countryCode).toUpperCase();
         badges.forEach(function (badge) {
-            badge.textContent = countryCode.toUpperCase();
+            badge.textContent = code;
+            badge.title = code;
             badge.classList.add('show');
+        });
+        currentCode = code;
+    }
+
+    // order[] = kon provider-er por kon provider try hobe. Protibar shuru-r provider
+    // ghure jay, jate ager keep-alive connection (purono IP-te) bar bar reuse na hoy.
+    function tryFetchCountry(order, index, done) {
+        if (index >= order.length) { done(null); return; }
+        var provider = providers[order[index]];
+        var bustParam = (provider.url.indexOf('?') === -1 ? '?' : '&') + '_t=' + Date.now();
+        var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var timer = controller ? setTimeout(function () { controller.abort(); }, 6000) : null;
+        fetch(provider.url + bustParam, {
+            cache: 'no-store',
+            referrerPolicy: 'no-referrer',
+            signal: controller ? controller.signal : undefined
+        })
+            .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+            .then(function (data) {
+                if (timer) clearTimeout(timer);
+                var code = provider.extract(data);
+                if (!code) { tryFetchCountry(order, index + 1, done); return; }
+                done(code);
+            })
+            .catch(function () {
+                if (timer) clearTimeout(timer);
+                tryFetchCountry(order, index + 1, done);
+            });
+    }
+
+    function checkCountry() {
+        if (inFlight) return;
+        inFlight = true;
+        var order = [];
+        for (var i = 0; i < providers.length; i++) order.push((checkCount + i) % providers.length);
+        checkCount++;
+        tryFetchCountry(order, 0, function (code) {
+            inFlight = false;
+            if (code && String(code).toUpperCase() !== currentCode) showBadge(code);
         });
     }
 
-    function tryFetchCountry(providers, index) {
-        if (index >= providers.length) return;
-        const provider = providers[index];
-        const bustParam = (provider.url.indexOf('?') === -1 ? '?' : '&') + '_t=' + Date.now();
-        fetch(provider.url + bustParam, { cache: 'no-store' })
-            .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
-            .then(function (data) {
-                const code = provider.extract(data);
-                if (!code) { tryFetchCountry(providers, index + 1); return; }
-                showBadge(code);
-            })
-            .catch(function () { tryFetchCountry(providers, index + 1); });
-    }
-
     function init() {
-        const providers = [
-            { url: 'https://get.geojs.io/v1/ip/country.json', extract: function (d) { return d && d.country; } },
-            { url: 'https://ipwho.is/', extract: function (d) { return d && d.country_code; } },
-            { url: 'https://ipapi.co/json/', extract: function (d) { return d && d.country_code; } }
-        ];
-        tryFetchCountry(providers, 0);
+        checkCountry();
+
+        // VPN extension popup theke fire ashle / tab-e fire ashle
+        window.addEventListener('focus', checkCountry);
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) checkCountry();
+        });
+        // network / VPN connect-disconnect
+        window.addEventListener('online', checkCountry);
+        if (navigator.connection && navigator.connection.addEventListener) {
+            navigator.connection.addEventListener('change', checkCountry);
+        }
+        // tab khola thakle protibar 15 second-e (hidden tab-e kono request jay na)
+        setInterval(function () {
+            if (!document.hidden) checkCountry();
+        }, 15000);
     }
 
     if (document.readyState === 'loading') {

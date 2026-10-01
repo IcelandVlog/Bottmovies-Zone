@@ -4520,3 +4520,144 @@ html.light-mode .watch-server-label, html.light-mode .watch-server-hint { color:
     .watch-server-bar + .watch-player-toolbar { margin-bottom: 0; }
     .watch-server-bar + .watch-player-toolbar .watch-close-btn { position: absolute; right: 8px; }
 }
+
+/* ==================== Dashboard on small screens ==================== */
+@media (max-width: 900px) {
+    /* logo stays visible: compact, never squeezed, scrolls together with the tabs */
+    .admin-sidebar-brand {
+        display: flex !important;
+        align-items: center;
+        flex-shrink: 0;
+        padding: 0 10px 0 2px;
+        margin: 0;
+    }
+    .admin-sidebar-brand .logo-img-admin { height: 20px; width: auto; max-width: none; flex-shrink: 0; }
+    .admin-sidebar-brand .logo-country-badge { font-size: 8px; margin-left: 2px; align-self: flex-start; }
+
+    /* smaller, lighter tab boxes */
+    .admin-nav { gap: 4px; flex-shrink: 0; }
+    .admin-nav-btn {
+        width: auto;
+        flex-shrink: 0;
+        gap: 6px;
+        padding: 6px 9px;
+        font-size: 11px;
+        border-radius: 7px;
+    }
+    .admin-nav-badge { font-size: 9px; padding: 1px 5px; }
+    .admin-sidebar { padding-top: 8px; padding-bottom: 10px; padding-left: 10px; }
+    .admin-sidebar-signout { padding: 6px 10px; font-size: 11px; border-radius: 7px; flex-shrink: 0; }
+
+    /* Close (X) pinned to the very top-right corner of the dashboard */
+    .admin-panel-dash { position: relative; }
+    .admin-panel-dash .admin-topbar .admin-close-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 30;
+        width: 34px;
+        height: 34px;
+        font-size: 14px;
+        background-color: #1b2233;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    .admin-panel-dash .admin-topbar .admin-close-btn:active { transform: scale(0.94); }
+    /* keep the last tab / Logout from hiding under the X */
+    .admin-sidebar { padding-right: 52px; scroll-padding-right: 52px; }
+    html.light-mode .admin-panel-dash .admin-topbar .admin-close-btn { background-color: #ffffff; border-color: #d5dae3; box-shadow: 0 2px 10px rgba(20, 22, 28, 0.15); }
+}
+
+/* ==================== Player close (X): exactly on the video's top-right corner ==================== */
+.watch-server-bar + .watch-player-toolbar .watch-close-btn,
+.watch-box .watch-player-toolbar .watch-close-btn {
+    top: -13px;
+    right: -13px;
+}
+@media (max-width: 600px) {
+    .watch-server-bar + .watch-player-toolbar .watch-close-btn,
+    .watch-box .watch-player-toolbar .watch-close-btn { top: -13px; right: -10px; }
+}
+
+/* ==================== Small phones: header in clean rows ==================== */
+@media (max-width: 480px) {
+    .top-bar { padding: 10px 12px 12px; gap: 10px; align-items: center; }
+    .top-bar .menu-toggle-btn { height: 34px; padding: 0 12px; }
+    .logo-img-header { height: 24px; }
+    .logo .logo-country-badge { font-size: 9px; }
+
+    /* all action buttons share ONE row (Bangla Dubbed | Anime/Flix | Dashboard/Login) */
+    .top-right-buttons { flex-wrap: nowrap; gap: 6px; justify-content: stretch; }
+    .top-right-buttons > * { flex: 1 1 0; min-width: 0; }
+    .btn-top-bolly, .btn-top-anime, .btn-auth-icon-mobile, .btn-auth {
+        height: 34px;
+        padding: 0 8px;
+        gap: 5px;
+        font-size: 10.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-left: 0;
+    }
+    .btn-top-bolly::before, .btn-top-anime::before { width: 12px; height: 12px; }
+    .search-container { width: 100%; }
+}
+
+@media (max-width: 480px) {
+    .top-right-buttons > .btn-top-bolly { flex: 1.45 1 0; }
+    .top-right-buttons > .btn-top-anime { flex: 1.1 1 0; }
+}
+@media (max-width: 360px) {
+    .btn-top-bolly, .btn-top-anime, .btn-auth-icon-mobile, .btn-auth { padding: 0 6px; font-size: 10px; gap: 4px; }
+    .top-right-buttons { gap: 5px; }
+}
+
+/* ==================== Mobile Login / Dashboard button: keep the icon (same as desktop) ==================== */
+.btn-auth-icon-mobile::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask-size: contain; mask-size: contain;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-position: center; mask-position: center;
+    /* user icon (Login) */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v3h16v-3c0-2.8-3.6-5-8-5z'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v3h16v-3c0-2.8-3.6-5-8-5z'/%3E%3C/svg%3E");
+}
+.btn-auth-icon-mobile.is-logged-in::before {   /* dashboard grid icon */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v10H3V3zm10 0h8v6h-8V3zM3 15h8v6H3v-6zm10-4h8v10h-8V11z'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v10H3V3zm10 0h8v6h-8V3zM3 15h8v6H3v-6zm10-4h8v10h-8V11z'/%3E%3C/svg%3E");
+}
+.btn-auth-icon-mobile.is-logged-in {
+    background: linear-gradient(135deg, #3b82f6 0%, #6d4aff 100%);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(79, 99, 255, 0.32), inset 0 1px 0 rgba(255,255,255,0.22);
+}
+.btn-auth-icon-mobile.is-logged-in:hover { filter: brightness(1.07); }
+@media (max-width: 480px) {
+    .btn-auth-icon-mobile::before { width: 12px; height: 12px; }
+    .top-right-buttons > .btn-auth-icon-mobile.is-logged-in { flex: 1.2 1 0; }
+}
+@media (max-width: 360px) {
+    .btn-auth-icon-mobile::before { width: 11px; height: 11px; }
+}
+
+@media (max-width: 300px) {
+    .btn-top-bolly::before, .btn-top-anime::before { display: none; }
+    .btn-top-bolly, .btn-top-anime, .btn-auth-icon-mobile { padding: 0 4px; font-size: 9.5px; gap: 3px; }
+    .logo-img-header { height: 20px; }
+    .top-bar { padding: 8px 8px 10px; }
+}
+@media (max-width: 300px) {
+    .top-right-buttons > .btn-top-bolly { flex: 1.9 1 0; }
+    .top-right-buttons > .btn-top-anime { flex: 1.2 1 0; }
+    .top-right-buttons > .btn-auth-icon-mobile, .top-right-buttons > .btn-auth-icon-mobile.is-logged-in { flex: 1.5 1 0; }
+    .top-right-buttons { gap: 4px; }
+}
+
+@media (max-width: 270px) {
+    .btn-auth-icon-mobile::before { display: none; }
+}
