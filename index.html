@@ -36,12 +36,12 @@
 <header class="main-header">
 <div class="top-bar">
     <button type="button" class="menu-toggle-btn" id="menuToggleBtn">☰ MENU</button>
-    <a href="#home" class="logo nav-link" data-target="all" id="siteLogo">BOTT<span class="logo-accent"> MOVIES</span><span class="logo-country-badge" id="logoCountryBadge"></span></a>
+    <a href="#home" class="logo nav-link" data-target="all" id="siteLogo"><img src="logo.png" alt="Bott Movies" class="logo-img logo-img-header" draggable="false"><span class="logo-country-badge" id="logoCountryBadge"></span></a>
     
     <div class="search-container">
-        <input type="text" id="searchInput" placeholder="What are you looking for?" autocomplete="off">
+        <button type="button" id="searchBtn" aria-label="Search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg></button>
+        <input type="text" id="searchInput" placeholder="Search movies, series..." autocomplete="off">
         <button type="button" id="searchClearBtn" class="search-clear-btn" aria-label="Clear search" title="Clear" style="display:none;">✕</button>
-        <button type="button" id="searchBtn">🔍</button>
         <div class="search-suggestions" id="searchSuggestions"></div>
     </div>
 
@@ -120,7 +120,7 @@
     </ul>
 </nav>
 
-<div class="notice-banner" id="noticeBanner">
+<div class="notice-banner" id="noticeBanner" style="display:none;">
     <span id="noticeBannerText">We have Changed our Official Domain to BOTTMOVIES.Bookmarks Now</span>
     <span class="close-banner" onclick="closeNotice()">✖</span>
 </div>
@@ -149,6 +149,7 @@
     </div>
     <div class="massive-watch-search-row">
         <div class="massive-watch-search-wrap">
+            <span class="massive-watch-search-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg></span>
             <input type="text" id="massiveWatchInput" class="massive-watch-input" placeholder="Search any movie or TV show name..." autocomplete="off">
             <button type="button" id="massiveWatchClearBtn" class="massive-watch-clear-btn" aria-label="Clear search" style="display:none;">✕</button>
             <div class="massive-watch-suggestions" id="massiveWatchResults"></div>
@@ -170,7 +171,7 @@
     <button type="button" class="auth-page-close" onclick="closeAuthModal()" aria-label="Close">✖</button>
 
     <div class="auth-page-wrap">
-        <a href="#home" class="auth-brand-logo" onclick="closeAuthModal()">BOTT<span class="logo-accent"> MOVIES</span><span class="logo-country-badge auth-logo-country-badge"></span></a>
+        <a href="#home" class="auth-brand-logo" onclick="closeAuthModal()"><img src="logo.png" alt="Bott Movies" class="logo-img logo-img-auth" draggable="false"><span class="logo-country-badge auth-logo-country-badge"></span></a>
 
         <div class="auth-page-card-outer">
           <div class="auth-page-card">
@@ -354,7 +355,7 @@
 
         <!-- ---------- SIDEBAR ---------- -->
         <div class="admin-sidebar">
-            <div class="admin-sidebar-brand">BOTT<span class="logo-accent"> MOVIES</span></div>
+            <div class="admin-sidebar-brand"><img src="logo.png" alt="Bott Movies" class="logo-img logo-img-admin" draggable="false"></div>
             <nav class="admin-nav">
                 <button type="button" class="admin-nav-btn active" id="userNavBtnProfile" onclick="switchUserTab('profile')">👤 <span>Profile</span></button>
                 <button type="button" class="admin-nav-btn" id="userNavBtnFavorites" onclick="switchUserTab('favorites')">❤️ <span>Favorites</span></button>
@@ -502,7 +503,7 @@
 
         <!-- ---------- SIDEBAR ---------- -->
         <div class="admin-sidebar">
-            <div class="admin-sidebar-brand">BOTT<span class="logo-accent"> MOVIES</span><span class="logo-country-badge admin-logo-country-badge" id="adminLogoCountryBadge"></span></div>
+            <div class="admin-sidebar-brand"><img src="logo.png" alt="Bott Movies" class="logo-img logo-img-admin" draggable="false"><span class="logo-country-badge admin-logo-country-badge" id="adminLogoCountryBadge"></span></div>
             <nav class="admin-nav">
                 <button type="button" class="admin-nav-btn active" id="adminNavBtnDashboard" onclick="switchAdminTab('dashboard')">📊 <span>Dashboard</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnAdd" onclick="switchAdminTab('add')">➕ <span>Add / Edit Content</span></button>

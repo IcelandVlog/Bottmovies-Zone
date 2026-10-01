@@ -2537,7 +2537,7 @@ fastServersList.forEach((fs, fIdx) => {
         setupExpandableText('audioLangText', 'audioLangToggleBtn');
         setupExpandableText('subsLangText', 'subsLangToggleBtn');
         initCommentsSection(movie);
-        verifyAndRenderWatchBox(movie, effectiveWatchLink, title, poster);
+        verifyAndRenderWatchBox(movie, effectiveWatchLink, title, poster, { id: resolvedTmdbId, isTV });
     }
 
     // Age ei "isRendered" flag-ta timeout-fallback render howar por SHOB
@@ -2950,7 +2950,7 @@ function buildWatchSelectorsHTML(movie, manualWatchSeasons, selectedSeason) {
     return { html, defaultEpisode };
 }
 
-async function verifyAndRenderWatchBox(movie, link, title, poster) {
+async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
     if (!link) return;
     const stillRelevant = () => {
         if (currentModalMovie !== movie) return false;
@@ -3015,7 +3015,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster) {
     // (playModalWatch()) barbe, jate accordion-ta shudhu open kore dekhleই
     // "view" count na hoye jay.
     container.innerHTML = `
-        <div class="season-box-item watch-box" id="watchBox" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
+        <div class="season-box-item watch-box" id="watchBox"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
             <div class="season-box-header" onclick="toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
@@ -3046,6 +3046,55 @@ function showAdblockNotice() {
     showToast('⚠️ Use an AdBlocker for the best experience — this video source may show pop-up ads.', null, { duration: 6000 });
 }
 
+// ==================== Watch server switcher (Server 01 / Server 02) ====================
+// Server 01 = ager embed (embed.filmu.in ba admin-er deya custom link) - ager moto-i.
+// Server 02 = nxsha.space embed:
+//   Movie  -> https://nxsha.space/embed/movie/{tmdbId}
+//   Series -> https://nxsha.space/embed/tv/{tmdbId}/{season}/{episode}
+// Player box-e data-tmdb-id + data-tmdb-type thakle-i Server 02 dekhano hoy.
+
+function getPreferredWatchServer() {
+    try { return localStorage.getItem('bm_watch_server') === '2' ? 2 : 1; } catch (e) { return 1; }
+}
+function setPreferredWatchServer(n) {
+    try { localStorage.setItem('bm_watch_server', String(n)); } catch (e) { /* ignore */ }
+}
+function resolveWatchEmbedUrl(link) {
+    const ytId = extractYoutubeVideoId(link);
+    return ytId ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0` : link;
+}
+function boxHasServer2(box) {
+    return !!(box && box.getAttribute('data-tmdb-id') && box.getAttribute('data-tmdb-type'));
+}
+function getWatchServerUrl(box, server) {
+    if (server === 2 && boxHasServer2(box)) {
+        const SERVER2_EMBED_BASE = 'https://nxsha.space/embed';
+        const id = encodeURIComponent(box.getAttribute('data-tmdb-id'));
+        if (box.getAttribute('data-tmdb-type') === 'tv') {
+            const season = parseInt(box.getAttribute('data-season'), 10);
+            const episode = parseInt(box.getAttribute('data-episode'), 10);
+            return `${SERVER2_EMBED_BASE}/tv/${id}/${Number.isFinite(season) && season > 0 ? season : 1}/${Number.isFinite(episode) && episode > 0 ? episode : 1}`;
+        }
+        return `${SERVER2_EMBED_BASE}/movie/${id}`;
+    }
+    return resolveWatchEmbedUrl(box.getAttribute('data-link'));
+}
+function buildWatchServerBarHTML(box, active) {
+    if (!boxHasServer2(box)) return '';
+    const btn = (n, label) => `<button type="button" class="watch-server-btn${active === n ? ' active' : ''}" data-server="${n}" onclick="switchWatchServer(this)"><span class="watch-server-dot"></span>${label}</button>`;
+    return `<div class="watch-server-bar"><span class="watch-server-label">Server</span>${btn(1, 'Server 01')}${btn(2, 'Server 02')}<span class="watch-server-hint">Video not working? Try another server.</span></div>`;
+}
+function switchWatchServer(btnEl) {
+    const box = btnEl.closest('.watch-box');
+    if (!box) return;
+    const server = parseInt(btnEl.getAttribute('data-server'), 10) === 2 ? 2 : 1;
+    const iframe = box.querySelector('.trailer-video-wrap iframe');
+    if (!iframe) return;
+    box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
+    setPreferredWatchServer(server);
+    iframe.src = getWatchServerUrl(box, server);
+}
+
 // "Watch Now" box-e click korle - thik trailer-er moto-i - thumbnail-er jaygay
 // ekta embedded video iframe show kore dey. Admin panel-e "Watch Button" On kore
 // TMDB ID diye rakhle eta embed.filmu.in-er "movie/{tmdbId}" URL diye iframe
@@ -3063,10 +3112,9 @@ function playModalWatch(el) {
 
     showAdblockNotice();
 
-    const ytId = extractYoutubeVideoId(rawLink);
-    const embedUrl = ytId
-        ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0`
-        : rawLink;
+    const activeServer = boxHasServer2(box) ? getPreferredWatchServer() : 1;
+    const embedUrl = getWatchServerUrl(box, activeServer);
+    const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
     // Note: referrerpolicy + credentialless attribute-dui-ta filmu.in-er official
     // embed snippet-e thake na, kintu ei site-e COOP/COEP header active thaka-r
@@ -3078,7 +3126,8 @@ function playModalWatch(el) {
     // panel (jemon Audio/Subtitle menu)-er close button-er thik upore chole
     // jeto, ar user panel bondho korte giye bhul kore pura video-i close kore
     // felto.
-    bodyEl.innerHTML = `<div class="watch-player-toolbar">
+    bodyEl.innerHTML = `${serverBarHTML}
+    <div class="watch-player-toolbar">
         <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeModalWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
     </div>
     <div class="trailer-video-wrap">
@@ -3339,13 +3388,12 @@ async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster) {
     const ok = await checkWatchLinkReachable(link, () => requestId === massiveWatchRequestId);
     if (requestId !== massiveWatchRequestId) return; // ei shomoy-e user notun kichu select/search kore fellে, ei result-ta ar dorkar nei
 
-    if (!ok) {
-        playerEl.innerHTML = `<div class="massive-watch-status">"${escapeHtml(title)}" is not available to watch right now. Please try another title.</div>`;
-        return;
-    }
+    // Server 01 unreachable hole-o Server 02 (nxsha) diye chalano jay - tai
+    // "not available" na dekhiye Server 02 default kore player dekhano hoy.
+    const serverDownAttr = ok ? '' : ' data-server1-down="1"';
 
     playerEl.innerHTML = `
-        <div class="season-box-item watch-box massive-watch-box" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(poster)}" data-title="${escapeAttr(title)}">
+        <div class="season-box-item watch-box massive-watch-box" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(poster)}" data-title="${escapeAttr(title)}" data-tmdb-id="${escapeAttr(tmdbId)}" data-tmdb-type="${mediaType === 'tv' ? 'tv' : 'movie'}"${serverDownAttr}>
             <div class="season-box-header" style="cursor:default;">
                 <span>⚡ ${escapeHtml(title)}</span>
             </div>
@@ -3373,14 +3421,16 @@ function playMassiveWatch(el) {
 
     showAdblockNotice();
 
-    let embedUrl = link;
-    const ytId = extractYoutubeVideoId(link);
-    if (ytId) embedUrl = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`;
+    const serverDown = box.getAttribute('data-server1-down') === '1';
+    const activeServer = boxHasServer2(box) ? (serverDown ? 2 : getPreferredWatchServer()) : 1;
+    const embedUrl = getWatchServerUrl(box, activeServer);
+    const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
     // Modal-er Online Watch-er moto-i: close button iframe-er baire (upore
     // alada bar-e) - jate player-er nijer Audio/Subtitle panel-er close
     // button-er upore na pore.
     bodyEl.innerHTML = `
+        ${serverBarHTML}
         <div class="watch-player-toolbar">
             <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeMassiveWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
         </div>
@@ -3628,11 +3678,15 @@ function updateNoticeBannerText(category, targetLink) {
         targetLink = document.querySelector(`.nav-link[data-target="${category}"]`);
     }
 
+    // Home page (category 'all')-e kono notice banner dekhano hobe na
+    if (category === 'all') {
+        if (noticeBanner) noticeBanner.style.display = 'none';
+        return;
+    }
+
     if (noticeText) {
         const customLabel = getCategoryBannerLabel(category);
-        if (category === 'all') {
-            noticeText.innerText = DEFAULT_NOTICE_TEXT;
-        } else if (customLabel) {
+        if (customLabel) {
             noticeText.innerText = customLabel;
         } else if (targetLink) {
             const customBanner = targetLink.getAttribute('data-banner');

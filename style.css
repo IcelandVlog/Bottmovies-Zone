@@ -3951,3 +3951,572 @@ html.light-mode .massive-watch-player .massive-watch-status { background-color: 
 .admin-trailer-card .admin-trailer-state-pill { align-self: center; }
 
 
+
+
+/* ==================== IMAGE LOGO (logo.png) ==================== */
+.logo, .auth-brand-logo, .admin-sidebar-brand { display: inline-flex; align-items: flex-start; }
+.admin-sidebar-brand { display: flex; }
+.logo-img { display: block; width: auto; max-width: 100%; user-select: none; -webkit-user-drag: none; }
+.logo-img-header { height: 34px; }
+.logo-img-auth { height: 40px; }
+.logo-img-admin { height: 28px; }
+.logo .logo-country-badge,
+.auth-brand-logo .logo-country-badge,
+.admin-sidebar-brand .logo-country-badge { top: 0; margin-left: 3px; }
+@media (max-width: 600px) {
+    .logo-img-header { height: 28px; }
+    .logo-img-auth { height: 34px; }
+}
+
+/* ==================== SEARCH BOX - logo green theme ==================== */
+:root { --brand-green: #7ed321; --brand-green-soft: rgba(126, 211, 33, 0.22); }
+
+.search-container {
+    align-items: center;
+    background-color: #14161c;
+    border: 1.5px solid #2a2f3d;
+    border-radius: 14px;
+    padding: 0 8px 0 4px;
+    height: 42px;
+    min-width: 140px;
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+.search-container:hover { border-color: rgba(126, 211, 33, 0.45); }
+.search-container:focus-within {
+    border-color: var(--brand-green);
+    box-shadow: 0 0 0 3px var(--brand-green-soft), 0 0 18px rgba(126, 211, 33, 0.18);
+}
+
+.search-container input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0 6px;
+    font-size: 14px;
+    color: #f3f6f8;
+    caret-color: var(--brand-green);
+}
+.search-container input::placeholder { color: #7b8497; }
+
+.search-container button#searchBtn {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #8a93a6;
+    transition: color 0.2s, background-color 0.2s;
+}
+.search-container:focus-within button#searchBtn,
+.search-container button#searchBtn:hover { color: var(--brand-green); }
+.search-container button#searchBtn:hover { background-color: rgba(126, 211, 33, 0.12); }
+
+.search-container button.search-clear-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #b4bccb;
+    font-size: 12px;
+}
+.search-container button.search-clear-btn:hover { background-color: var(--brand-green); color: #0b1a02; }
+
+/* Suggestions dropdown */
+.search-suggestions {
+    top: calc(100% + 8px);
+    background-color: #14161c;
+    border: 1.5px solid rgba(126, 211, 33, 0.35);
+    border-radius: 14px;
+    scrollbar-color: rgba(126, 211, 33, 0.4) transparent;
+    overflow-x: hidden;
+}
+.search-suggestions::-webkit-scrollbar-thumb { background-color: rgba(126, 211, 33, 0.35); }
+.search-suggestions::-webkit-scrollbar-thumb:hover { background-color: var(--brand-green); }
+.suggestion-item { border-bottom-color: #1f2430; font-size: 13px; padding: 11px 14px; }
+.suggestion-item:hover { background-color: rgba(126, 211, 33, 0.12); color: #ffffff; box-shadow: inset 3px 0 0 var(--brand-green); }
+
+/* Light mode */
+html.light-mode .search-container { background-color: #ffffff; border-color: #dde1e8; }
+html.light-mode .search-container:hover { border-color: rgba(94, 170, 20, 0.55); }
+html.light-mode .search-container:focus-within { border-color: #5fb41a; box-shadow: 0 0 0 3px rgba(126, 211, 33, 0.25); }
+html.light-mode .search-container input { background: transparent; background-color: transparent; border: none; color: #14161c; }
+html.light-mode .search-container button#searchBtn { background: transparent; background-color: transparent; border: none; color: #7b8497; }
+html.light-mode .search-container:focus-within button#searchBtn,
+html.light-mode .search-container button#searchBtn:hover { color: #4f9a14; }
+html.light-mode .search-container button.search-clear-btn { background-color: #eef1f5; color: #4b5563; }
+html.light-mode .search-container button.search-clear-btn:hover { background-color: #7ed321; color: #0b1a02; }
+html.light-mode .search-suggestions { background-color: #ffffff; border-color: rgba(94, 170, 20, 0.45); }
+html.light-mode .suggestion-item:hover { background-color: rgba(126, 211, 33, 0.14); color: #14161c; }
+
+/* "Watch any title" search (massive watch) - same green accent */
+.massive-watch-input:focus { border-color: var(--brand-green); box-shadow: 0 0 0 3px var(--brand-green-soft); }
+.massive-watch-clear-btn:hover { background: var(--brand-green); color: #0b1a02; }
+.massive-watch-suggestions { border-color: rgba(126, 211, 33, 0.3); }
+
+@media (max-width: 600px) {
+    .search-container { height: 40px; min-width: 0; }
+    .search-container input { font-size: 13px; }
+}
+
+/* =====================================================================
+   HOME REDESIGN - smart buttons, nav, hero, cards, sections (logo green)
+   ===================================================================== */
+:root {
+    --g1: #7ed321;      /* logo green */
+    --g2: #b6f36a;      /* light green */
+    --g3: #4c9a14;      /* deep green */
+    --panel: #12141a;
+    --line: #232838;
+}
+
+/* ---------- Page background: soft green glow at the top ---------- */
+body {
+    background-image: radial-gradient(1100px 380px at 50% -140px, rgba(126, 211, 33, 0.10), transparent 70%);
+    background-repeat: no-repeat;
+}
+html.light-mode body { background-image: radial-gradient(1100px 380px at 50% -140px, rgba(126, 211, 33, 0.16), transparent 70%); }
+
+/* ---------- Header ---------- */
+.main-header { background: linear-gradient(180deg, #101217 0%, #0b0c10 100%); }
+.top-bar { padding-top: 14px; padding-bottom: 14px; }
+
+/* ---------- Top buttons: Bangla Dubbed / Anime-Flix / Login / Dashboard ---------- */
+.top-right-buttons { align-items: center; gap: 10px; }
+
+.btn-top-bolly, .btn-top-anime, .btn-auth, .btn-auth-icon-mobile {
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: transform 0.18s ease, box-shadow 0.2s ease, filter 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.btn-top-bolly, .btn-top-anime, .btn-auth { display: inline-flex; }
+.btn-top-bolly:hover, .btn-top-anime:hover, .btn-auth:hover { transform: translateY(-2px); }
+.btn-top-bolly:active, .btn-top-anime:active, .btn-auth:active { transform: translateY(0) scale(0.97); }
+
+/* small icons drawn with CSS masks (no extra HTML needed) */
+.btn-top-bolly::before, .btn-top-anime::before,
+.btn-auth-signin::before, .btn-auth-dashboard::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    background-color: currentColor;
+    -webkit-mask-size: contain; mask-size: contain;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-position: center; mask-position: center;
+}
+.btn-top-bolly::before {   /* play-in-circle */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 100 20 10 10 0 000-20zm-2 14.5v-9l7 4.5-7 4.5z'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 100 20 10 10 0 000-20zm-2 14.5v-9l7 4.5-7 4.5z'/%3E%3C/svg%3E");
+}
+.btn-top-anime::before {   /* sparkle */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2zm7 13l1 2.5 2.5 1-2.5 1L19 22l-1-2.5-2.5-1 2.5-1 1-2.5z'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2zm7 13l1 2.5 2.5 1-2.5 1L19 22l-1-2.5-2.5-1 2.5-1 1-2.5z'/%3E%3C/svg%3E");
+}
+.btn-auth-signin::before {   /* user */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v3h16v-3c0-2.8-3.6-5-8-5z'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v3h16v-3c0-2.8-3.6-5-8-5z'/%3E%3C/svg%3E");
+}
+.btn-auth-dashboard::before {   /* dashboard grid */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v10H3V3zm10 0h8v6h-8V3zM3 15h8v6H3v-6zm10-4h8v10h-8V11z'/%3E%3C/svg%3E");
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v10H3V3zm10 0h8v6h-8V3zM3 15h8v6H3v-6zm10-4h8v10h-8V11z'/%3E%3C/svg%3E");
+}
+
+/* Bangla Dubbed - warm red gradient */
+.btn-top-bolly {
+    background: linear-gradient(135deg, #ff5a4d 0%, #d32f2f 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(229, 57, 53, 0.30), inset 0 1px 0 rgba(255,255,255,0.22);
+}
+.btn-top-bolly:hover { box-shadow: 0 8px 20px rgba(229, 57, 53, 0.45), inset 0 1px 0 rgba(255,255,255,0.25); filter: brightness(1.06); }
+
+/* Anime/Flix - logo green gradient */
+.btn-top-anime {
+    background: linear-gradient(135deg, var(--g2) 0%, var(--g1) 45%, #5fb41a 100%);
+    color: #0b1a02;
+    box-shadow: 0 4px 14px rgba(126, 211, 33, 0.30), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.btn-top-anime:hover { box-shadow: 0 8px 20px rgba(126, 211, 33, 0.45), inset 0 1px 0 rgba(255,255,255,0.4); filter: brightness(1.05); }
+
+/* Login - glass outline */
+.btn-auth-signin, .btn-auth-signout {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #e5e9f0;
+}
+.btn-auth-signin:hover, .btn-auth-signout:hover {
+    background-color: rgba(126, 211, 33, 0.10);
+    border-color: rgba(126, 211, 33, 0.6);
+    color: #ffffff;
+}
+
+/* Dashboard - blue->violet gradient so it stands apart from the two above */
+.btn-auth-dashboard, .btn-auth-signup {
+    background: linear-gradient(135deg, #3b82f6 0%, #6d4aff 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(79, 99, 255, 0.32), inset 0 1px 0 rgba(255,255,255,0.22);
+}
+.btn-auth-dashboard:hover, .btn-auth-signup:hover { box-shadow: 0 8px 20px rgba(79, 99, 255, 0.5), inset 0 1px 0 rgba(255,255,255,0.25); filter: brightness(1.07); }
+
+/* mobile account button (Login / Dashboard) */
+.btn-auth-icon-mobile {
+    height: 34px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #e5e9f0;
+}
+.btn-auth-icon-mobile:hover { background-color: rgba(126, 211, 33, 0.12); border-color: rgba(126, 211, 33, 0.6); }
+
+/* ---------- Main nav bar ---------- */
+.main-nav {
+    background: linear-gradient(180deg, #15181f 0%, #11131a 100%);
+    border-top: 1px solid rgba(126, 211, 33, 0.12);
+    border-bottom: 1px solid #1d2230;
+}
+.main-nav ul { padding: 6px 0; gap: 2px; }
+.main-nav ul li a {
+    padding: 9px 16px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    letter-spacing: 0.7px;
+    transition: color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+.main-nav ul li a:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.06); }
+.main-nav ul li a.active {
+    color: var(--g2);
+    background-color: rgba(126, 211, 33, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
+}
+.dropdown-menu {
+    border-radius: 14px;
+    border: 1px solid #262c3b;
+    padding: 6px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+    margin-top: 4px;
+}
+.dropdown-menu li a { border-radius: 8px; border-bottom: none !important; }
+.dropdown-menu li a:hover { background-color: rgba(126, 211, 33, 0.12); }
+
+/* ---------- Hero slider: orange -> logo green ---------- */
+.hero-banner { margin-top: 22px; }
+.hero-border-wrap {
+    border-radius: 20px;
+    background: linear-gradient(115deg, var(--g3) 0%, var(--g1) 38%, var(--g2) 62%, #5fb41a 100%);
+    box-shadow: 0 10px 40px rgba(126, 211, 33, 0.18), 0 0 0 1px rgba(126, 211, 33, 0.15);
+}
+.hero-viewport { border-radius: 18px; }
+.hero-badge { border-radius: 999px; padding: 5px 13px; background-color: rgba(8, 10, 8, 0.7); backdrop-filter: blur(6px); }
+.hero-badge-featured { color: var(--g2); border-color: rgba(126, 211, 33, 0.55); }
+.hero-badge-cat:hover { color: var(--g2); }
+.hero-slide-title { letter-spacing: -0.3px; }
+.hero-slide-title:hover { color: var(--g2); }
+.hero-slide-subtitle { color: #cfe9b4; }
+.hero-meta-hd, .hero-meta-date { border: 1px solid rgba(126, 211, 33, 0.45); background-color: rgba(126, 211, 33, 0.12); border-radius: 999px; padding: 4px 11px; }
+.hero-watch-btn {
+    background: linear-gradient(135deg, var(--g2), var(--g1));
+    color: #0b1a02;
+    border: none;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 12.5px;
+    box-shadow: 0 6px 18px rgba(126, 211, 33, 0.35);
+    backdrop-filter: none;
+}
+.hero-watch-btn:hover { background: linear-gradient(135deg, #c7f78a, #8fe030); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(126, 211, 33, 0.5); }
+.hero-nav-btn { border: 1.5px solid rgba(126, 211, 33, 0.7); }
+.hero-nav-btn:hover { background-color: var(--g1); color: #0b1a02; }
+.hero-dot.active { background: linear-gradient(90deg, var(--g1), var(--g2)); }
+
+/* ---------- Movie cards ---------- */
+.movie-grid { gap: 20px 16px; }
+.movie-card { transition: transform 0.25s ease; }
+.movie-card:hover { transform: translateY(-5px); }
+.poster-wrapper {
+    border-radius: 14px;
+    border: 1px solid #1f2430;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.poster-wrapper::after {      /* soft dark fade at the bottom of every poster */
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 38%;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent);
+    pointer-events: none;
+}
+.movie-card:hover .poster-wrapper {
+    border-color: rgba(126, 211, 33, 0.7);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(126, 211, 33, 0.25), 0 0 22px rgba(126, 211, 33, 0.22);
+}
+.movie-card:hover .poster-wrapper img { transform: scale(1.06); }
+.poster-rating-badge {
+    top: 10px; left: 10px;
+    border-radius: 999px;
+    padding: 4px 9px;
+    background-color: rgba(10, 12, 16, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.movie-details { padding: 10px 4px 0; }
+.movie-title { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: #e6eaf0; transition: color 0.2s ease; }
+.movie-card:hover .movie-title { color: var(--g2); }
+
+/* ---------- "500K+ Movies & TV Shows" panel ---------- */
+.massive-watch-section {
+    margin: 30px 0 40px;
+    padding: 30px 20px 34px;
+    border: 1px solid rgba(126, 211, 33, 0.16);
+    border-radius: 22px;
+    background:
+        radial-gradient(600px 200px at 50% 0%, rgba(126, 211, 33, 0.10), transparent 70%),
+        linear-gradient(180deg, #11141a 0%, #0c0e12 100%);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+.massive-watch-heading h2 {
+    font-size: 26px;
+    letter-spacing: -0.3px;
+    background: linear-gradient(90deg, #ffffff 0%, var(--g2) 55%, var(--g1) 100%);
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+            color: transparent;
+}
+.massive-watch-input { background-color: #0f1116; border: 1.5px solid #262c3b; padding: 14px 46px 14px 22px; font-size: 14px; }
+.massive-watch-input:hover { border-color: rgba(126, 211, 33, 0.45); }
+
+/* ---------- Pagination ---------- */
+.pagination { gap: 8px; }
+.page-num {
+    min-width: 38px;
+    padding: 9px 13px;
+    text-align: center;
+    border-radius: 12px;
+    background-color: #14171e;
+    border: 1px solid #232838;
+    color: #b8c1d1;
+    transition: all 0.18s ease;
+}
+.page-num:hover:not(.disabled) { background-color: rgba(126, 211, 33, 0.12); border-color: rgba(126, 211, 33, 0.5); color: #fff; transform: translateY(-1px); }
+.page-num.active { background: linear-gradient(135deg, var(--g2), var(--g1)); border-color: transparent; color: #0b1a02; box-shadow: 0 6px 16px rgba(126, 211, 33, 0.3); }
+.page-num.prev-next { background-color: #14171e; color: #fff; }
+
+/* ---------- Footer ---------- */
+.main-footer { background: linear-gradient(180deg, #000, #07080a); border-top: 1px solid rgba(126, 211, 33, 0.14); }
+
+/* ---------- Light mode versions ---------- */
+html.light-mode .main-header { background: #ffffff; }
+html.light-mode .main-nav { background: #ffffff; border-top-color: #e5e8ee; border-bottom-color: #e5e8ee; }
+html.light-mode .main-nav ul li a:hover { background-color: #f1f3f7; color: #14161c; }
+html.light-mode .main-nav ul li a.active { color: #3f8a0c; background-color: rgba(126, 211, 33, 0.18); box-shadow: inset 0 0 0 1px rgba(94, 170, 20, 0.45); }
+html.light-mode .btn-auth-signin, html.light-mode .btn-auth-signout, html.light-mode .btn-auth-icon-mobile { background-color: #ffffff; border-color: #d5dae3; color: #14161c; }
+html.light-mode .btn-auth-signin:hover, html.light-mode .btn-auth-signout:hover { background-color: rgba(126, 211, 33, 0.14); border-color: #5fb41a; }
+html.light-mode .poster-wrapper { border-color: #dfe3ea; box-shadow: 0 6px 16px rgba(20, 22, 28, 0.12); }
+html.light-mode .movie-title { color: #1b1f27; }
+html.light-mode .movie-card:hover .movie-title { color: #3f8a0c; }
+html.light-mode .massive-watch-section { background: radial-gradient(600px 200px at 50% 0%, rgba(126, 211, 33, 0.14), transparent 70%), #ffffff; border-color: rgba(94, 170, 20, 0.3); box-shadow: 0 10px 30px rgba(20, 22, 28, 0.08); }
+html.light-mode .massive-watch-heading h2 { background: linear-gradient(90deg, #14161c 0%, #3f8a0c 100%); -webkit-background-clip: text; background-clip: text; }
+html.light-mode .massive-watch-input { background-color: #f7f8fa; border-color: #dde1e8; color: #14161c; }
+html.light-mode .page-num { background-color: #ffffff; border-color: #dde1e8; color: #3b4352; }
+html.light-mode .page-num.active { color: #0b1a02; }
+html.light-mode .main-footer { background: #ffffff; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+    .top-right-buttons { justify-content: center; flex-wrap: wrap; }
+    .movie-grid { gap: 16px 12px; }
+}
+@media (max-width: 600px) {
+    .btn-auth-icon-mobile { display: inline-flex; }
+    .btn-top-bolly, .btn-top-anime { height: 34px; padding: 0 13px; font-size: 11px; }
+    .btn-auth-icon-mobile { height: 34px; font-size: 11px; }
+    .main-nav ul li a { padding: 10px 14px; font-size: 12px; }
+    .massive-watch-section { padding: 24px 14px 28px; border-radius: 18px; }
+    .massive-watch-heading h2 { font-size: 21px; }
+    .hero-border-wrap { border-radius: 16px; }
+    .hero-viewport { border-radius: 14px; }
+}
+
+/* ==================== "500K+" search box - same design as header search ==================== */
+.massive-watch-search-wrap {
+    display: flex;
+    align-items: center;
+    height: 50px;
+    padding: 0 10px 0 6px;
+    background-color: #14161c;
+    border: 1.5px solid #2a2f3d;
+    border-radius: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.massive-watch-search-wrap:hover { border-color: rgba(126, 211, 33, 0.45); }
+.massive-watch-search-wrap:focus-within {
+    border-color: var(--brand-green, #7ed321);
+    box-shadow: 0 0 0 3px rgba(126, 211, 33, 0.22), 0 0 22px rgba(126, 211, 33, 0.18);
+}
+.massive-watch-search-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    color: #8a93a6;
+    transition: color 0.2s;
+}
+.massive-watch-search-wrap:focus-within .massive-watch-search-icon { color: var(--brand-green, #7ed321); }
+
+/* input becomes transparent - the wrapper draws the box */
+.massive-watch-input,
+.massive-watch-input:hover,
+.massive-watch-input:focus {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    height: 100%;
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0 6px;
+    font-size: 15px;
+    color: #f3f6f8;
+    caret-color: var(--brand-green, #7ed321);
+}
+.massive-watch-input::placeholder { color: #7b8497; }
+
+/* clear button sits inside the flex row (not absolute) */
+.massive-watch-clear-btn {
+    position: static;
+    transform: none;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    margin-left: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #b4bccb;
+}
+.massive-watch-clear-btn:hover { background: var(--brand-green, #7ed321); color: #0b1a02; }
+
+.massive-watch-suggestions {
+    top: calc(100% + 8px);
+    border: 1.5px solid rgba(126, 211, 33, 0.35);
+    border-radius: 16px;
+    background-color: #14161c;
+}
+.massive-watch-suggestion-item:hover { background-color: rgba(126, 211, 33, 0.12); box-shadow: inset 3px 0 0 var(--brand-green, #7ed321); }
+
+html.light-mode .massive-watch-search-wrap { background-color: #ffffff; border-color: #dde1e8; }
+html.light-mode .massive-watch-search-wrap:hover { border-color: rgba(94, 170, 20, 0.55); }
+html.light-mode .massive-watch-search-wrap:focus-within { border-color: #5fb41a; box-shadow: 0 0 0 3px rgba(126, 211, 33, 0.25); }
+html.light-mode .massive-watch-input,
+html.light-mode .massive-watch-input:hover,
+html.light-mode .massive-watch-input:focus { background: transparent; background-color: transparent; color: #14161c; }
+html.light-mode .massive-watch-search-icon { color: #7b8497; }
+html.light-mode .massive-watch-search-wrap:focus-within .massive-watch-search-icon { color: #4f9a14; }
+html.light-mode .massive-watch-clear-btn { background: #eef1f5; color: #4b5563; }
+html.light-mode .massive-watch-suggestions { background-color: #ffffff; border-color: rgba(94, 170, 20, 0.45); }
+
+@media (max-width: 600px) {
+    .massive-watch-search-wrap { height: 46px; border-radius: 14px; }
+    .massive-watch-input { font-size: 14px; }
+}
+
+/* ==================== Watch server switcher (Server 01 / Server 02) ==================== */
+.watch-server-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px 4px 10px;
+}
+.watch-server-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #8a93a6;
+    margin-right: 2px;
+}
+.watch-server-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid #2a2f3d;
+    background-color: #14161c;
+    color: #c4cbd8;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+.watch-server-btn:hover { border-color: rgba(126, 211, 33, 0.6); color: #fff; transform: translateY(-1px); }
+.watch-server-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #5b6475;
+    transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+.watch-server-btn.active {
+    background: linear-gradient(135deg, #b6f36a, #7ed321);
+    border-color: transparent;
+    color: #0b1a02;
+    box-shadow: 0 4px 14px rgba(126, 211, 33, 0.3);
+}
+.watch-server-btn.active .watch-server-dot { background-color: #0b1a02; box-shadow: 0 0 0 3px rgba(11, 26, 2, 0.15); }
+.watch-server-hint { font-size: 11.5px; color: #7b8497; margin-left: 4px; }
+
+html.light-mode .watch-server-btn { background-color: #ffffff; border-color: #dde1e8; color: #3b4352; }
+html.light-mode .watch-server-btn.active { color: #0b1a02; border-color: transparent; }
+html.light-mode .watch-server-label, html.light-mode .watch-server-hint { color: #6b7385; }
+
+@media (max-width: 600px) {
+    .watch-server-bar { padding: 8px 6px 8px; gap: 6px; }
+    .watch-server-hint { display: none; }
+    .watch-server-btn { height: 30px; padding: 0 12px; font-size: 11.5px; }
+}
+
+/* Close (X) sits exactly on the video's top-right corner when the server bar is shown */
+.watch-server-bar + .watch-player-toolbar {
+    height: 0;
+    display: block;
+    margin: 0;
+    padding: 0 !important;
+}
+.watch-server-bar + .watch-player-toolbar .watch-close-btn {
+    position: absolute;
+    top: -13px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+}
+.watch-server-bar { padding-bottom: 16px; }
+@media (max-width: 600px) {
+    .watch-server-bar { padding-bottom: 16px; }
+    .watch-server-bar + .watch-player-toolbar { margin-bottom: 0; }
+    .watch-server-bar + .watch-player-toolbar .watch-close-btn { position: absolute; right: 8px; }
+}
