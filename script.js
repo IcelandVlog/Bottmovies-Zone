@@ -3725,7 +3725,9 @@ function updateNoticeBannerText(category, targetLink) {
 function switchCategory(category, initialPage) {
     if (!category) return;
 
-    const targetLink = document.querySelector(`.nav-link[data-target="${category}"]`);
+    // logo (#siteLogo) o .nav-link[data-target="all"] tai menu bar er link ke age khujbo, naile HOME active hoy na
+    const targetLink = document.querySelector(`.main-nav .nav-link[data-target="${category}"]`)
+        || document.querySelector(`.nav-link[data-target="${category}"]`);
 
     document.querySelectorAll('.nav-link, .dropdown-toggle').forEach(el => el.classList.remove('active'));
     if (targetLink) {
