@@ -3078,7 +3078,8 @@ function showAdblockNotice() {
 // Player box-e data-tmdb-id + data-tmdb-type thakle-i Server 02 dekhano hoy.
 
 function getPreferredWatchServer() {
-    try { return localStorage.getItem('bm_watch_server') === '2' ? 2 : 1; } catch (e) { return 1; }
+    try { localStorage.removeItem('bm_watch_server'); } catch (e) { /* ignore */ }
+    return 1;
 }
 function setPreferredWatchServer(n) {
     try { localStorage.setItem('bm_watch_server', String(n)); } catch (e) { /* ignore */ }
@@ -3115,7 +3116,6 @@ function switchWatchServer(btnEl) {
     const iframe = box.querySelector('.trailer-video-wrap iframe');
     if (!iframe) return;
     box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
-    setPreferredWatchServer(server);
     iframe.src = getWatchServerUrl(box, server);
 }
 
@@ -3136,7 +3136,8 @@ function playModalWatch(el) {
 
     showAdblockNotice();
 
-    const activeServer = boxHasServer2(box) ? getPreferredWatchServer() : 1;
+    // Online watch e shob shomoy Server 1 diye shuru hobe (ager choice mone rakha hoy na)
+    const activeServer = 1;
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -3446,7 +3447,8 @@ function playMassiveWatch(el) {
     showAdblockNotice();
 
     const serverDown = box.getAttribute('data-server1-down') === '1';
-    const activeServer = boxHasServer2(box) ? (serverDown ? 2 : getPreferredWatchServer()) : 1;
+    // Default Server 1; shudhu Server 1 down thakle Server 2 e jabe
+    const activeServer = boxHasServer2(box) ? (serverDown ? 2 : 1) : 1;
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -7457,6 +7459,22 @@ function addSeasonBlock(data) {
     } else {
         addSeasonLinkRow(linksContainer);
     }
+    // purano data-te label e 720p kintu item e 1080p thakle edit kholar shomoy-i thik hoye jabe
+    syncSeasonLabelQuality(block);
+}
+
+// Season label (jemon "Season 1 Complete 720p") er quality part ta, link row er selected quality
+// theke live sync kore. Sob row-er quality ek hole tobei label bodlay; alada alada hole label ke chhuy na.
+function syncSeasonLabelQuality(block) {
+    if (!block) return;
+    const labelInput = block.querySelector('.admin-season-label');
+    if (!labelInput) return;
+    const qualities = Array.from(block.querySelectorAll('.admin-season-links .admin-link-quality')).map(sel => sel.value);
+    if (qualities.length === 0 || qualities.some(q => q !== qualities[0])) return;
+    const qualityRe = /\b(360p|480p|720p|1080p|2160p|4k)\b/i;
+    if (qualityRe.test(labelInput.value)) {
+        labelInput.value = labelInput.value.replace(qualityRe, qualities[0]);
+    }
 }
 
 function addSeasonLinkRow(container, data) {
@@ -7474,6 +7492,8 @@ function addSeasonLinkRow(container, data) {
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
     container.appendChild(row);
+    const qSel = row.querySelector('.admin-link-quality');
+    if (qSel) qSel.addEventListener('change', () => syncSeasonLabelQuality(row.closest('.admin-season-block')));
 }
 
 // ---------- Season trailer rows (TV) ----------
@@ -7547,6 +7567,7 @@ function collectSeasons() {
     blocks.forEach((block, idx) => {
         const labelInput = block.querySelector('.admin-season-label');
         
+        syncSeasonLabelQuality(block);
         const label = (labelInput.value.trim()) || `Season ${idx + 1} Complete 720p`;
         
         const items = [];
