@@ -3039,7 +3039,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
     // (playModalWatch()) barbe, jate accordion-ta shudhu open kore dekhleই
     // "view" count na hoye jay.
     container.innerHTML = `
-        <div class="season-box-item watch-box" id="watchBox"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
+        <div class="season-box-item watch-box" id="watchBox"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-default-server="${Number(movie.watchServer) === 2 ? 2 : 1}" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
             <div class="season-box-header" onclick="toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
@@ -3136,8 +3136,9 @@ function playModalWatch(el) {
 
     showAdblockNotice();
 
-    // Online watch e shob shomoy Server 1 diye shuru hobe (ager choice mone rakha hoy na)
-    const activeServer = 1;
+    // Admin je server set koreche (Watch Button > Default server) seta diye shuru; set na thakle Server 1.
+    // Server 2 shudhu tokhon-i jokhon TMDB ID ache (nahole Server 2 er URL banano jay na).
+    const activeServer = (boxHasServer2(box) && box.getAttribute('data-default-server') === '2') ? 2 : 1;
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -9126,6 +9127,14 @@ function renderAdminWatchList(filter) {
                 ` : ''}
                 <input type="text" class="admin-watch-link-input" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed)" value="${escapeAttr(movie.watchLink || '')}">
                 <input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}">
+                <label class="admin-watch-server-row">
+                    <span>Default server</span>
+                    <select class="admin-watch-server-select" title="Online watch e kon server diye shuru hobe">
+                        <option value=""${!movie.watchServer ? ' selected' : ''}>Auto (Server 1)</option>
+                        <option value="1"${Number(movie.watchServer) === 1 ? ' selected' : ''}>Server 1</option>
+                        <option value="2"${Number(movie.watchServer) === 2 ? ' selected' : ''}>Server 2</option>
+                    </select>
+                </label>
                 </div>
             </div>
             <div class="admin-db-actions">
@@ -9232,6 +9241,10 @@ function renderAdminWatchList(filter) {
         };
         makeFieldAutoSave(thumbInput, () => movie.watchThumb || null);
         makeFieldAutoSave(linkInput, () => movie.watchLink || null);
+        const serverSelect = card.querySelector('.admin-watch-server-select');
+        if (serverSelect) {
+            serverSelect.addEventListener('change', () => saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState));
+        }
 
         if (isTv) {
             // TV series - "Auto" checkbox diye dui-rokom mode-er modhye
@@ -9503,9 +9516,19 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
             payload = { watchEnabled, watchLink: linkRaw, watchThumb: thumbRaw };
         }
 
+        // Default server (1/2). Khali = Auto = Server 1. Column shudhu tokhon-i pathai jokhon kichu set kora ache
+        // ba age set kora chilo (jate column na thakle baki watch settings save fail na hoy).
+        const serverSelectEl = card.querySelector('.admin-watch-server-select');
+        const serverRaw = serverSelectEl ? serverSelectEl.value : '';
+        const watchServerVal = serverRaw ? (parseInt(serverRaw, 10) === 2 ? 2 : 1) : null;
+        if (watchServerVal !== null || movie.watchServer != null) {
+            payload.watchServer = watchServerVal;
+        }
+
         const { error } = await supabaseClient.from('movies').update(payload).eq('id', movie.id);
         if (error) throw error;
 
+        if ('watchServer' in payload) movie.watchServer = watchServerVal;
         movie.watchEnabled = watchEnabled;
         movie.watchThumb = thumbRaw;
         if (useSeasonMode) {
@@ -9518,7 +9541,9 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
         btn.textContent = 'Saved';
     } catch (err) {
         console.error('Save watch settings error:', err);
-        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        const errMsg = (err && err.message) ? err.message : 'Unknown error';
+        const needsCol = /watchServer/i.test(errMsg);
+        showToast('❌ Save failed: ' + errMsg + (needsCol ? ' — Supabase SQL Editor e eta chalao: ALTER TABLE movies ADD COLUMN "watchServer" smallint;' : ''), 'error');
         // Explicit "Save" button-er bodole ekhon ekta chhoto status indicator
         // (jeta klik-e save hoy na, karon shob field-i blur/change-e nijeই
         // auto-save hoy) - tai save fail korleo eikhane "Retry" showing kore

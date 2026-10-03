@@ -4966,3 +4966,19 @@ html.light-mode .notice-banner { border: 1.5px solid #cfd5df; }
 /* Notice banner border: green in dark mode, orange in light mode */
 .notice-banner { border: 1.5px solid rgba(126, 211, 33, 0.7); }
 html.light-mode .notice-banner { border: 1.5px solid #f97316; }
+
+/* Admin > Watch Button > "Default server" row */
+.admin-watch-server-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; color: #94a3b8; }
+.admin-watch-server-select {
+    background-color: #111622;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #e2e8f0;
+    outline: none;
+    cursor: pointer;
+}
+.admin-watch-server-select:focus { border-color: #2563eb; }
+html.light-mode .admin-watch-server-row { color: #5b6472; }
+html.light-mode .admin-watch-server-select { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
