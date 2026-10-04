@@ -4836,3 +4836,30 @@ html.light-mode .btn-zip-download, html.light-mode .btn-copy-link { color: #ffff
     .season-box-item:not(.watch-box) .season-badges-right::after { width: 13px; height: 13px; }
     .season-badges-right { gap: 7px; }
 }
+
+/* ==================== Nav: active trail (main button + parent items + sub item all coloured) ==================== */
+.sub-dropdown-toggle { transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease; }
+.sub-dropdown-toggle.active,
+.dropdown-menu li.sub-dropdown:hover > .sub-dropdown-toggle {
+    color: #b6f36a;
+    border-color: rgba(126, 211, 33, 0.65);
+    background-color: rgba(126, 211, 33, 0.14);
+}
+/* the opened sub menu: keep it clearly attached to the highlighted parent */
+.dropdown-menu li.sub-dropdown > a.nav-link.active { color: #b6f36a; }
+
+html.light-mode .sub-dropdown-toggle.active {
+    color: #3f8a0c;
+    border-color: rgba(94, 170, 20, 0.7);
+    background-color: rgba(126, 211, 33, 0.18);
+}
+html.light-mode .dropdown-menu li.sub-dropdown > a.nav-link.active { color: #3f8a0c; }
+
+/* Dropdown items: small radius for hover/active highlight (top-level nav buttons keep their own shape) */
+.main-nav .dropdown-menu li a,
+.main-nav .dropdown-menu li a.active,
+.main-nav .dropdown-menu li a:hover,
+.main-nav .dropdown-menu li.sub-dropdown > a.nav-link {
+    border-radius: 6px;
+}
+.main-nav .dropdown-menu li.sub-dropdown > a.nav-link { display: flex; align-items: center; }

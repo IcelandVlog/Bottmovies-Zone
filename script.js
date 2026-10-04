@@ -3698,20 +3698,40 @@ function updateNoticeBannerText(category, targetLink) {
     if (noticeBanner) noticeBanner.style.display = 'block';
 }
 
+// Colours every parent of the active nav item: top-level button (MOVIES) and any
+// intermediate dropdown item (English Movies) together with its arrow button.
+function markActiveNavTrail(link) {
+    if (!link) return;
+    const ownLi = link.closest('li');
+    // an item that itself has a sub menu: colour its own arrow button too
+    const ownCaret = ownLi ? ownLi.querySelector(':scope > .sub-dropdown-toggle') : null;
+    if (ownCaret) ownCaret.classList.add('active');
+
+    let parentLi = ownLi && ownLi.parentElement ? ownLi.parentElement.closest('li.has-dropdown') : null;
+    while (parentLi) {
+        const parentAnchor = parentLi.querySelector(':scope > a');            // MOVIES toggle / English Movies link
+        if (parentAnchor) parentAnchor.classList.add('active');
+        const parentCaret = parentLi.querySelector(':scope > .sub-dropdown-toggle');
+        if (parentCaret) parentCaret.classList.add('active');
+        parentLi = parentLi.parentElement ? parentLi.parentElement.closest('li.has-dropdown') : null;
+    }
+}
+
 function switchCategory(category, initialPage) {
     if (!category) return;
 
     const targetLink = document.querySelector(`.nav-link[data-target="${category}"]`);
 
-    document.querySelectorAll('.nav-link, .dropdown-toggle').forEach(el => el.classList.remove('active'));
-    if (targetLink) {
-        targetLink.classList.add('active');
-        const parentDropdown = targetLink.closest('.has-dropdown:not(.sub-dropdown)');
-        if (parentDropdown) {
-            const toggle = parentDropdown.querySelector('.dropdown-toggle');
-            if (toggle) toggle.classList.add('active');
-        }
-    }
+    // Active state:
+    //  - Home page  -> HOME button active (HOME, not the header logo which shares data-target="all")
+    //  - a sub item -> the whole chain stays coloured: main button (MOVIES) + every parent
+    //                  dropdown item (English Movies + its arrow) + the item itself (German Movies)
+    document.querySelectorAll('.nav-link, .dropdown-toggle, .sub-dropdown-toggle, #mainNav li.has-dropdown > a')
+        .forEach(el => el.classList.remove('active'));
+    document.querySelectorAll(`.nav-link[data-target="${category}"]`).forEach(link => {
+        link.classList.add('active');
+        markActiveNavTrail(link);
+    });
 
     document.body.setAttribute('data-category', category);
 
