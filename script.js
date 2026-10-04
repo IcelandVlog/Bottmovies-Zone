@@ -6637,7 +6637,10 @@ function mediaScanResolveRegionalFromTitle(baseName, title) {
     if (!t) return null;
     for (const entry of MEDIA_SCAN_REGIONAL_QUALIFIERS) {
         if (entry.base !== baseName) continue;
-        if (t === entry.qualifier || t.includes(entry.qualifier)) return entry.full;
+        // Remove the language's own name first: otherwise the title "Russian" contains the
+        // qualifier "russia" and every plain Russian track became "Russian (Russia)".
+        const rest = t.split(entry.base.toLowerCase()).join(' ').trim();
+        if (rest === entry.qualifier || rest.includes(entry.qualifier)) return entry.full;
     }
     return null;
 }
@@ -6664,8 +6667,12 @@ function mediaScanGuessLanguageFromToken(token) {
     //    Note this never fires for codes like "cmn" (no hyphen), so Mandarin
     //    stays distinct from the generic "zh"/Chinese mapping.
     if (norm.includes('-')) {
-        const primary = norm.split('-')[0];
-        if (MEDIA_SCAN_LANGUAGE_MAP[primary]) return MEDIA_SCAN_LANGUAGE_MAP[primary];
+        const parts = norm.split('-');
+        // drop trailing subtags one by one: zh-hans-cn -> zh-hans -> zh
+        for (let n = parts.length - 1; n >= 1; n--) {
+            const partial = parts.slice(0, n).join('-');
+            if (MEDIA_SCAN_LANGUAGE_MAP[partial]) return MEDIA_SCAN_LANGUAGE_MAP[partial];
+        }
     }
 
     // 3. Loose substring match against longer known keys (last resort, kept
@@ -6674,6 +6681,235 @@ function mediaScanGuessLanguageFromToken(token) {
         if (key.length > 3 && norm.includes(key)) return MEDIA_SCAN_LANGUAGE_MAP[key];
     }
     return null;
+}
+
+
+// Native/local language names (e.g. "Espanol", "Deutsch", "Bahasa Indonesia"). Used when a
+// track has no usable language code but its title names the language.
+const MEDIA_SCAN_NATIVE_NAMES = {
+    'acèh': 'Acehnese',
+    'afaan oromoo': 'Oromo',
+    'aragonés': 'Aragonese',
+    'avañe\'ẽ': 'Guarani',
+    'aymar aru': 'Aymara',
+    'azərbaycan': 'Azerbaijani',
+    'bahasa indonesia': 'Indonesian',
+    'bahasa melayu': 'Malay',
+    'basa jawa': 'Javanese',
+    'basa sunda': 'Sundanese',
+    'bosanski': 'Bosnian',
+    'brezhoneg': 'Breton',
+    'català': 'Catalan',
+    'cymraeg': 'Welsh',
+    'dansk': 'Danish',
+    'deutsch': 'German',
+    'eesti': 'Estonian',
+    'español': 'Spanish',
+    'euskara': 'Basque',
+    'français': 'French',
+    'gaeilge': 'Irish',
+    'galego': 'Galician',
+    'hrvatski': 'Croatian',
+    'isixhosa': 'Xhosa',
+    'isizulu': 'Zulu',
+    'italiano': 'Italian',
+    'kapampangan': 'Pampangan',
+    'kiswahili': 'Swahili',
+    'kreyòl ayisyen': 'Haitian Creole',
+    'kurdî': 'Northern Kurdish',
+    'latina': 'Latin',
+    'latviešu': 'Latvian',
+    'lietuvių': 'Lithuanian',
+    'lingála': 'Lingala',
+    'lëtzebuergesch': 'Luxembourgish',
+    'magyar': 'Hungarian',
+    'malti': 'Maltese',
+    'māori': 'Maori',
+    'nederlands': 'Dutch',
+    'norsk bokmål': 'Norwegian (Norsk Bokmål)',
+    'oʻzbekcha': 'Uzbek',
+    'polski': 'Polish',
+    'português (brasil)': 'Portuguese (Brazil)',
+    'português (portugal)': 'Portuguese (Portugal)',
+    'română': 'Romanian',
+    'runa simi': 'Quechua',
+    'salitan pangasinan': 'Pangasinan',
+    'sesotho': 'Southern Sotho',
+    'setswana': 'Tswana',
+    'shqip': 'Albanian',
+    'sicilianu': 'Sicilian',
+    'slovenčina': 'Slovak',
+    'slovenščina': 'Slovenian',
+    'suomi': 'Finnish',
+    'svenska': 'Swedish',
+    'tiếng việt': 'Vietnamese',
+    'türkmençe': 'Turkmen',
+    'türkçe': 'Turkish',
+    'xitsonga': 'Tsonga',
+    'íslenska': 'Icelandic',
+    'čeština': 'Czech',
+    'ελληνικά': 'Greek',
+    'башҡортса': 'Bashkir',
+    'беларуская': 'Belarusian',
+    'български': 'Bulgarian',
+    'кыргызча': 'Kyrgyz',
+    'македонски': 'Macedonian',
+    'монгол': 'Mongolian',
+    'русский': 'Russian',
+    'српски': 'Serbian',
+    'татар теле': 'Tatar',
+    'тоҷикӣ': 'Tajik',
+    'українська': 'Ukrainian',
+    'қазақ тілі': 'Kazakh',
+    'հայերեն': 'Armenian',
+    'ייִדיש': 'Yiddish',
+    'עברית': 'Hebrew',
+    'ئۇيغۇرچە': 'Uyghur',
+    'اردو': 'Urdu',
+    'العربية': 'Arabic',
+    'دری': 'Dari',
+    'فارسی': 'Persian',
+    'هَرْشٜىٰن هَوْسَا': 'Hausa',
+    'پښتو': 'Pashto',
+    'کوردی': 'Central Kurdish',
+    'कोंकणी': 'Konkani',
+    'नेपाली': 'Nepali',
+    'भोजपुरी': 'Bhojpuri',
+    'मराठी': 'Marathi',
+    'मैथिली': 'Maithili',
+    'संस्कृतम्': 'Sanskrit',
+    'हिन्दी': 'Hindi',
+    'অসমীয়া': 'Assamese',
+    'বাংলা': 'Bangla',
+    'ਪੰਜਾਬੀ': 'Punjabi',
+    'ગુજરાતી': 'Gujarati',
+    'தமிழ்': 'Tamil',
+    'తెలుగు': 'Telugu',
+    'ಕನ್ನಡ': 'Kannada',
+    'മലയാളം': 'Malayalam',
+    'සිංහල': 'Sinhala',
+    'ไทย': 'Thai',
+    'ລາວ': 'Lao',
+    'မြန်မာ': 'Burmese',
+    'ქართული': 'Georgian',
+    'አማርኛ': 'Amharic',
+    'ខ្មែរ': 'Khmer',
+    '日本語': 'Japanese',
+    '한국어': 'Korean'
+};
+
+// Track title -> language. Some tracks carry no language code at all (the code lives in
+// Matroska's LanguageIETF field which ffmpeg.wasm 4.3 cannot read), but the uploader often
+// wrote the language into the track title ("Lombard", "Central Kurdish", "Deutsch" ...).
+function mediaScanGuessLanguageFromTitle(title) {
+    if (!title) return null;
+    const norm = String(title).toLowerCase()
+        .replace(/[\[\](){}_,.|/\\:;"']+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!norm) return null;
+    const lookup = (k) => MEDIA_SCAN_LANGUAGE_MAP[k] || MEDIA_SCAN_NATIVE_NAMES[k] || null;
+    // Whole title is exactly a name/code ("Lombard", "ben")
+    if (lookup(norm)) return lookup(norm);
+    // Longest phrase first ("central kurdish", "haitian creole"), then single words.
+    // Single words shorter than 4 letters are ignored here: "may", "sin", "per"... are
+    // ISO codes but also ordinary words, so they are only trusted when the title is just that.
+    const words = norm.split(' ');
+    for (let n = Math.min(3, words.length); n >= 1; n--) {
+        for (let i = 0; i + n <= words.length; i++) {
+            const phrase = words.slice(i, i + n).join(' ');
+            if (n === 1 && phrase.length < 4) continue;
+            const hit = lookup(phrase);
+            if (hit) return hit;
+        }
+    }
+    return null;
+}
+
+// ---------- Matroska (MKV) header reader ----------
+// ffmpeg.wasm 4.3 ignores the LanguageIETF element, so a track tagged with a language that
+// has no ISO 639-2 code (Lombard "lmo", Dari "prs", Central Kurdish "ckb", Konkani "gom",
+// BCP-47 tags like "zh-Hant", ...) shows no language in its log and became "Unknown".
+// Here the Tracks element is read straight from the file header bytes instead.
+function mediaScanParseMkvTracks(u8) {
+    try {
+        if (!u8 || u8.length < 64 || u8[0] !== 0x1A || u8[1] !== 0x45 || u8[2] !== 0xDF || u8[3] !== 0xA3) return null;
+        const readId = (pos) => {
+            const b = u8[pos]; let len = 1, mask = 0x80;
+            while (len <= 4 && !(b & mask)) { len++; mask >>= 1; }
+            if (len > 4 || pos + len > u8.length) return null;
+            let id = 0; for (let i = 0; i < len; i++) id = id * 256 + u8[pos + i];
+            return { id, len };
+        };
+        const readSize = (pos) => {
+            const b = u8[pos]; let len = 1, mask = 0x80;
+            while (len <= 8 && !(b & mask)) { len++; mask >>= 1; }
+            if (len > 8 || pos + len > u8.length) return null;
+            let val = b & (mask - 1), allOnes = val === mask - 1;
+            for (let i = 1; i < len; i++) { val = val * 256 + u8[pos + i]; if (u8[pos + i] !== 0xFF) allOnes = false; }
+            return { size: allOnes ? -1 : val, len };
+        };
+        const readUint = (pos, size) => { let v = 0; for (let i = 0; i < size; i++) v = v * 256 + u8[pos + i]; return v; };
+        const readStr = (pos, size) => {
+            let end = pos + size; while (end > pos && u8[end - 1] === 0) end--;
+            return new TextDecoder('utf-8').decode(u8.subarray(pos, end));
+        };
+        const ID_SEGMENT = 0x18538067, ID_TRACKS = 0x1654AE6B, ID_ENTRY = 0xAE, ID_CLUSTER = 0x1F43B675;
+
+        // top level: EBML header, then Segment
+        let pos = 0, segStart = -1;
+        while (pos < u8.length) {
+            const id = readId(pos); if (!id) return null;
+            const sz = readSize(pos + id.len); if (!sz) return null;
+            const dataPos = pos + id.len + sz.len;
+            if (id.id === ID_SEGMENT) { segStart = dataPos; break; }
+            if (sz.size < 0) return null;
+            pos = dataPos + sz.size;
+        }
+        if (segStart < 0) return null;
+
+        // inside Segment: skip children until Tracks
+        pos = segStart;
+        let tracksPos = -1, tracksEnd = -1;
+        while (pos < u8.length) {
+            const id = readId(pos); if (!id) break;
+            const sz = readSize(pos + id.len); if (!sz) break;
+            const dataPos = pos + id.len + sz.len;
+            if (id.id === ID_TRACKS) { tracksPos = dataPos; tracksEnd = sz.size < 0 ? u8.length : dataPos + sz.size; break; }
+            if (id.id === ID_CLUSTER || sz.size < 0) break; // Tracks always comes before the clusters
+            pos = dataPos + sz.size;
+        }
+        if (tracksPos < 0 || tracksEnd > u8.length) return null; // header not fully inside this chunk
+
+        const out = { audio: [], subtitle: [], video: [] };
+        pos = tracksPos;
+        while (pos < tracksEnd) {
+            const id = readId(pos); if (!id) break;
+            const sz = readSize(pos + id.len); if (!sz || sz.size < 0) break;
+            const dataPos = pos + id.len + sz.len, dataEnd = dataPos + sz.size;
+            if (id.id === ID_ENTRY) {
+                const tr = { type: 0, lang: '', ietf: '', name: '' };
+                let q = dataPos;
+                while (q < dataEnd) {
+                    const cid = readId(q); if (!cid) break;
+                    const csz = readSize(q + cid.len); if (!csz || csz.size < 0) break;
+                    const cd = q + cid.len + csz.len;
+                    if (cid.id === 0x83) tr.type = readUint(cd, csz.size);          // TrackType
+                    else if (cid.id === 0x22B59C) tr.lang = readStr(cd, csz.size);  // Language
+                    else if (cid.id === 0x22B59D) tr.ietf = readStr(cd, csz.size);  // LanguageIETF
+                    else if (cid.id === 0x536E) tr.name = readStr(cd, csz.size);    // Name
+                    q = cd + csz.size;
+                }
+                if (tr.type === 2) out.audio.push(tr);
+                else if (tr.type === 17) out.subtitle.push(tr);
+                else if (tr.type === 1) out.video.push(tr);
+            }
+            pos = dataEnd;
+        }
+        return out;
+    } catch (e) {
+        return null;
+    }
 }
 
 async function mediaScanEnsureFFmpeg(onProgress) {
@@ -6696,7 +6932,7 @@ async function mediaScanEnsureFFmpeg(onProgress) {
     return mediaScanFFmpegLoadingPromise;
 }
 
-function mediaScanParseStreamLogs(lines) {
+function mediaScanParseStreamLogs(lines, mkvInfo) {
     // Set-er bodole array byabohar kora hocche - eki language-er duita/tinta
     // alada audio (ba subtitle) track thakle age Set duplicate-gulo shoriye
     // dito, tai ekta-i "Spanish" dekhato - ekhon file-e joto-bar shei bhasha-r
@@ -6714,6 +6950,7 @@ function mediaScanParseStreamLogs(lines) {
     const audioTracks = [];
     const subtitleTracks = [];
     let current = null; // { kind, code (generic 639-2/639-1), ietf, title }
+    const unresolved = []; // tracks that are still "Unknown" (shown to the admin for debugging)
 
     function flush() {
         if (!current) return;
@@ -6755,7 +6992,26 @@ function mediaScanParseStreamLogs(lines) {
     });
     flush();
 
-    // FFmpeg-এর demuxer আসলে Matroska-র নতুন LanguageIETF element পার্সই করে না
+    // Fill in what ffmpeg.wasm could not read (LanguageIETF / Name) from the MKV header.
+    // Only applied when both sides list the same number of tracks, so a mismatch can never
+    // put a language on the wrong track.
+    function applyMkv(list, mk) {
+        if (!mk || mk.length !== list.length) return;
+        list.forEach((t, i) => {
+            const m = mk[i];
+            const ietf = (m.ietf || '').toLowerCase().trim();
+            const lang = (m.lang || '').toLowerCase().trim();
+            if (ietf && ietf !== 'und') t.ietf = ietf;
+            else if ((!t.code || t.code === 'und') && lang && lang !== 'und') t.code = lang;
+            if (!t.title && m.name) t.title = m.name;
+        });
+    }
+    if (mkvInfo) {
+        applyMkv(audioTracks, mkvInfo.audio);
+        applyMkv(subtitleTracks, mkvInfo.subtitle);
+    }
+
+    // FFmpeg- demuxerএর demuxer আসলে Matroska-র নতুন LanguageIETF element পার্সই করে না
     // (এটা FFmpeg-এর নিজেরই একটা known limitation, ffmpeg.wasm-এর সীমাবদ্ধতা না) -
     // তাই es-LA/es-ES/pt-BR-এর মতো regional কোড কখনোই "language" মেটাডেটা লাইনে
     // আসে না। বাস্তব ফাইলে দেখা গেছে regional তথ্যটা track "title"-এ থাকে, তবে
@@ -6769,7 +7025,14 @@ function mediaScanParseStreamLogs(lines) {
         // agey ei obosthay resolveTrack() null return korto, fole track-ta
         // "Unknown" hishebe dekhanor bodole puropuri skip hoye jeto. Tai
         // language ekdom na paile default "Unknown"-e fallback kora hocche.
-        const baseName = mediaScanGuessLanguageFromToken(t.ietf || t.code) || 'Unknown';
+        // 1) ietf (full BCP-47 tag) 2) plain code  3) language named in the track title
+        let baseName = mediaScanGuessLanguageFromToken(t.ietf)
+            || mediaScanGuessLanguageFromToken(t.code)
+            || mediaScanGuessLanguageFromTitle(t.title)
+            || 'Unknown';
+        if (baseName === 'Unknown') {
+            unresolved.push({ kind: t.kind, code: t.code || '', ietf: t.ietf || '', title: t.title || '' });
+        }
         if (t.title) {
             const matches = t.title.match(localeTokenRe);
             if (matches) {
@@ -6787,7 +7050,7 @@ function mediaScanParseStreamLogs(lines) {
     audioTracks.forEach(t => { const n = resolveTrack(t); if (n) audio.push(n); });
     subtitleTracks.forEach(t => { const n = resolveTrack(t); if (n) subtitle.push(n); });
 
-    return { audio, subtitle };
+    return { audio, subtitle, unresolved };
 }
 
 // ffmpeg.wasm's own fetchFile() reads the whole file through the old
@@ -6832,7 +7095,7 @@ async function mediaScanProbeVideoFile(file, onProgress) {
     const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
     const safeName = 'probe_input' + (extMatch ? extMatch[0] : '.mkv');
 
-    let bestResult = { audio: [], subtitle: [] };
+    let bestResult = { audio: [], subtitle: [], unresolved: [] };
 
     for (let i = 0; i < MEDIA_SCAN_CHUNK_BYTES.length; i++) {
         const chunkBytes = MEDIA_SCAN_CHUNK_BYTES[i];
@@ -6843,7 +7106,8 @@ async function mediaScanProbeVideoFile(file, onProgress) {
         const logLines = [];
         ffmpeg.setLogger(({ message }) => { if (message) logLines.push(message); });
 
-        ffmpeg.FS('writeFile', safeName, await mediaScanReadFileAsUint8Array(probeBlob));
+        const probeBytes = await mediaScanReadFileAsUint8Array(probeBlob);
+        ffmpeg.FS('writeFile', safeName, probeBytes);
 
         if (onProgress) onProgress('Detecting audio & subtitle tracks...');
         try {
@@ -6854,7 +7118,8 @@ async function mediaScanProbeVideoFile(file, onProgress) {
         }
         try { ffmpeg.FS('unlink', safeName); } catch (e) {}
 
-        const result = mediaScanParseStreamLogs(logLines);
+        const mkvInfo = /\.mkv$/i.test(file.name) ? mediaScanParseMkvTracks(probeBytes) : null;
+        const result = mediaScanParseStreamLogs(logLines, mkvInfo);
         const foundSomething = result.audio.length > 0 || result.subtitle.length > 0;
         if (foundSomething) bestResult = result; // partial হলেও এখন পর্যন্ত পাওয়া সেরা ফলাফল রাখা হচ্ছে
 
@@ -6999,11 +7264,26 @@ async function handleMediaScanFile(file) {
         if (audioStr && audioInput) audioInput.value = audioStr;
         if (subStr && subInput) subInput.value = subStr;
 
+        // Tracks still "Unknown": list their raw tag/title so the cause is visible
+        // (and the missing code can be added to MEDIA_SCAN_LANGUAGE_MAP).
+        const unresolved = result.unresolved || [];
+        let unresolvedNote = '';
+        if (unresolved.length) {
+            console.warn('Media scan: tracks that could not be identified', unresolved);
+            const shown = unresolved.slice(0, 8).map(u => {
+                const raw = [u.ietf && ('ietf: ' + u.ietf), u.code && ('code: ' + u.code), u.title && ('title: ' + u.title)].filter(Boolean).join(', ') || 'no language tag, no title';
+                return `${u.kind} (${raw})`;
+            }).join(' | ');
+            const more = unresolved.length > 8 ? ` ... +${unresolved.length - 8} more` : '';
+            unresolvedNote = `<div class="admin-media-scan-pill" style="opacity:.75;font-size:11px;">${unresolved.length} track(s) still Unknown: ${escapeAttr(shown + more)}</div>`;
+        }
+
         if (resultEl) {
             resultEl.style.display = 'grid';
             resultEl.innerHTML = `
                 <div class="admin-media-scan-pill">${escapeAttr(audioStr || 'No audio tracks detected')}</div>
                 <div class="admin-media-scan-pill">${escapeAttr(subStr || 'No subtitles detected')}</div>
+                ${unresolvedNote}
             `;
         }
 
