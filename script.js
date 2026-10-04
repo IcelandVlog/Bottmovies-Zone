@@ -575,38 +575,14 @@ const ADMIN_POSTER_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent
 
 // via.placeholder.com is dead/unreliable in 2026 (SSL/DNS issues) - use a local SVG instead
 // so poster boxes never end up blank when there's no real poster to show.
-function makePosterPlaceholder(label, light) {
+function makePosterPlaceholder(label) {
     const safeLabel = escapeHtml(label || 'No Poster');
-    // dark: original look. light: white background with soft grey icon/text.
-    const bg = light ? '#ffffff' : '#1a1c23';
-    const icon = light ? '#cbd5e1' : '#475569';
-    const text = light ? '#94a3b8' : '#64748b';
     return "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="${bg}"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="${icon}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="${icon}"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="${text}" text-anchor="middle">${safeLabel}</text></svg>`
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#1a1c23"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="#475569" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="#475569"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${safeLabel}</text></svg>`
     );
 }
-const POSTER_PLACEHOLDER_LOADING_DARK = makePosterPlaceholder('Loading...', false);
-const POSTER_PLACEHOLDER_MISSING_DARK = makePosterPlaceholder('No Poster', false);
-const POSTER_PLACEHOLDER_LOADING_LIGHT = makePosterPlaceholder('Loading...', true);
-const POSTER_PLACEHOLDER_MISSING_LIGHT = makePosterPlaceholder('No Poster', true);
-function posterPlaceholderLoading() {
-    return document.documentElement.classList.contains('light-mode') ? POSTER_PLACEHOLDER_LOADING_LIGHT : POSTER_PLACEHOLDER_LOADING_DARK;
-}
-function posterPlaceholderMissing() {
-    return document.documentElement.classList.contains('light-mode') ? POSTER_PLACEHOLDER_MISSING_LIGHT : POSTER_PLACEHOLDER_MISSING_DARK;
-}
-// theme toggle korle jei placeholder gulo ekhono dekhano hocche segulo sathe sathe notun theme er version e swap hobe
-function swapPosterPlaceholdersForTheme(isLight) {
-    const pairs = isLight
-        ? [[POSTER_PLACEHOLDER_LOADING_DARK, POSTER_PLACEHOLDER_LOADING_LIGHT], [POSTER_PLACEHOLDER_MISSING_DARK, POSTER_PLACEHOLDER_MISSING_LIGHT]]
-        : [[POSTER_PLACEHOLDER_LOADING_LIGHT, POSTER_PLACEHOLDER_LOADING_DARK], [POSTER_PLACEHOLDER_MISSING_LIGHT, POSTER_PLACEHOLDER_MISSING_DARK]];
-    document.querySelectorAll('img[src^="data:image/svg+xml"]').forEach(img => {
-        const cur = img.getAttribute('src');
-        for (const [from, to] of pairs) {
-            if (cur === from) { img.setAttribute('src', to); break; }
-        }
-    });
-}
+const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
+const POSTER_PLACEHOLDER_MISSING = makePosterPlaceholder('No Poster');
 
 // OMDb (IMDb-r Amazon CDN) theke asha poster URL default-e onek choto/cropped
 // size-e ashe (jemon "..._V1_SX300.jpg" ba "..._V1_UY268_CR61,0,182,268_AL_.jpg").
@@ -675,7 +651,7 @@ function handlePosterImgError(imgEl) {
     if (!imgEl) return;
     if (imgEl.dataset.posterRetried === '1') {
         imgEl.onerror = null;
-        imgEl.src = posterPlaceholderMissing();
+        imgEl.src = POSTER_PLACEHOLDER_MISSING;
         return;
     }
     imgEl.dataset.posterRetried = '1';
@@ -963,7 +939,7 @@ function renderHeroSlides() {
         slide.className = 'hero-slide';
         if (isClone) slide.setAttribute('aria-hidden', 'true');
         slide.innerHTML = `
-            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${upgradePosterQuality(movie.poster) || posterPlaceholderLoading()}')"></div>
+            <div class="hero-slide-bg" id="heroBg-${domId}" style="background-image:url('${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}')"></div>
             <div class="hero-slide-shade"></div>
             <div class="hero-slide-top">
                 <span class="hero-badge hero-badge-featured">Featured</span>
@@ -2115,7 +2091,7 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
-            <img src="${upgradePosterQuality(movie.poster) || posterPlaceholderLoading()}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
+            <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
         `;
@@ -2195,7 +2171,7 @@ async function openMovieModal(movie) {
     `;
 
     let title = movie.title || "N/A";
-    let poster = movie.poster || posterPlaceholderMissing();
+    let poster = movie.poster || POSTER_PLACEHOLDER_MISSING;
     let year = movie.year || "N/A";
     let genre = movie.genre || "Drama";
     let plot = movie.plot || "No plot description available.";
@@ -3039,7 +3015,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
     // (playModalWatch()) barbe, jate accordion-ta shudhu open kore dekhleই
     // "view" count na hoye jay.
     container.innerHTML = `
-        <div class="season-box-item watch-box" id="watchBox"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-default-server="${Number(movie.watchServer) === 2 ? 2 : 1}" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
+        <div class="season-box-item watch-box" id="watchBox"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
             <div class="season-box-header" onclick="toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
@@ -3078,8 +3054,7 @@ function showAdblockNotice() {
 // Player box-e data-tmdb-id + data-tmdb-type thakle-i Server 02 dekhano hoy.
 
 function getPreferredWatchServer() {
-    try { localStorage.removeItem('bm_watch_server'); } catch (e) { /* ignore */ }
-    return 1;
+    try { return localStorage.getItem('bm_watch_server') === '2' ? 2 : 1; } catch (e) { return 1; }
 }
 function setPreferredWatchServer(n) {
     try { localStorage.setItem('bm_watch_server', String(n)); } catch (e) { /* ignore */ }
@@ -3116,6 +3091,7 @@ function switchWatchServer(btnEl) {
     const iframe = box.querySelector('.trailer-video-wrap iframe');
     if (!iframe) return;
     box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
+    setPreferredWatchServer(server);
     iframe.src = getWatchServerUrl(box, server);
 }
 
@@ -3136,9 +3112,7 @@ function playModalWatch(el) {
 
     showAdblockNotice();
 
-    // Admin je server set koreche (Watch Button > Default server) seta diye shuru; set na thakle Server 1.
-    // Server 2 shudhu tokhon-i jokhon TMDB ID ache (nahole Server 2 er URL banano jay na).
-    const activeServer = (boxHasServer2(box) && box.getAttribute('data-default-server') === '2') ? 2 : 1;
+    const activeServer = boxHasServer2(box) ? getPreferredWatchServer() : 1;
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -3448,8 +3422,7 @@ function playMassiveWatch(el) {
     showAdblockNotice();
 
     const serverDown = box.getAttribute('data-server1-down') === '1';
-    // Default Server 1; shudhu Server 1 down thakle Server 2 e jabe
-    const activeServer = boxHasServer2(box) ? (serverDown ? 2 : 1) : 1;
+    const activeServer = boxHasServer2(box) ? (serverDown ? 2 : getPreferredWatchServer()) : 1;
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -3728,9 +3701,7 @@ function updateNoticeBannerText(category, targetLink) {
 function switchCategory(category, initialPage) {
     if (!category) return;
 
-    // logo (#siteLogo) o .nav-link[data-target="all"] tai menu bar er link ke age khujbo, naile HOME active hoy na
-    const targetLink = document.querySelector(`.main-nav .nav-link[data-target="${category}"]`)
-        || document.querySelector(`.nav-link[data-target="${category}"]`);
+    const targetLink = document.querySelector(`.nav-link[data-target="${category}"]`);
 
     document.querySelectorAll('.nav-link, .dropdown-toggle').forEach(el => el.classList.remove('active'));
     if (targetLink) {
@@ -4285,7 +4256,6 @@ function setThemeMode(mode) {
     document.documentElement.classList.toggle('light-mode', isLight);
     try { localStorage.setItem(THEME_STORAGE_KEY, isLight ? 'light' : 'dark'); } catch (e) {}
     applyThemeToggleIcon();
-    swapPosterPlaceholdersForTheme(isLight);
 }
 
 function toggleThemeMode() {
@@ -6582,7 +6552,63 @@ const MEDIA_SCAN_LANGUAGE_MAP = {
     // shadharonoto ei 3-letter code-e-i thake (onno shob bhashar jonno-o
     // upore 2-letter + 3-letter dutoi ache), tai eta na thakle "lat" detect
     // hoto na - ei-i chilo "Latin detect hocche na" problem-er asol karon.
-    la: 'Latin', lat: 'Latin'
+    la: 'Latin', lat: 'Latin',
+
+    // ---- Extra languages: every language the subtitle-translator can translate into ----
+    // (2-letter code, 3-letter ISO 639-2/639-3 code(s) and English name). Without these,
+    // tracks tagged with e.g. "ceb", "jv", "ps", "yi" showed up as "Unknown".
+    // Legacy tags (iw/in/ji/jw) are still found in older files.
+    english: 'English',
+    'simplified chinese': 'Chinese (Simplified)',
+    'traditional chinese': 'Chinese (Traditional)',
+    'norwegian bokmål': 'Norwegian (Norsk Bokmål)', 'norwegian bokmal': 'Norwegian (Norsk Bokmål)',
+    be: 'Belarusian', bel: 'Belarusian', belarusian: 'Belarusian',
+    scn: 'Sicilian', sicilian: 'Sicilian',
+    lmo: 'Lombard', lombard: 'Lombard',
+    br: 'Breton', bre: 'Breton', breton: 'Breton',
+    yi: 'Yiddish', yid: 'Yiddish', yiddish: 'Yiddish',
+    lb: 'Luxembourgish', ltz: 'Luxembourgish', luxembourgish: 'Luxembourgish',
+    oc: 'Occitan', oci: 'Occitan', occitan: 'Occitan',
+    an: 'Aragonese', arg: 'Aragonese', aragonese: 'Aragonese',
+    latin: 'Latin',
+    eo: 'Esperanto', epo: 'Esperanto', esperanto: 'Esperanto',
+    ps: 'Pashto', pus: 'Pashto', pashto: 'Pashto',
+    prs: 'Dari', dari: 'Dari',
+    ckb: 'Central Kurdish', 'central kurdish': 'Central Kurdish',
+    kmr: 'Northern Kurdish', 'northern kurdish': 'Northern Kurdish',
+    ky: 'Kyrgyz', kir: 'Kyrgyz', kyrgyz: 'Kyrgyz',
+    tk: 'Turkmen', tuk: 'Turkmen', turkmen: 'Turkmen',
+    tg: 'Tajik', tgk: 'Tajik', tajik: 'Tajik',
+    ba: 'Bashkir', bak: 'Bashkir', bashkir: 'Bashkir',
+    tt: 'Tatar', tat: 'Tatar', tatar: 'Tatar',
+    ug: 'Uyghur', uig: 'Uyghur', uyghur: 'Uyghur',
+    bho: 'Bhojpuri', bhojpuri: 'Bhojpuri',
+    mai: 'Maithili', maithili: 'Maithili',
+    as: 'Assamese', asm: 'Assamese', assamese: 'Assamese',
+    gom: 'Konkani', konkani: 'Konkani',
+    sa: 'Sanskrit', san: 'Sanskrit', sanskrit: 'Sanskrit',
+    jv: 'Javanese', jav: 'Javanese', javanese: 'Javanese',
+    su: 'Sundanese', sun: 'Sundanese', sundanese: 'Sundanese',
+    ace: 'Acehnese', acehnese: 'Acehnese',
+    pag: 'Pangasinan', pangasinan: 'Pangasinan',
+    pam: 'Pampangan', pampangan: 'Pampangan',
+    ceb: 'Cebuano', cebuano: 'Cebuano',
+    wo: 'Wolof', wol: 'Wolof', wolof: 'Wolof',
+    om: 'Oromo', orm: 'Oromo', oromo: 'Oromo',
+    st: 'Southern Sotho', sot: 'Southern Sotho', 'southern sotho': 'Southern Sotho',
+    tn: 'Tswana', tsn: 'Tswana', tswana: 'Tswana',
+    ts: 'Tsonga', tso: 'Tsonga', tsonga: 'Tsonga',
+    mg: 'Malagasy', mlg: 'Malagasy', malagasy: 'Malagasy',
+    ln: 'Lingala', lin: 'Lingala', lingala: 'Lingala',
+    'haitian creole': 'Haitian Creole',
+    qu: 'Quechua', que: 'Quechua', quechua: 'Quechua',
+    ay: 'Aymara', aym: 'Aymara', aymara: 'Aymara',
+    gn: 'Guarani', grn: 'Guarani', guarani: 'Guarani',
+    mi: 'Maori', mao: 'Maori', mri: 'Maori', maori: 'Maori',
+    iw: 'Hebrew',
+    'in': 'Indonesian',
+    ji: 'Yiddish',
+    jw: 'Javanese'
 };
 
 // অনেক MKV uploader/muxer regional info একদম hyphenated code (es-LA) হিসেবে
@@ -7460,22 +7486,6 @@ function addSeasonBlock(data) {
     } else {
         addSeasonLinkRow(linksContainer);
     }
-    // purano data-te label e 720p kintu item e 1080p thakle edit kholar shomoy-i thik hoye jabe
-    syncSeasonLabelQuality(block);
-}
-
-// Season label (jemon "Season 1 Complete 720p") er quality part ta, link row er selected quality
-// theke live sync kore. Sob row-er quality ek hole tobei label bodlay; alada alada hole label ke chhuy na.
-function syncSeasonLabelQuality(block) {
-    if (!block) return;
-    const labelInput = block.querySelector('.admin-season-label');
-    if (!labelInput) return;
-    const qualities = Array.from(block.querySelectorAll('.admin-season-links .admin-link-quality')).map(sel => sel.value);
-    if (qualities.length === 0 || qualities.some(q => q !== qualities[0])) return;
-    const qualityRe = /\b(360p|480p|720p|1080p|2160p|4k)\b/i;
-    if (qualityRe.test(labelInput.value)) {
-        labelInput.value = labelInput.value.replace(qualityRe, qualities[0]);
-    }
 }
 
 function addSeasonLinkRow(container, data) {
@@ -7493,8 +7503,6 @@ function addSeasonLinkRow(container, data) {
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
     container.appendChild(row);
-    const qSel = row.querySelector('.admin-link-quality');
-    if (qSel) qSel.addEventListener('change', () => syncSeasonLabelQuality(row.closest('.admin-season-block')));
 }
 
 // ---------- Season trailer rows (TV) ----------
@@ -7568,7 +7576,6 @@ function collectSeasons() {
     blocks.forEach((block, idx) => {
         const labelInput = block.querySelector('.admin-season-label');
         
-        syncSeasonLabelQuality(block);
         const label = (labelInput.value.trim()) || `Season ${idx + 1} Complete 720p`;
         
         const items = [];
@@ -9127,14 +9134,6 @@ function renderAdminWatchList(filter) {
                 ` : ''}
                 <input type="text" class="admin-watch-link-input" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed)" value="${escapeAttr(movie.watchLink || '')}">
                 <input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}">
-                <label class="admin-watch-server-row">
-                    <span>Default server</span>
-                    <select class="admin-watch-server-select" title="Online watch e kon server diye shuru hobe">
-                        <option value=""${!movie.watchServer ? ' selected' : ''}>Auto (Server 1)</option>
-                        <option value="1"${Number(movie.watchServer) === 1 ? ' selected' : ''}>Server 1</option>
-                        <option value="2"${Number(movie.watchServer) === 2 ? ' selected' : ''}>Server 2</option>
-                    </select>
-                </label>
                 </div>
             </div>
             <div class="admin-db-actions">
@@ -9241,10 +9240,6 @@ function renderAdminWatchList(filter) {
         };
         makeFieldAutoSave(thumbInput, () => movie.watchThumb || null);
         makeFieldAutoSave(linkInput, () => movie.watchLink || null);
-        const serverSelect = card.querySelector('.admin-watch-server-select');
-        if (serverSelect) {
-            serverSelect.addEventListener('change', () => saveAdminWatchSettings(movie, card, saveBtn, () => watchOnState));
-        }
 
         if (isTv) {
             // TV series - "Auto" checkbox diye dui-rokom mode-er modhye
@@ -9516,19 +9511,9 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
             payload = { watchEnabled, watchLink: linkRaw, watchThumb: thumbRaw };
         }
 
-        // Default server (1/2). Khali = Auto = Server 1. Column shudhu tokhon-i pathai jokhon kichu set kora ache
-        // ba age set kora chilo (jate column na thakle baki watch settings save fail na hoy).
-        const serverSelectEl = card.querySelector('.admin-watch-server-select');
-        const serverRaw = serverSelectEl ? serverSelectEl.value : '';
-        const watchServerVal = serverRaw ? (parseInt(serverRaw, 10) === 2 ? 2 : 1) : null;
-        if (watchServerVal !== null || movie.watchServer != null) {
-            payload.watchServer = watchServerVal;
-        }
-
         const { error } = await supabaseClient.from('movies').update(payload).eq('id', movie.id);
         if (error) throw error;
 
-        if ('watchServer' in payload) movie.watchServer = watchServerVal;
         movie.watchEnabled = watchEnabled;
         movie.watchThumb = thumbRaw;
         if (useSeasonMode) {
@@ -9541,9 +9526,7 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
         btn.textContent = 'Saved';
     } catch (err) {
         console.error('Save watch settings error:', err);
-        const errMsg = (err && err.message) ? err.message : 'Unknown error';
-        const needsCol = /watchServer/i.test(errMsg);
-        showToast('❌ Save failed: ' + errMsg + (needsCol ? ' — Supabase SQL Editor e eta chalao: ALTER TABLE movies ADD COLUMN "watchServer" smallint;' : ''), 'error');
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
         // Explicit "Save" button-er bodole ekhon ekta chhoto status indicator
         // (jeta klik-e save hoy na, karon shob field-i blur/change-e nijeই
         // auto-save hoy) - tai save fail korleo eikhane "Retry" showing kore

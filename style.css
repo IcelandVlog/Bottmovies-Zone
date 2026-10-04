@@ -4333,12 +4333,7 @@ html.light-mode .btn-auth-signin, html.light-mode .btn-auth-signout, html.light-
 html.light-mode .btn-auth-signin:hover, html.light-mode .btn-auth-signout:hover { background-color: rgba(126, 211, 33, 0.14); border-color: #5fb41a; }
 html.light-mode .poster-wrapper { border-color: #dfe3ea; box-shadow: 0 6px 16px rgba(20, 22, 28, 0.12); }
 html.light-mode .movie-title { color: #1b1f27; }
-html.light-mode .movie-card:hover .movie-title { color: #ea580c; }
-html.light-mode .movie-card:hover .poster-wrapper {
-    border-color: #f97316 !important;
-    box-shadow: 0 10px 22px rgba(20, 22, 28, 0.12), 0 0 0 2px rgba(249, 115, 22, 0.35);
-}
-html.light-mode .movie-card:hover { background: transparent; }
+html.light-mode .movie-card:hover .movie-title { color: #3f8a0c; }
 html.light-mode .massive-watch-section { background: radial-gradient(600px 200px at 50% 0%, rgba(126, 211, 33, 0.14), transparent 70%), #ffffff; border-color: rgba(94, 170, 20, 0.3); box-shadow: 0 10px 30px rgba(20, 22, 28, 0.08); }
 html.light-mode .massive-watch-heading h2 { background: linear-gradient(90deg, #14161c 0%, #3f8a0c 100%); -webkit-background-clip: text; background-clip: text; }
 html.light-mode .massive-watch-input { background-color: #f7f8fa; border-color: #dde1e8; color: #14161c; }
@@ -4745,240 +4740,99 @@ html.light-mode .hero-badge-cat:hover {
 /* dark mode hover (keeps green, adds border) */
 html:not(.light-mode) .hero-badge-cat:hover { color: var(--g2, #b6f36a); border-color: rgba(126, 211, 33, 0.55); }
 
-
 /* =====================================================================
-   LIGHT MODE: ORANGE ACCENT (replaces green everywhere in light mode)
-   Dark mode is untouched. Logo / country badge keep their own colors.
+   BOXES & BUTTONS - dark "glass" style (like the Transfer to Drive / GDFlix buttons)
+   Border-radius is intentionally NOT touched anywhere in this block.
    ===================================================================== */
-html.light-mode {
-    --g1: #f97316;
-    --g2: #fb923c;
-    --g3: #ea580c;
-    --brand-green: #f97316;
-    --brand-green-soft: rgba(249, 115, 22, 0.22);
+.season-box-item {
+    position: relative;
+    background: linear-gradient(180deg, #211d38 0%, #181630 100%);      /* ZIP / download: soft purple tint */
+    border: 1px solid rgba(139, 107, 255, 0.20);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
-html.light-mode body { background-image: radial-gradient(1100px 380px at 50% -140px, rgba(249, 115, 22, 0.14), transparent 70%); }
-
-/* search bars */
-html.light-mode .search-container:hover,
-html.light-mode .massive-watch-search-wrap:hover,
-html.light-mode .massive-watch-input:hover { border-color: rgba(234, 88, 12, 0.55); }
-html.light-mode .search-container:focus-within,
-html.light-mode .massive-watch-search-wrap:focus-within { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
-html.light-mode .massive-watch-input:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
-html.light-mode .search-container button#searchBtn:hover { background-color: rgba(249, 115, 22, 0.12); color: #ea580c; }
-html.light-mode .search-container button.search-clear-btn:hover,
-html.light-mode .massive-watch-clear-btn:hover { background-color: #f97316; background: #f97316; color: #fff; }
-html.light-mode .search-suggestions,
-html.light-mode .massive-watch-suggestions { border-color: rgba(234, 88, 12, 0.45); }
-html.light-mode .suggestion-item:hover,
-html.light-mode .massive-watch-suggestion-item:hover { background-color: rgba(249, 115, 22, 0.14); color: #14161c; box-shadow: inset 3px 0 0 #f97316; }
-html.light-mode .search-suggestions::-webkit-scrollbar-thumb { background-color: rgba(249, 115, 22, 0.4); }
-html.light-mode .search-suggestions::-webkit-scrollbar-thumb:hover { background-color: #f97316; }
-
-/* header buttons, nav, dropdown */
-html.light-mode .btn-auth-signin:hover,
-html.light-mode .btn-auth-signout:hover,
-html.light-mode .btn-auth-icon-mobile:hover { background-color: rgba(249, 115, 22, 0.14); border-color: #f97316; }
-html.light-mode .main-nav ul li a.active { color: #ea580c; background-color: rgba(249, 115, 22, 0.16); box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45); }
-html.light-mode .dropdown-menu li a:hover { background-color: rgba(249, 115, 22, 0.12); }
-/* Anime/Flix box keeps its original green (variables are orange in light mode, so pin them) */
-html.light-mode .btn-top-anime { background: linear-gradient(135deg, #b6f36a 0%, #7ed321 45%, #5fb41a 100%); color: #0b1a02; box-shadow: 0 4px 14px rgba(126, 211, 33, 0.30), inset 0 1px 0 rgba(255,255,255,0.35); }
-html.light-mode .btn-top-anime:hover { box-shadow: 0 8px 20px rgba(126, 211, 33, 0.45), inset 0 1px 0 rgba(255,255,255,0.4); }
-html.light-mode .main-footer { border-top-color: rgba(249, 115, 22, 0.2); }
-
-/* hero slider */
-html.light-mode .hero-badge-featured { color: #ea580c; border-color: rgba(234, 88, 12, 0.55); }
-html.light-mode .hero-badge-cat:hover { color: #ea580c; background-color: #ffffff; border-color: rgba(234, 88, 12, 0.7); }
-html.light-mode .hero-meta-hd,
-html.light-mode .hero-meta-date { border-color: rgba(249, 115, 22, 0.55); background-color: rgba(249, 115, 22, 0.14); }
-html.light-mode .hero-watch-btn { background: linear-gradient(135deg, #fb923c, #f97316); color: #fff; box-shadow: 0 6px 18px rgba(249, 115, 22, 0.35); }
-html.light-mode .hero-watch-btn:hover { background: linear-gradient(135deg, #fdba74, #ea580c); box-shadow: 0 10px 24px rgba(249, 115, 22, 0.5); }
-html.light-mode .hero-nav-btn { border-color: rgba(249, 115, 22, 0.7); }
-html.light-mode .hero-nav-btn:hover { background-color: #f97316; color: #fff; }
-
-/* "500K+ Movies" panel */
-html.light-mode .massive-watch-section { background: radial-gradient(600px 200px at 50% 0%, rgba(249, 115, 22, 0.14), transparent 70%), #ffffff; border-color: rgba(234, 88, 12, 0.3); }
-html.light-mode .massive-watch-heading h2 { background: linear-gradient(90deg, #14161c 0%, #ea580c 100%); -webkit-background-clip: text; background-clip: text; }
-
-/* pagination */
-html.light-mode .page-num:hover:not(.disabled) { border-color: rgba(234, 88, 12, 0.55); color: #ea580c; }
-html.light-mode .page-num.active { background: linear-gradient(135deg, #fb923c, #f97316) !important; border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(249, 115, 22, 0.3); }
-
-/* watch page server buttons */
-html.light-mode .watch-server-btn:hover { border-color: rgba(234, 88, 12, 0.6); color: #ea580c; }
-html.light-mode .watch-server-btn.active { background: linear-gradient(135deg, #fb923c, #f97316); color: #fff; box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3); }
-html.light-mode .watch-server-btn.active .watch-server-dot { background-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25); }
-
-
-/* Footer links (How to Download | Report Broken Links): visible hover in both themes */
-.footer-link { color: #94a3b8; text-decoration: none; font-size: 15px; transition: color 0.2s; }
-.footer-link:hover { color: #b6f36a; }
-.footer-link-sep { color: #3a3f4a; margin: 0 10px; }
-html.light-mode .footer-link { color: #5b6472; }
-html.light-mode .footer-link:hover { color: #ea580c; }
-html.light-mode .footer-link-sep { color: #c2c8d1; }
-
-/* Footer links in light mode: !important so it wins even over old inline styles / onmouseover handlers */
-html.light-mode .main-footer a { color: #5b6472 !important; }
-html.light-mode .main-footer a:hover { color: #ea580c !important; }
-html.light-mode .main-footer span { color: #c2c8d1 !important; }
-
-/* Footer links in dark mode: green on hover (!important so it also beats old inline styles) */
-html:not(.light-mode) .main-footer a:hover { color: #b6f36a !important; }
-
-/* Light mode: poster placeholder (Loading... / No Poster) is white, so hide the dark bottom fade on top of it */
-html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"])::after { display: none; }
-html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"]) { background-color: #ffffff !important; }
-
-/* =====================================================================
-   Dropdown rows that have a ▾ toggle (English Movies, English Series, Disney+ Hotstar):
-   when active, the WHOLE row (link + ▾ button) is one highlighted box.
-   ===================================================================== */
-.main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) {
-    border-radius: 8px;
-    background-color: rgba(126, 211, 33, 0.14);
-    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
+.season-box-item:hover {
+    border-color: rgba(126, 211, 33, 0.45);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(126, 211, 33, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
-.main-nav .dropdown-menu li.sub-dropdown > a.nav-link.active {
-    background: transparent !important;
-    box-shadow: none !important;
-    border-radius: 8px 0 0 8px;
-    color: var(--g2);
+.season-box-item.fast-server-box {                                      /* Server / WEB: teal tint */
+    background: linear-gradient(180deg, #112a30 0%, #0d2026 100%);
+    border: 1px solid rgba(0, 200, 210, 0.22);
 }
-.main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) > .sub-dropdown-toggle {
-    color: var(--g2);
-    border-color: rgba(126, 211, 33, 0.55);
+.season-box-item.watch-box {                                            /* Online Watch: green tint */
+    background: linear-gradient(180deg, #13281c 0%, #0e1f15 100%);
+    border: 1px solid rgba(126, 211, 33, 0.28);
 }
 
-/* light mode = orange */
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) {
-    background-color: rgba(249, 115, 22, 0.16);
-    box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45);
-}
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown > a.nav-link.active { color: #ea580c; }
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> a.nav-link.active) > .sub-dropdown-toggle {
-    color: #ea580c;
-    border-color: rgba(234, 88, 12, 0.55);
-    background-color: rgba(255, 255, 255, 0.5);
-}
+.season-box-header { padding: 13px 18px; font-weight: 700; letter-spacing: 0.1px; }
+.season-box-header:hover { background: rgba(255, 255, 255, 0.04); }
 
-/* =====================================================================
-   Parent row stays active when one of its sub-items (German / Spanish / Marvel / DC ...)
-   is active, and every active dropdown item uses the same box style.
-   ===================================================================== */
-.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) {
-    border-radius: 8px;
-    background-color: rgba(126, 211, 33, 0.14);
-    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
+/* ZIP / WEB label  ->  like the "1 credit" chip */
+.badge-icon-list {
+    background: rgba(255, 255, 255, 0.08);
+    color: #9aa3b8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    letter-spacing: 0.3px;
 }
-.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > a.nav-link,
-.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
-    color: var(--g2);
-}
-.main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
-    border-color: rgba(126, 211, 33, 0.55);
-}
-/* active sub-item = same box (8px, not a pill) */
-.main-nav .sub-menu li > a.nav-link.active {
-    border-radius: 8px;
-    background-color: rgba(126, 211, 33, 0.14);
-    box-shadow: inset 0 0 0 1px rgba(126, 211, 33, 0.35);
-    color: var(--g2);
-}
+.season-badges-right { align-items: center; gap: 10px; }
 
-/* light mode = orange */
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) {
-    background-color: rgba(249, 115, 22, 0.16);
-    box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45);
-}
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > a.nav-link,
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
-    color: #ea580c;
-}
-html.light-mode .main-nav .dropdown-menu li.sub-dropdown:has(> .sub-menu a.nav-link.active) > .sub-dropdown-toggle {
-    border-color: rgba(234, 88, 12, 0.55);
-    background-color: rgba(255, 255, 255, 0.5);
-}
-html.light-mode .main-nav .sub-menu li > a.nav-link.active {
-    background-color: rgba(249, 115, 22, 0.16);
-    box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.45);
-    color: #ea580c;
-}
-
-/* =====================================================================
-   NOTICE BANNER (category note) - bookmark icon + big bold text on dark card
-   ===================================================================== */
-.notice-banner {
-    background: linear-gradient(90deg, #08080a 0%, #111014 55%, #1d1115 100%);
-    color: #ffffff;
-    text-align: left;
-    padding: 14px 52px 14px 18px;
-    font-size: 17px;
-    font-weight: 800;
-    line-height: 1.35;
-    letter-spacing: 0.1px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-}
-.notice-banner::before {
+/* arrow on the right, like the buttons in the reference */
+.season-box-item:not(.watch-box) .season-badges-right::after {
     content: "";
-    display: inline-block;
-    width: 20px;
-    height: 24px;
-    margin-right: 14px;
-    vertical-align: -5px;
-    background-color: currentColor;
-    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z'/></svg>") center / contain no-repeat;
-            mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'><path d='M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z'/></svg>") center / contain no-repeat;
+    width: 15px;
+    height: 15px;
+    background-color: #e7eaf2;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: transform 0.2s ease, background-color 0.2s ease;
 }
-.notice-banner .close-banner { right: 16px; font-size: 15px; color: #9aa3b2; transition: color 0.15s ease; }
-.notice-banner .close-banner:hover { color: #ffffff; }
+.season-box-item:not(.watch-box) .season-box-header:hover .season-badges-right::after { transform: translateX(3px); background-color: #b6f36a; }
+.dropdown-arrow { color: #e7eaf2; }
 
-/* light mode */
-html.light-mode .notice-banner {
-    background: linear-gradient(90deg, #ffffff 0%, #fafbfc 60%, #fff4ec 100%);
-    color: #14161c;
-    border-color: #e5e8ee;
-    box-shadow: 0 6px 16px rgba(20, 22, 28, 0.08);
+/* the panel that opens under a box */
+.season-download-body { background: #0f111a; border-color: rgba(255, 255, 255, 0.07); }
+
+/* buttons inside the opened panel */
+.btn-zip-download, .btn-copy-link {
+    background: linear-gradient(180deg, #221e3a 0%, #181630 100%);
+    border: 1px solid rgba(139, 107, 255, 0.30);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: 0.2px;
 }
-html.light-mode .notice-banner::before { background-color: #ea580c; }
-html.light-mode .notice-banner .close-banner { color: #8891a0; }
-html.light-mode .notice-banner .close-banner:hover { color: #14161c; }
+.btn-copy-link {
+    background: linear-gradient(180deg, #19213a 0%, #121830 100%);
+    border: 1px solid rgba(77, 124, 255, 0.32);
+}
+.btn-zip-download:hover, .btn-copy-link:hover {
+    border-color: rgba(126, 211, 33, 0.6);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), 0 0 14px rgba(126, 211, 33, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
+}
+
+/* ---------- light mode ---------- */
+html.light-mode .season-box-item {
+    background: linear-gradient(180deg, #f5f3fc 0%, #ebe8f7 100%);
+    border: 1px solid rgba(110, 84, 210, 0.25);
+    box-shadow: 0 4px 14px rgba(20, 22, 28, 0.08), inset 0 1px 0 #ffffff;
+}
+html.light-mode .season-box-item.fast-server-box { background: linear-gradient(180deg, #eaf7f8 0%, #dcf0f2 100%); border: 1px solid rgba(0, 150, 160, 0.30); }
+html.light-mode .season-box-item.watch-box { background: linear-gradient(180deg, #eff8e8 0%, #e1f1d4 100%); border: 1px solid rgba(94, 170, 20, 0.40); }
+html.light-mode .season-box-item:hover { border-color: rgba(94, 170, 20, 0.6); }
+html.light-mode .season-box-header { color: #1b1f27; }
+html.light-mode .season-box-header:hover { background: rgba(20, 22, 28, 0.04); }
+html.light-mode .badge-icon-list { background: rgba(20, 22, 28, 0.08); color: #4b5263; }
+html.light-mode .season-box-item:not(.watch-box) .season-badges-right::after { background-color: #2a2f3d; }
+html.light-mode .season-box-item:not(.watch-box) .season-box-header:hover .season-badges-right::after { background-color: #3f8a0c; }
+html.light-mode .dropdown-arrow { color: #1b1f27; }
+html.light-mode .season-download-body { background: #ffffff; border-color: #e1e4ea; }
+html.light-mode .btn-zip-download, html.light-mode .btn-copy-link { color: #ffffff; }
 
 @media (max-width: 600px) {
-    .notice-banner { font-size: 14.5px; padding: 12px 44px 12px 14px; }
-    .notice-banner::before { width: 17px; height: 21px; margin-right: 10px; vertical-align: -4px; }
+    .season-box-header { padding: 11px 12px; }
+    .season-box-item:not(.watch-box) .season-badges-right::after { width: 13px; height: 13px; }
+    .season-badges-right { gap: 7px; }
 }
-
-/* Notice banner: visible border + centered text */
-.notice-banner {
-    text-align: center;
-    padding-left: 52px;
-    border: 1.5px solid rgba(255, 255, 255, 0.28);
-}
-html.light-mode .notice-banner { border: 1.5px solid #cfd5df; }
-@media (max-width: 600px) {
-    .notice-banner { padding-left: 44px; }
-}
-
-/* Notice banner border: green in dark mode, orange in light mode */
-.notice-banner { border: 1.5px solid rgba(126, 211, 33, 0.7); }
-html.light-mode .notice-banner { border: 1.5px solid #f97316; }
-
-/* Admin > Watch Button > "Default server" row */
-.admin-watch-server-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; color: #94a3b8; }
-.admin-watch-server-select {
-    background-color: #111622;
-    border: 1px solid #1e293b;
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 12px;
-    color: #e2e8f0;
-    outline: none;
-    cursor: pointer;
-}
-.admin-watch-server-select:focus { border-color: #2563eb; }
-html.light-mode .admin-watch-server-row { color: #5b6472; }
-html.light-mode .admin-watch-server-select { background-color: #ffffff; border-color: #dde1e8; color: #14161c; }
