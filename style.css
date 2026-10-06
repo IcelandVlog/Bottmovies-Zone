@@ -5118,3 +5118,135 @@ html.light-mode .admin-watch-server-btn:not(.active):hover { background-color: #
 /* Light mode: hero title (hover) and subtitle in a deeper orange instead of pale orange */
 html.light-mode .hero-slide-title:hover { color: #ea580c; }
 html.light-mode .hero-slide-subtitle { color: #f97316; }
+
+/* ==================== Poster placeholder ("Loading..." / "No Poster") ==================== */
+/* The placeholder image is transparent now, so the card background shows through:
+   dark in dark mode (as before), WHITE in light mode. */
+.poster-wrapper { background-color: #1a1c23; }
+html.light-mode .poster-wrapper { background-color: #ffffff; }
+/* no dark fade over the placeholder in light mode */
+html.light-mode .poster-wrapper:has(img[src^="data:image/svg+xml"])::after { display: none; }
+
+/* ==================== Admin category chips: natural size, rows stretch to fill (no gap on the right) ==================== */
+.admin-category-box {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.admin-category-pill {
+    flex: 1 1 auto;               /* every chip grows a little so each row ends exactly at the right edge */
+    justify-content: space-between;
+    min-width: 0;
+}
+.admin-category-pill-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.admin-category-pill-icon { flex-shrink: 0; }
+
+/* ---------- Admin category search ---------- */
+.admin-category-search { display: flex; align-items: center; gap: 12px; margin: 2px 0 10px; }
+.admin-category-search input { flex: 1; min-width: 0; }
+.admin-category-search-meta { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: #8a93a6; white-space: nowrap; }
+.admin-category-empty { grid-column: 1 / -1; padding: 14px 4px; font-size: 12.5px; color: #8a93a6; }
+html.light-mode .admin-category-search-meta, html.light-mode .admin-category-empty { color: #5b6475; }
+@media (max-width: 600px) {
+    .admin-category-search { flex-wrap: wrap; gap: 6px; }
+    .admin-category-search input { flex-basis: 100%; }
+}
+
+/* ==================== Search boxes: same style everywhere (icon left, focus ring, clear button) ==================== */
+.site-search-box {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    height: 42px;
+    padding: 0 8px 0 4px;
+    background-color: #14161c;
+    border: 1.5px solid #2a2f3d;
+    border-radius: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.site-search-box:hover { border-color: rgba(126, 211, 33, 0.45); }
+.site-search-box:focus-within {
+    border-color: var(--brand-green, #7ed321);
+    box-shadow: 0 0 0 3px var(--brand-green-soft, rgba(126, 211, 33, 0.22)), 0 0 18px rgba(126, 211, 33, 0.14);
+}
+.site-search-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    color: #8a93a6;
+    transition: color 0.2s;
+}
+.site-search-box:focus-within .site-search-icon { color: var(--brand-green, #7ed321); }
+
+/* the input only types - the wrapper draws the box */
+.site-search-box input[type="text"],
+.site-search-box input[type="text"]:focus,
+.admin-manage-search .site-search-box input[type="text"],
+.admin-manage-search .site-search-box input[type="text"]:focus,
+.admin-field .site-search-box input[type="text"],
+.admin-field .site-search-box input[type="text"]:focus {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    height: 100%;
+    padding: 0 6px;
+    margin: 0;
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    outline: none;
+    font-size: 14px;
+    color: #f3f6f8;
+    caret-color: var(--brand-green, #7ed321);
+}
+.site-search-box input::placeholder { color: #7b8497; }
+
+/* clear button: only visible when something is typed */
+.site-search-clear {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 4px;
+    padding: 0;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.10);
+    color: #b4bccb;
+    cursor: pointer;
+    transition: background-color 0.18s, color 0.18s;
+}
+.site-search-box.has-value .site-search-clear { display: flex; }
+.site-search-clear:hover { background: var(--brand-green, #7ed321); color: #0b1a02; }
+
+/* light mode */
+html.light-mode .site-search-box { background-color: #ffffff; border-color: #dde1e8; }
+html.light-mode .site-search-box:hover { border-color: rgba(249, 115, 22, 0.55); }
+html.light-mode .site-search-box:focus-within { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
+html.light-mode .site-search-icon { color: #7b8497; }
+html.light-mode .site-search-box:focus-within .site-search-icon { color: #ea580c; }
+html.light-mode .site-search-box input[type="text"],
+html.light-mode .site-search-box input[type="text"]:focus,
+html.light-mode .admin-manage-search .site-search-box input[type="text"],
+html.light-mode .admin-manage-search .site-search-box input[type="text"]:focus,
+html.light-mode .admin-field .site-search-box input[type="text"],
+html.light-mode .admin-field .site-search-box input[type="text"]:focus { background: transparent; background-color: transparent; color: #14161c; }
+html.light-mode .site-search-clear { background: #eef1f5; color: #4b5563; }
+html.light-mode .site-search-clear:hover { background: #ea580c; color: #fff; }
+
+@media (max-width: 600px) { .site-search-box { height: 40px; } .site-search-box input[type="text"] { font-size: 13px; } }

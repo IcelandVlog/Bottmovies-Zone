@@ -612,6 +612,10 @@
 
                     <div class="admin-field">
                         <label>Category <span class="admin-hint">(select one or more — "All" is applied automatically)</span></label>
+                        <div class="admin-category-search">
+                            <input type="text" id="adminCategorySearchInput" placeholder="🔍 Search category..." autocomplete="off" oninput="renderAdminCategoryBox()">
+                            <span class="admin-category-search-meta" id="adminCategorySearchMeta"></span>
+                        </div>
                         <div class="admin-category-box" id="adminCategoryBox"></div>
                         <div class="admin-add-category-row">
                             <input type="text" id="adminNewCategoryInput" placeholder="Type a new category name...">

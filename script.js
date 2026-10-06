@@ -578,7 +578,7 @@ const ADMIN_POSTER_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent
 function makePosterPlaceholder(label) {
     const safeLabel = escapeHtml(label || 'No Poster');
     return "data:image/svg+xml;utf8," + encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#1a1c23"/><path d="M55 140l25-32 22 22 27-36 23 27" stroke="#475569" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="#475569"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${safeLabel}</text></svg>`
+        `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><path d="M55 140l25-32 22 22 27-36 23 27" stroke="#475569" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="72" cy="105" r="10" fill="#475569"/><text x="100" y="230" font-family="sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${safeLabel}</text></svg>`
     );
 }
 const POSTER_PLACEHOLDER_LOADING = makePosterPlaceholder('Loading...');
@@ -7367,10 +7367,32 @@ function renderAdminCategoryBox() {
     const box = document.getElementById('adminCategoryBox');
     if (!box) return;
     box.innerHTML = '';
-    const cats = getAllKnownCategories();
+    const allCats = getAllKnownCategories();
+
+    // Search (above the chips): matches "hindi", "hindi series" and "hindi-series"
+    const searchEl = document.getElementById('adminCategorySearchInput');
+    const metaEl = document.getElementById('adminCategorySearchMeta');
+    const q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+    const cats = q
+        ? allCats.filter(c => c.toLowerCase().includes(q) || c.toLowerCase().replace(/-/g, ' ').includes(q))
+        : allCats;
+    if (metaEl) {
+        const picked = adminSelectedCategories ? adminSelectedCategories.size : 0;
+        metaEl.textContent = allCats.length
+            ? ((q ? cats.length + ' of ' + allCats.length + ' shown' : allCats.length + ' categories') + (picked ? '  |  ' + picked + ' selected' : ''))
+            : '';
+    }
+
+    if (allCats.length === 0) {
+        box.innerHTML = '<span style="color:#64748b;font-size:12px;">No categories yet — add one below.</span>';
+        return;
+    }
 
     if (cats.length === 0) {
-        box.innerHTML = '<span style="color:#64748b;font-size:12px;">No categories yet — add one below.</span>';
+        const msg = document.createElement('div');
+        msg.className = 'admin-category-empty';
+        msg.textContent = 'No category found for "' + searchEl.value.trim() + '". You can add it below.';
+        box.appendChild(msg);
         return;
     }
 
@@ -7381,6 +7403,7 @@ function renderAdminCategoryBox() {
         const label = document.createElement('span');
         label.className = 'admin-category-pill-label';
         label.textContent = cat;
+        label.title = cat;
         label.onclick = function() {
             if (adminSelectedCategories.has(cat)) adminSelectedCategories.delete(cat);
             else adminSelectedCategories.add(cat);
@@ -7422,6 +7445,8 @@ function addNewAdminCategory() {
     adminExtraCategories.add(slug);
     adminSelectedCategories.add(slug);
     input.value = '';
+    const catSearch = document.getElementById('adminCategorySearchInput');
+    if (catSearch) catSearch.value = '';
     renderAdminCategoryBox();
     saveNewCategoryToDb(slug);
 }
@@ -11612,4 +11637,68 @@ document.addEventListener('click', (e) => {
     } else {
         init();
     }
+})();
+
+// ==================== Search boxes: one style everywhere + clear (x) button ====================
+// The header search and the "500K+" search already have their own clear button. Every other
+// search box (admin tabs, user dashboard tabs, category search) is wrapped here in the same
+// pill style (search icon on the left, green/orange focus ring) and gets a clear button that
+// appears as soon as something is typed. Clearing fires a normal "input" event, so the list
+// below re-renders exactly as if the text had been deleted by hand.
+(function () {
+    var SEARCH_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.2" y2="16.2"/></svg>';
+    var CLEAR_ICON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+    var SELECTOR = '.admin-manage-search input[type="text"], #adminCategorySearchInput';
+
+    function enhance(input) {
+        if (!input || input.dataset.searchEnhanced === '1' || !input.parentNode) return;
+        input.dataset.searchEnhanced = '1';
+
+        // the magnifier emoji in the placeholder is replaced by the real icon
+        if (input.placeholder) input.placeholder = input.placeholder.replace(/^[\s\u{1F50D}\u{1F50E}]+/u, '');
+
+        var wrap = document.createElement('div');
+        wrap.className = 'site-search-box';
+        var icon = document.createElement('span');
+        icon.className = 'site-search-icon';
+        icon.innerHTML = SEARCH_ICON;
+        var clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'site-search-clear';
+        clear.title = 'Clear';
+        clear.setAttribute('aria-label', 'Clear search');
+        clear.innerHTML = CLEAR_ICON;
+
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(icon);
+        wrap.appendChild(input);
+        wrap.appendChild(clear);
+
+        function sync() { wrap.classList.toggle('has-value', input.value.length > 0); }
+        input.addEventListener('input', sync);
+        input.addEventListener('change', sync);
+
+        // keep the button right even when the page sets input.value from code
+        var desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        if (desc && desc.get && desc.set) {
+            Object.defineProperty(input, 'value', {
+                configurable: true,
+                get: function () { return desc.get.call(this); },
+                set: function (v) { desc.set.call(this, v); sync(); }
+            });
+        }
+
+        clear.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep focus in the box
+        clear.addEventListener('click', function () {
+            input.value = '';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+        });
+        sync();
+    }
+
+    function enhanceAll() { document.querySelectorAll(SELECTOR).forEach(enhance); }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enhanceAll);
+    else enhanceAll();
 })();
