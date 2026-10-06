@@ -510,6 +510,7 @@
                 <button type="button" class="admin-nav-btn" id="adminNavBtnManage" onclick="switchAdminTab('manage')">🗂 <span>Database</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnTrailer" onclick="switchAdminTab('trailer')">🎬 <span>Trailer / Teaser</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnWatch" onclick="switchAdminTab('watch')">▶️ <span>Watch Button</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnServer" onclick="switchAdminTab('server')">🖥️ <span>Server</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎞️ <span>Hero Banner</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnNavigation" onclick="switchAdminTab('navigation')">🧭 <span>Navigation</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
@@ -717,6 +718,22 @@
                         <input type="text" id="adminWatchSearchInput" placeholder="🔍 Search content to add/edit Watch Button...">
                     </div>
                     <div class="admin-database-list" id="adminWatchList"></div>
+                </div>
+
+                <!-- SERVER TAB (choose which server is the DEFAULT in the "Online Watch" player: Server 01 or Server 02 - for each title, or for all titles at once) -->
+                <div class="admin-tab-content" id="adminTabServer" style="display:none;">
+                    <div class="admin-watch-bulk-server">
+                        <span class="admin-watch-server-label">Default server for ALL titles</span>
+                        <div class="admin-watch-server-seg" role="group" aria-label="Default server for all titles">
+                            <button type="button" class="admin-watch-server-btn" data-server="1" onclick="setAllWatchDefaultServer(1)">Server 01</button>
+                            <button type="button" class="admin-watch-server-btn" data-server="2" onclick="setAllWatchDefaultServer(2)">Server 02</button>
+                        </div>
+                        <span class="admin-watch-bulk-status" id="adminWatchBulkStatus"></span>
+                    </div>
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminServerSearchInput" placeholder="🔍 Search content to set its default server...">
+                    </div>
+                    <div class="admin-database-list" id="adminServerList"></div>
                 </div>
 
                 <!-- HERO BANNER TAB (select which movies/series show on the homepage auto-slide banner) -->

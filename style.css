@@ -4863,3 +4863,258 @@ html.light-mode .dropdown-menu li.sub-dropdown > a.nav-link.active { color: #3f8
     border-radius: 6px;
 }
 .main-nav .dropdown-menu li.sub-dropdown > a.nav-link { display: flex; align-items: center; }
+
+/* ==================== Admin > Watch Button: default server ==================== */
+.admin-watch-server-row,
+.admin-watch-bulk-server {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.admin-watch-server-row { margin: 2px 0 10px; }
+.admin-watch-bulk-server {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(126, 211, 33, 0.22);
+    background: linear-gradient(180deg, rgba(126, 211, 33, 0.07), rgba(126, 211, 33, 0.02));
+    border-radius: 8px;
+}
+.admin-watch-server-label { font-size: 12px; font-weight: 700; letter-spacing: 0.3px; color: #aab3c5; }
+.admin-watch-server-seg { display: inline-flex; gap: 6px; }
+.admin-watch-server-btn {
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 6px;
+    border: 1px solid #2a2f3d;
+    background: #14161c;
+    color: #c4cbd8;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.16s ease;
+}
+.admin-watch-server-btn:hover { border-color: rgba(126, 211, 33, 0.6); color: #fff; }
+.admin-watch-server-btn.active {
+    background: linear-gradient(135deg, #b6f36a, #7ed321);
+    border-color: transparent;
+    color: #0b1a02;
+    box-shadow: 0 3px 10px rgba(126, 211, 33, 0.25);
+}
+.admin-watch-server-tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    color: #b6f36a;
+    background: rgba(126, 211, 33, 0.14);
+    border: 1px solid rgba(126, 211, 33, 0.4);
+    white-space: nowrap;
+}
+.admin-watch-bulk-status { font-size: 11.5px; color: #8a93a6; }
+.admin-watch-bulk-status.warn { color: #fbbf24; flex-basis: 100%; line-height: 1.5; }
+.admin-watch-bulk-status code {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.35);
+    color: #fde68a;
+    font-size: 11px;
+    user-select: all;
+    word-break: break-all;
+}
+html.light-mode .admin-watch-server-label { color: #4b5263; }
+html.light-mode .admin-watch-server-btn { background: #fff; border-color: #dde1e8; color: #3b4352; }
+html.light-mode .admin-watch-server-btn.active { color: #0b1a02; border-color: transparent; }
+html.light-mode .admin-watch-server-tag { color: #3f8a0c; background: rgba(126, 211, 33, 0.18); border-color: rgba(94, 170, 20, 0.5); }
+html.light-mode .admin-watch-bulk-status { color: #5b6475; }
+html.light-mode .admin-watch-bulk-status.warn { color: #b45309; }
+html.light-mode .admin-watch-bulk-status code { background: rgba(0, 0, 0, 0.06); color: #7c4a03; }
+
+/* ==================== Admin > Server tab ==================== */
+.admin-server-card { flex-wrap: wrap; }
+.admin-server-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.admin-server-save-status { min-width: 62px; font-size: 11px; font-weight: 600; color: #8a93a6; text-align: right; }
+.admin-server-save-status.ok { color: #86efac; }
+.admin-server-save-status.err { color: #fca5a5; }
+html.light-mode .admin-server-save-status.ok { color: #15803d; }
+html.light-mode .admin-server-save-status.err { color: #b91c1c; }
+@media (max-width: 600px) {
+    .admin-server-actions { width: 100%; justify-content: space-between; margin-left: 0; }
+    .admin-server-actions .admin-watch-server-seg { flex: 1; }
+    .admin-server-actions .admin-watch-server-btn { flex: 1; }
+}
+
+/* ==================== Light mode: movie card hover accent = orange (instead of green) ==================== */
+html.light-mode .movie-card:hover .poster-wrapper {
+    border-color: rgba(249, 115, 22, 0.85);
+    box-shadow: 0 14px 30px rgba(20, 22, 28, 0.20), 0 0 0 1px rgba(249, 115, 22, 0.30), 0 0 22px rgba(249, 115, 22, 0.28);
+}
+html.light-mode .movie-card:hover .movie-title { color: #d9480f; }
+html.light-mode .movie-card:focus-within .poster-wrapper,
+html.light-mode .movie-card:active .poster-wrapper { border-color: rgba(249, 115, 22, 0.85); }
+
+/* =====================================================================
+   LIGHT MODE: every green accent -> ORANGE
+   (logo, the Anime/Flix button and "On / Saved" status colours stay as they are)
+   ===================================================================== */
+html.light-mode {
+    --g1: #f97316;                         /* main orange */
+    --g2: #fdba74;                         /* light orange */
+    --g3: #c2410c;                         /* deep orange  */
+    --brand-green: #f97316;
+    --brand-green-soft: rgba(249, 115, 22, 0.25);
+}
+html.light-mode body { background-image: radial-gradient(1100px 380px at 50% -140px, rgba(249, 115, 22, 0.14), transparent 70%); }
+
+/* ---------- nav ---------- */
+html.light-mode .main-nav { border-top-color: rgba(249, 115, 22, 0.20); }
+html.light-mode .main-nav ul li a.active {
+    color: #c2410c;
+    background-color: rgba(249, 115, 22, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.50);
+}
+html.light-mode .dropdown-menu li a:hover { color: #c2410c !important; background-color: rgba(249, 115, 22, 0.12); }
+html.light-mode .sub-dropdown-toggle:hover,
+html.light-mode .sub-dropdown-toggle.active,
+html.light-mode .dropdown-menu li.sub-dropdown:hover > .sub-dropdown-toggle {
+    color: #c2410c;
+    border-color: rgba(249, 115, 22, 0.70);
+    background-color: rgba(249, 115, 22, 0.16);
+}
+html.light-mode .dropdown-menu li.sub-dropdown > a.nav-link.active { color: #c2410c; }
+html.light-mode .toggle-more-btn:hover { color: #c2410c; }
+html.light-mode .btn-auth-signin:hover, html.light-mode .btn-auth-signout:hover,
+html.light-mode .btn-auth-icon-mobile:hover { background-color: rgba(249, 115, 22, 0.14); border-color: #f97316; }
+
+/* ---------- hero slider ---------- */
+html.light-mode .hero-border-wrap {
+    background: linear-gradient(115deg, #c2410c 0%, #f97316 38%, #fdba74 62%, #ea580c 100%);
+    box-shadow: 0 10px 40px rgba(249, 115, 22, 0.22), 0 0 0 1px rgba(249, 115, 22, 0.20);
+}
+html.light-mode .hero-badge-featured { color: #c2410c; border-color: rgba(249, 115, 22, 0.60); }
+html.light-mode .hero-badge-cat:hover { color: #c2410c; border-color: rgba(249, 115, 22, 0.75); background-color: #ffffff; }
+html.light-mode .hero-slide-subtitle { color: #fed7aa; }
+html.light-mode .hero-meta-hd, html.light-mode .hero-meta-date { border-color: rgba(249, 115, 22, 0.60); background-color: rgba(249, 115, 22, 0.16); }
+html.light-mode .hero-watch-btn {
+    background: linear-gradient(135deg, #fdba74, #f97316);
+    color: #2b1100;
+    box-shadow: 0 6px 18px rgba(249, 115, 22, 0.40);
+}
+html.light-mode .hero-watch-btn:hover { background: linear-gradient(135deg, #fed7aa, #fb923c); box-shadow: 0 10px 24px rgba(249, 115, 22, 0.55); }
+html.light-mode .hero-nav-btn { border-color: rgba(249, 115, 22, 0.80); }
+html.light-mode .hero-nav-btn:hover { background-color: #f97316; color: #2b1100; }
+html.light-mode .hero-dot.active { background: linear-gradient(90deg, #f97316, #fdba74); }
+
+/* ---------- header search ---------- */
+html.light-mode .search-container:hover { border-color: rgba(249, 115, 22, 0.55); }
+html.light-mode .search-container:focus-within { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
+html.light-mode .search-container:focus-within button#searchBtn,
+html.light-mode .search-container button#searchBtn:hover { color: #ea580c; }
+html.light-mode .search-container button#searchBtn:hover { background-color: rgba(249, 115, 22, 0.12); }
+html.light-mode .search-container button.search-clear-btn:hover { background-color: #f97316; color: #2b1100; }
+html.light-mode .search-suggestions { border-color: rgba(249, 115, 22, 0.45); scrollbar-color: rgba(249, 115, 22, 0.45) transparent; }
+html.light-mode .search-suggestions::-webkit-scrollbar-thumb { background-color: rgba(249, 115, 22, 0.40); }
+html.light-mode .suggestion-item:hover { background-color: rgba(249, 115, 22, 0.14); box-shadow: inset 3px 0 0 #f97316; }
+
+/* ---------- "500K+" search ---------- */
+html.light-mode .massive-watch-section {
+    background: radial-gradient(600px 200px at 50% 0%, rgba(249, 115, 22, 0.14), transparent 70%), #ffffff;
+    border-color: rgba(249, 115, 22, 0.32);
+}
+html.light-mode .massive-watch-heading h2 { background: linear-gradient(90deg, #14161c 0%, #c2410c 100%); -webkit-background-clip: text; background-clip: text; }
+html.light-mode .massive-watch-search-wrap:hover { border-color: rgba(249, 115, 22, 0.55); }
+html.light-mode .massive-watch-search-wrap:focus-within { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.25); }
+html.light-mode .massive-watch-search-wrap:focus-within .massive-watch-search-icon { color: #ea580c; }
+html.light-mode .massive-watch-clear-btn:hover { background: #f97316; color: #2b1100; }
+html.light-mode .massive-watch-suggestions { border-color: rgba(249, 115, 22, 0.45); }
+html.light-mode .massive-watch-suggestion-item:hover { background-color: rgba(249, 115, 22, 0.14); box-shadow: inset 3px 0 0 #f97316; }
+
+/* ---------- pagination / footer ---------- */
+html.light-mode .page-num:hover:not(.disabled) { background-color: rgba(249, 115, 22, 0.14); border-color: rgba(249, 115, 22, 0.55); color: #c2410c; }
+html.light-mode .page-num.active { background: linear-gradient(135deg, #fdba74, #f97316); color: #2b1100; box-shadow: 0 6px 16px rgba(249, 115, 22, 0.32); }
+html.light-mode .main-footer { border-top-color: rgba(249, 115, 22, 0.22); }
+
+/* ---------- download / season boxes + watch player ---------- */
+html.light-mode .season-box-item:hover { border-color: rgba(249, 115, 22, 0.65); }
+html.light-mode .season-box-item.watch-box {
+    background: linear-gradient(180deg, #fff4ea 0%, #ffe6d0 100%);
+    border: 1px solid rgba(249, 115, 22, 0.45);
+}
+html.light-mode .season-box-item:not(.watch-box) .season-box-header:hover .season-badges-right::after { background-color: #ea580c; }
+html.light-mode .btn-copy-link { border-color: #f97316; box-shadow: 0 0 10px rgba(249, 115, 22, 0.20); }
+html.light-mode .btn-zip-download:hover, html.light-mode .btn-copy-link:hover {
+    border-color: rgba(249, 115, 22, 0.80);
+    box-shadow: 0 6px 16px rgba(20, 22, 28, 0.25), 0 0 14px rgba(249, 115, 22, 0.28);
+}
+html.light-mode .watch-server-btn:hover { border-color: rgba(249, 115, 22, 0.70); color: #c2410c; }
+html.light-mode .watch-server-btn.active {
+    background: linear-gradient(135deg, #fdba74, #f97316);
+    color: #2b1100;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(249, 115, 22, 0.32);
+}
+html.light-mode .watch-server-btn.active .watch-server-dot { background-color: #2b1100; box-shadow: 0 0 0 3px rgba(43, 17, 0, 0.15); }
+
+/* ---------- admin > Server tab ---------- */
+html.light-mode .admin-watch-bulk-server { border-color: rgba(249, 115, 22, 0.30); background: linear-gradient(180deg, rgba(249, 115, 22, 0.08), rgba(249, 115, 22, 0.02)); }
+html.light-mode .admin-watch-server-btn:hover { border-color: rgba(249, 115, 22, 0.70); }
+html.light-mode .admin-watch-server-btn.active { background: linear-gradient(135deg, #fdba74, #f97316); color: #2b1100; box-shadow: 0 3px 10px rgba(249, 115, 22, 0.28); }
+html.light-mode .admin-watch-server-tag { color: #c2410c; background: rgba(249, 115, 22, 0.16); border-color: rgba(249, 115, 22, 0.50); }
+
+/* Anime/Flix stays green in light mode too (it shares the accent variables, so pin its colours) */
+html.light-mode .btn-top-anime { background: linear-gradient(135deg, #b6f36a 0%, #7ed321 45%, #5fb41a 100%); }
+
+/* =====================================================================
+   LIGHT MODE: hover must get DARKER / deeper than the normal state (never lighter)
+   ===================================================================== */
+/* coloured buttons: darker on hover (base colours unchanged) */
+html.light-mode .btn-top-bolly:hover,
+html.light-mode .btn-top-anime:hover,
+html.light-mode .btn-auth-dashboard:hover,
+html.light-mode .btn-auth-signup:hover,
+html.light-mode .btn-auth-icon-mobile.is-logged-in:hover,
+html.light-mode .auth-submit-btn:hover,
+html.light-mode .avatar-crop-save-btn:hover,
+html.light-mode .comment-login-prompt button:hover { filter: brightness(0.88); }
+
+/* hero */
+html.light-mode .hero-watch-btn:hover { background: linear-gradient(135deg, #fb923c, #ea580c); box-shadow: 0 10px 24px rgba(194, 65, 12, 0.55); }
+html.light-mode .hero-badge-cat:hover { background-color: #fed7aa; color: #9a3412; border-color: #ea580c; }
+html.light-mode .hero-nav-btn:hover { background-color: #ea580c; color: #fff; }
+
+/* nav + dropdown + login */
+html.light-mode .main-nav ul li a:hover { background-color: #e3e6ec; color: #14161c; }
+html.light-mode .main-nav ul li a.active:hover { background-color: rgba(249, 115, 22, 0.26); color: #9a3412; }
+html.light-mode .main-nav .dropdown-menu li a:hover { background-color: rgba(249, 115, 22, 0.22); color: #9a3412 !important; }
+html.light-mode .sub-dropdown-toggle:hover { background-color: rgba(249, 115, 22, 0.26); color: #9a3412; border-color: #ea580c; }
+html.light-mode .btn-auth-signin:hover, html.light-mode .btn-auth-signout:hover,
+html.light-mode .btn-auth-icon-mobile:hover { background-color: rgba(249, 115, 22, 0.24); border-color: #ea580c; color: #14161c; }
+
+/* search + suggestions */
+html.light-mode .search-container button#searchBtn:hover { background-color: rgba(249, 115, 22, 0.22); color: #c2410c; }
+html.light-mode .search-container button.search-clear-btn:hover { background-color: #ea580c; color: #fff; }
+html.light-mode .suggestion-item:hover,
+html.light-mode .massive-watch-suggestion-item:hover { background-color: rgba(249, 115, 22, 0.22); color: #14161c; }
+html.light-mode .massive-watch-clear-btn:hover { background: #ea580c; color: #fff; }
+
+/* pagination */
+html.light-mode .page-num:hover:not(.disabled):not(.active) { background-color: rgba(249, 115, 22, 0.26); border-color: #ea580c; color: #9a3412; }
+html.light-mode .page-num.active:hover { filter: brightness(0.9); }
+
+/* boxes / buttons inside the movie modal */
+html.light-mode .season-box-header:hover { background: rgba(20, 22, 28, 0.09); }
+html.light-mode .season-box-item:hover { border-color: #ea580c; }
+html.light-mode .watch-server-btn:not(.active):hover { background-color: #ffedd5; border-color: #ea580c; color: #9a3412; }
+html.light-mode .admin-watch-server-btn:not(.active):hover { background-color: #ffedd5; border-color: #ea580c; }
+
+/* Light mode: hero title (hover) and subtitle in a deeper orange instead of pale orange */
+html.light-mode .hero-slide-title:hover { color: #ea580c; }
+html.light-mode .hero-slide-subtitle { color: #f97316; }

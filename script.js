@@ -774,6 +774,9 @@ async function fetchMoviesFromSupabase() {
                     // Watch Button tab-eও ekই bug (upore-r comment dekho).
                     const searchInput = document.getElementById('adminWatchSearchInput');
                     renderAdminWatchList(searchInput ? searchInput.value.trim() : '');
+                } else if (currentAdminTab === 'server') {
+                    const searchInput = document.getElementById('adminServerSearchInput');
+                    renderAdminServerList(searchInput ? searchInput.value.trim() : '');
                 } else if (currentAdminTab === 'banner') {
                     const searchInput = document.getElementById('adminBannerSearchInput');
                     renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -3015,7 +3018,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
     // (playModalWatch()) barbe, jate accordion-ta shudhu open kore dekhleই
     // "view" count na hoye jay.
     container.innerHTML = `
-        <div class="season-box-item watch-box" id="watchBox"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
+        <div class="season-box-item watch-box" id="watchBox" data-default-server="${Number(movie && movie.watchServer) === 2 ? 2 : 1}"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
             <div class="season-box-header" onclick="toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
@@ -3053,18 +3056,30 @@ function showAdblockNotice() {
 //   Series -> https://nxsha.space/embed/tv/{tmdbId}/{season}/{episode}
 // Player box-e data-tmdb-id + data-tmdb-type thakle-i Server 02 dekhano hoy.
 
-function getPreferredWatchServer() {
-    try { return localStorage.getItem('bm_watch_server') === '2' ? 2 : 1; } catch (e) { return 1; }
-}
-function setPreferredWatchServer(n) {
-    try { localStorage.setItem('bm_watch_server', String(n)); } catch (e) { /* ignore */ }
-}
 function resolveWatchEmbedUrl(link) {
     const ytId = extractYoutubeVideoId(link);
     return ytId ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0` : link;
 }
 function boxHasServer2(box) {
     return !!(box && box.getAttribute('data-tmdb-id') && box.getAttribute('data-tmdb-type'));
+}
+// Default server of a watch box (admin: Watch Button -> "Default server").
+//  - Movie details modal: the title's own value is written on the box (data-default-server)
+//  - Home search player: titles are TMDB results, so the library entry with the same TMDB id
+//    is looked up; anything not in the library stays on Server 01.
+// Server 02 can only be the default when it can actually be built (TMDB id known).
+function getBoxDefaultServer(box) {
+    if (!boxHasServer2(box)) return 1;
+    let n = parseInt(box.getAttribute('data-default-server'), 10);
+    if (!n) {
+        const id = box.getAttribute('data-tmdb-id');
+        const type = box.getAttribute('data-tmdb-type');
+        const m = (typeof allMovies !== 'undefined' && Array.isArray(allMovies))
+            ? allMovies.find(x => x && String(x.tmdbId) === String(id) && ((x.tmdbType || 'movie') === type))
+            : null;
+        n = m ? parseInt(m.watchServer, 10) : 1;
+    }
+    return n === 2 ? 2 : 1;
 }
 function getWatchServerUrl(box, server) {
     if (server === 2 && boxHasServer2(box)) {
@@ -3091,7 +3106,6 @@ function switchWatchServer(btnEl) {
     const iframe = box.querySelector('.trailer-video-wrap iframe');
     if (!iframe) return;
     box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
-    setPreferredWatchServer(server);
     iframe.src = getWatchServerUrl(box, server);
 }
 
@@ -3112,7 +3126,7 @@ function playModalWatch(el) {
 
     showAdblockNotice();
 
-    const activeServer = boxHasServer2(box) ? getPreferredWatchServer() : 1;
+    const activeServer = getBoxDefaultServer(box); // set per title in Admin > Watch Button (Server 01 if not set)
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -3388,8 +3402,8 @@ async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster) {
     const ok = await checkWatchLinkReachable(link, () => requestId === massiveWatchRequestId);
     if (requestId !== massiveWatchRequestId) return; // ei shomoy-e user notun kichu select/search kore fellে, ei result-ta ar dorkar nei
 
-    // Server 01 unreachable hole-o Server 02 (nxsha) diye chalano jay - tai
-    // "not available" na dekhiye Server 02 default kore player dekhano hoy.
+    // Server 01 unreachable hole-o player dekhano hoy (default Server 01 thake),
+    // user chaile Server 02 (nxsha) te switch korte pare.
     const serverDownAttr = ok ? '' : ' data-server1-down="1"';
 
     playerEl.innerHTML = `
@@ -3421,8 +3435,7 @@ function playMassiveWatch(el) {
 
     showAdblockNotice();
 
-    const serverDown = box.getAttribute('data-server1-down') === '1';
-    const activeServer = boxHasServer2(box) ? (serverDown ? 2 : getPreferredWatchServer()) : 1;
+    const activeServer = getBoxDefaultServer(box); // Server 01 unless the admin chose Server 02 for this title
     const embedUrl = getWatchServerUrl(box, activeServer);
     const serverBarHTML = buildWatchServerBarHTML(box, activeServer);
 
@@ -6197,6 +6210,7 @@ const ADMIN_TAB_TITLES = {
     manage: 'Database',
     trailer: 'Trailer / Teaser',
     watch: 'Watch Button',
+    server: 'Server',
     banner: 'Hero Banner',
     navigation: 'Navigation Menu',
     comments: 'Comments',
@@ -6207,7 +6221,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -6233,6 +6247,9 @@ function switchAdminTab(tab) {
     } else if (validTab === 'watch') {
         const searchInput = document.getElementById('adminWatchSearchInput');
         renderAdminWatchList(searchInput ? searchInput.value.trim() : '');
+    } else if (validTab === 'server') {
+        const searchInput = document.getElementById('adminServerSearchInput');
+        renderAdminServerList(searchInput ? searchInput.value.trim() : '');
     } else if (validTab === 'banner') {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -6397,6 +6414,13 @@ function setupAdminPanel() {
     if (adminWatchSearchInput) {
         adminWatchSearchInput.addEventListener('input', function() {
             renderAdminWatchList(this.value.trim());
+        });
+    }
+
+    const adminServerSearchInput = document.getElementById('adminServerSearchInput');
+    if (adminServerSearchInput) {
+        adminServerSearchInput.addEventListener('input', function() {
+            renderAdminServerList(this.value.trim());
         });
     }
 
@@ -9379,6 +9403,60 @@ function collectAdminWatchSeasonRows(card) {
     return result;
 }
 
+
+// ---------- Watch Button tab: default server for ALL titles ----------
+const WATCH_SERVER_SQL = 'alter table public.movies add column if not exists "watchServer" smallint;';
+
+function watchServerColumnExists() {
+    return Array.isArray(allMovies) && allMovies.length > 0 && Object.prototype.hasOwnProperty.call(allMovies[0], 'watchServer');
+}
+
+function refreshWatchBulkServerUI() {
+    const statusEl = document.getElementById('adminWatchBulkStatus');
+    const btns = document.querySelectorAll('.admin-watch-bulk-server .admin-watch-server-btn');
+    if (!statusEl) return;
+    const list = Array.isArray(allMovies) ? allMovies : [];
+    if (list.length && !watchServerColumnExists()) {
+        statusEl.innerHTML = 'Run once in the Supabase SQL editor: <code>' + escapeHtml(WATCH_SERVER_SQL) + '</code>';
+        statusEl.classList.add('warn');
+        btns.forEach(b => b.classList.remove('active'));
+        return;
+    }
+    statusEl.classList.remove('warn');
+    const s2 = list.filter(m => Number(m.watchServer) === 2).length;
+    const s1 = list.length - s2;
+    statusEl.textContent = list.length ? ('Server 01: ' + s1 + '  |  Server 02: ' + s2) : '';
+    btns.forEach(b => {
+        const n = parseInt(b.getAttribute('data-server'), 10);
+        b.classList.toggle('active', list.length > 0 && (n === 2 ? s2 === list.length : s2 === 0));
+    });
+}
+
+async function setAllWatchDefaultServer(n) {
+    n = n === 2 ? 2 : 1;
+    const list = Array.isArray(allMovies) ? allMovies : [];
+    if (!list.length) return;
+    if (!confirm('Set Server 0' + n + ' as the default for ALL ' + list.length + ' titles?\n(You can still change any single title afterwards.)')) return;
+    const statusEl = document.getElementById('adminWatchBulkStatus');
+    if (statusEl) { statusEl.classList.remove('warn'); statusEl.textContent = 'Saving...'; }
+    try {
+        const { error } = await supabaseClient.from('movies').update({ watchServer: n }).not('id', 'is', null);
+        if (error) throw error;
+        list.forEach(m => { m.watchServer = n; });
+        const q = (document.getElementById('adminServerSearchInput') || {}).value || '';
+        renderAdminServerList(q.trim());
+        showToast('Server 0' + n + ' is now the default for all titles');
+    } catch (err) {
+        console.error('Set all default server error:', err);
+        if (/watchServer/i.test((err && err.message) || '')) {
+            showToast('The "watchServer" column is missing in the database - see the note at the top.', 'error');
+        } else {
+            showToast('Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        }
+        refreshWatchBulkServerUI();
+    }
+}
+
 function renderAdminWatchList(filter) {
     const container = document.getElementById('adminWatchList');
     if (!container) return;
@@ -9824,6 +9902,7 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
 
         showToast('✅ Watch Button saved for "' + (movie.title || 'this item') + '"');
         btn.textContent = 'Saved';
+        return true;
     } catch (err) {
         console.error('Save watch settings error:', err);
         showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
@@ -9833,10 +9912,93 @@ async function saveAdminWatchSettings(movie, card, btn, getOnState) {
         // kono lav nei (click-e kichu hobe na), tai just error-state dekhano
         // hoy, textContent "Save" na reverting kore.
         btn.textContent = '⚠️ Save failed';
+        return false;
     } finally {
         btn.disabled = false;
     }
 }
+
+// ---------- Server tab: default server (Server 01 / Server 02) for each title ----------
+async function saveAdminServerSetting(movie, n, statusEl) {
+    if (!movie || !movie.id) return false;
+    if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Saving...'; }
+    try {
+        const { error } = await supabaseClient.from('movies').update({ watchServer: n }).eq('id', movie.id);
+        if (error) throw error;
+        movie.watchServer = n;
+        if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Saved'; }
+        showToast('Server 0' + n + ' is now the default for "' + (movie.title || 'this item') + '"');
+        return true;
+    } catch (err) {
+        console.error('Save default server error:', err);
+        const missing = /watchServer/i.test((err && err.message) || '');
+        if (statusEl) { statusEl.classList.add('err'); statusEl.textContent = missing ? 'Column missing' : 'Save failed'; }
+        showToast(missing
+            ? 'The "watchServer" column is missing in the database - see the note at the top of the Server tab.'
+            : 'Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        return false;
+    }
+}
+
+function renderAdminServerList(filter) {
+    const container = document.getElementById('adminServerList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const q = (filter || '').toLowerCase().trim();
+    const source = Array.isArray(allMovies) ? allMovies : [];
+    const filtered = q ? source.filter(m => {
+        const t = (m.title || '').toLowerCase();
+        const sn = (m.searchName || '').toLowerCase();
+        return t.includes(q) || sn.includes(q);
+    }) : source;
+
+    if (filtered.length === 0) {
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">No content found.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
+        refreshWatchBulkServerUI();
+        return;
+    }
+
+    filtered.forEach(movie => {
+        const isTv = movie.tmdbType === 'tv';
+        const hasTmdb = !!movie.tmdbId;
+        const card = document.createElement('div');
+        card.className = 'admin-db-card admin-server-card';
+        const current = Number(movie.watchServer) === 2 ? 2 : 1;
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(movie.title || 'Untitled')}</div>
+                <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'}${hasTmdb ? '  TMDB ' + escapeHtml(String(movie.tmdbId)) : '  no TMDB match (Server 02 needs one)'}</div>
+            </div>
+            <div class="admin-server-actions">
+                <div class="admin-watch-server-seg" role="group" aria-label="Default server">
+                    <button type="button" class="admin-watch-server-btn ${current === 1 ? 'active' : ''}" data-server="1">Server 01</button>
+                    <button type="button" class="admin-watch-server-btn ${current === 2 ? 'active' : ''}" data-server="2">Server 02</button>
+                </div>
+                <span class="admin-server-save-status" aria-live="polite"></span>
+            </div>
+        `;
+        const btns = card.querySelectorAll('.admin-watch-server-btn');
+        const statusEl = card.querySelector('.admin-server-save-status');
+        const sync = (n) => btns.forEach(b => b.classList.toggle('active', parseInt(b.getAttribute('data-server'), 10) === n));
+        btns.forEach(btn => btn.addEventListener('click', async () => {
+            const prev = Number(movie.watchServer) === 2 ? 2 : 1;
+            const next = parseInt(btn.getAttribute('data-server'), 10) === 2 ? 2 : 1;
+            if (next === prev) return;
+            sync(next);
+            const ok = await saveAdminServerSetting(movie, next, statusEl);
+            if (!ok) sync(prev);
+            refreshWatchBulkServerUI();
+        }));
+        container.appendChild(card);
+    });
+
+    refreshWatchBulkServerUI();
+}
+
 
 function renderAdminBannerList(filter) {
     const container = document.getElementById('adminBannerList');
