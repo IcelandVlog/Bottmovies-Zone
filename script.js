@@ -3708,7 +3708,7 @@ function updateNoticeBannerText(category, targetLink) {
             noticeText.innerText = category;
         }
     }
-    if (noticeBanner) noticeBanner.style.display = 'block';
+    if (noticeBanner) noticeBanner.style.display = 'flex';
 }
 
 // Colours every parent of the active nav item: top-level button (MOVIES) and any
@@ -9430,10 +9430,12 @@ function collectAdminWatchSeasonRows(card) {
 
 
 // ---------- Watch Button tab: default server for ALL titles ----------
-const WATCH_SERVER_SQL = 'alter table public.movies add column if not exists "watchServer" smallint;';
+const WATCH_SERVER_SQL = 'alter table public.movies add column if not exists "watchServer" smallint; alter table public.movies add column if not exists "watchServerManual" boolean default false;';
 
 function watchServerColumnExists() {
-    return Array.isArray(allMovies) && allMovies.length > 0 && Object.prototype.hasOwnProperty.call(allMovies[0], 'watchServer');
+    return Array.isArray(allMovies) && allMovies.length > 0
+        && Object.prototype.hasOwnProperty.call(allMovies[0], 'watchServer')
+        && Object.prototype.hasOwnProperty.call(allMovies[0], 'watchServerManual');
 }
 
 function refreshWatchBulkServerUI() {
@@ -9450,10 +9452,16 @@ function refreshWatchBulkServerUI() {
     statusEl.classList.remove('warn');
     const s2 = list.filter(m => Number(m.watchServer) === 2).length;
     const s1 = list.length - s2;
-    statusEl.textContent = list.length ? ('Server 01: ' + s1 + '  |  Server 02: ' + s2) : '';
+    const manual = list.filter(m => m.watchServerManual === true).length;
+    statusEl.textContent = list.length
+        ? ('Server 01: ' + s1 + '  |  Server 02: ' + s2 + (manual ? '  |  Manual: ' + manual : ''))
+        : '';
+    // Bulk button active = every NON-manual title is on that server (manual titles keep their own choice)
+    const auto = list.filter(m => m.watchServerManual !== true);
+    const a2 = auto.filter(m => Number(m.watchServer) === 2).length;
     btns.forEach(b => {
         const n = parseInt(b.getAttribute('data-server'), 10);
-        b.classList.toggle('active', list.length > 0 && (n === 2 ? s2 === list.length : s2 === 0));
+        b.classList.toggle('active', auto.length > 0 && (n === 2 ? a2 === auto.length : a2 === 0));
     });
 }
 
@@ -9461,20 +9469,34 @@ async function setAllWatchDefaultServer(n) {
     n = n === 2 ? 2 : 1;
     const list = Array.isArray(allMovies) ? allMovies : [];
     if (!list.length) return;
-    if (!confirm('Set Server 0' + n + ' as the default for ALL ' + list.length + ' titles?\n(You can still change any single title afterwards.)')) return;
+    const manualCount = list.filter(m => m.watchServerManual === true).length;
+    const autoCount = list.length - manualCount;
+    const noteHtml = manualCount
+        ? manualCount + ' manually set title(s) will be skipped and keep their own server.'
+        : 'You can still change any single title afterwards.';
+    const ok = await showConfirmModal(
+        '<div style="text-align:center;"><div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:8px;">Set Server 0' + n + ' as default?</div>'
+        + '<div>Do you want to make <b>Server 0' + n + '</b> the default server for ' + (manualCount ? 'all titles except the manually set ones (' + autoCount + ' titles)?' : 'all titles?') + '</div>'
+        + '<div style="margin-top:8px;font-size:12px;color:#94a3b8;">' + noteHtml + '</div></div>',
+        { confirmText: 'Yes, set Server 0' + n, cancelText: 'Cancel', danger: false, centerActions: true }
+    );
+    if (!ok) return;
     const statusEl = document.getElementById('adminWatchBulkStatus');
     if (statusEl) { statusEl.classList.remove('warn'); statusEl.textContent = 'Saving...'; }
     try {
-        const { error } = await supabaseClient.from('movies').update({ watchServer: n }).not('id', 'is', null);
+        // Only titles that are NOT manually set follow the default.
+        const { error } = await supabaseClient.from('movies').update({ watchServer: n })
+            .not('id', 'is', null)
+            .or('watchServerManual.is.null,watchServerManual.eq.false');
         if (error) throw error;
-        list.forEach(m => { m.watchServer = n; });
+        list.forEach(m => { if (m.watchServerManual !== true) m.watchServer = n; });
         const q = (document.getElementById('adminServerSearchInput') || {}).value || '';
         renderAdminServerList(q.trim());
         showToast('Server 0' + n + ' is now the default for all titles');
     } catch (err) {
         console.error('Set all default server error:', err);
         if (/watchServer/i.test((err && err.message) || '')) {
-            showToast('The "watchServer" column is missing in the database - see the note at the top.', 'error');
+            showToast('The "watchServer" / "watchServerManual" column is missing in the database - see the note at the top.', 'error');
         } else {
             showToast('Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
         }
@@ -9948,9 +9970,11 @@ async function saveAdminServerSetting(movie, n, statusEl) {
     if (!movie || !movie.id) return false;
     if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Saving...'; }
     try {
-        const { error } = await supabaseClient.from('movies').update({ watchServer: n }).eq('id', movie.id);
+        // A title set by hand is marked manual, so the "ALL titles" default no longer overwrites it.
+        const { error } = await supabaseClient.from('movies').update({ watchServer: n, watchServerManual: true }).eq('id', movie.id);
         if (error) throw error;
         movie.watchServer = n;
+        movie.watchServerManual = true;
         if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Saved'; }
         showToast('Server 0' + n + ' is now the default for "' + (movie.title || 'this item') + '"');
         return true;
@@ -10263,7 +10287,7 @@ function showConfirmModal(message, options) {
             <div class="custom-confirm-box">
                 <button type="button" class="custom-confirm-x-btn" aria-label="Close">×</button>
                 <div class="custom-confirm-message">${message}</div>
-                <div class="custom-confirm-actions">
+                <div class="custom-confirm-actions${options.centerActions ? ' center' : ''}">
                     <button type="button" class="custom-confirm-cancel-btn">${cancelText}</button>
                     <button type="button" class="custom-confirm-ok-btn${danger ? ' danger' : ''}">${confirmText}</button>
                 </div>
