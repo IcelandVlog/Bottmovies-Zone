@@ -1371,12 +1371,16 @@ html.light-mode .admin-link-quality { background-color: #ffffff; border-color: #
     .sub-menu { padding-left: 20px; }
 
     .movie-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .download-info-section { padding: 14px 16px; }
-    .season-accordion-group { padding: 14px 16px; }
+    .download-info-section { padding: 12px 12px; }
+    .season-accordion-group { padding: 8px; }
 
-    .modal-box { padding: 12px; }
+    /* Choto device-e dui pashe faka jaiga kom - box gulo jeno jotota shomvob boro hoy */
+    .modal-overlay { padding: 20px 4px; }
+    .modal-box { padding: 8px 5px; }
+    .trailer-box { padding: 6px; }
+    .season-download-body.open { padding: 12px; }
     .movie-summary-card {
-        padding: 14px;
+        padding: 10px;
         grid-template-columns: 115px 1fr;
         grid-template-rows: auto auto;
         column-gap: 14px;
@@ -1402,8 +1406,41 @@ html.light-mode .admin-link-quality { background-color: #ffffff; border-color: #
         grid-row: 2 / 3;
     }
 
+    /* Choto device-e poster float kora hoy, jate poster-er pashe faka jaiga thakle
+       date/comments/views/pills/plot shob upore uthe ese oi jaiga bhore dey,
+       ar poster shesh hole lekha gulo full width-e chole jay. */
+    .movie-summary-card { display: flow-root; }
+    .card-poster-side { float: left; width: 115px; margin: 0 14px 6px 0; }
+    .card-header-info, .card-body-info { display: block; }
+    /* Stats (date/comments/views): poster-er pashe jaiga thakle sekhanei boshe, jaiga kom hole
+       nijei porer line-e nambe (dot hide kora, jate lekha gulo gochano thake). */
+    .card-stats-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: flex-start;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 3px;
+        white-space: nowrap;
+        margin-top: 8px;
+    }
+    .card-stats-row .stat-item { white-space: nowrap; }
+    .card-stats-row .stat-dot { display: none; }
+    .card-pills-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .card-pill { margin: 0; }
+    .card-actions-row { clear: both; }
+
     .card-movie-title { font-size: 16px !important; padding-right: 22px; margin-bottom: 2px; word-break: break-word; }
-    .card-tagline { font-size: 11px !important; margin-bottom: 3px !important; }
+    .card-tagline {
+        font-size: 11px !important;
+        margin-bottom: 3px !important;
+        /* Choto device-e tagline max 3 line dekhabe, tar pore hide hoye jabe */
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        overflow: hidden;
+    }
     .card-meta-subtitle { font-size: 11px !important; margin-bottom: 8px !important; }
     .card-stats-row { font-size: 10.5px !important; gap: 6px; margin-bottom: 6px !important; flex-wrap: wrap; }
     .card-stats-row .stat-item svg { width: 12px; height: 12px; }
@@ -4590,7 +4627,12 @@ html.light-mode .watch-server-label, html.light-mode .watch-server-hint { color:
 }
 @media (max-width: 600px) {
     .watch-server-bar + .watch-player-toolbar .watch-close-btn,
-    .watch-box .watch-player-toolbar .watch-close-btn { top: -13px; right: -10px; }
+    .watch-box .watch-player-toolbar .watch-close-btn {
+        /* Choto device-e X button video-r upore-r dhar-e thake (age-r moto), kintu dan dike
+           box-er bhetore 6px shorano - jate box-er baire beriye na jay. */
+        top: -13px;
+        right: 6px;
+    }
 }
 
 /* ==================== Small phones: header in clean rows ==================== */
