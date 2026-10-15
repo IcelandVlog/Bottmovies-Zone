@@ -2558,7 +2558,10 @@ fastServersList.forEach((fs, fIdx) => {
         setupExpandableText('audioLangText', 'audioLangToggleBtn');
         setupExpandableText('subsLangText', 'subsLangToggleBtn');
         initCommentsSection(movie);
-        verifyAndRenderWatchBox(movie, effectiveWatchLink, title, poster, { id: resolvedTmdbId, isTV });
+        // Admin manually watch link dile (customWatchLink) Server 01/02 bar dekhano hobe na -
+        // tai box-e TMDB ID boshano hoy na (Server bar shudhu TMDB ID thakle-i ashe).
+        // Shudhu auto (TMDB-based) link hole-i Server 01/02 switcher thakbe.
+        verifyAndRenderWatchBox(movie, effectiveWatchLink, title, poster, { id: customWatchLink ? null : resolvedTmdbId, isTV });
     }
 
     // Age ei "isRendered" flag-ta timeout-fallback render howar por SHOB
