@@ -2815,6 +2815,60 @@ function toggleAccordion(id) {
     }
 }
 
+// ==================== AGE-RESTRICTED / NON-EMBEDDABLE TRAILER FIX ====================
+// YouTube age-restricted (ba owner embed off kora) video kono website-e embed kore
+// chalano jay na - eta YouTube-er nijer niyom, code diye bypass kora shomvob na.
+// Tai YouTube IFrame API-r onError diye eta dhore, \"Sorry, this content is
+// age-restricted\" screen-er bodole thumbnail + \"Watch on YouTube\" button dekhano hoy.
+let ytIframeApiPromise = null;
+function loadYouTubeIframeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+    if (ytIframeApiPromise) return ytIframeApiPromise;
+    ytIframeApiPromise = new Promise((resolve, reject) => {
+        const prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+            if (typeof prev === 'function') { try { prev(); } catch (e) {} }
+            resolve(window.YT);
+        };
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.onerror = () => { ytIframeApiPromise = null; reject(new Error('YT API load failed')); };
+        document.head.appendChild(tag);
+        setTimeout(() => reject(new Error('YT API timeout')), 8000);
+    });
+    return ytIframeApiPromise;
+}
+
+function showTrailerEmbedBlocked(bodyEl, ytId, thumbUrl) {
+    if (!bodyEl) return;
+    const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(ytId)}`;
+    bodyEl.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}');background-size:cover;background-position:center;position:relative;">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,0.72);text-align:center;padding:16px;">
+            <div style="color:#fff;font-size:14px;line-height:1.4;">This trailer is age-restricted, so it can't be played here.</div>
+            <a href="${watchUrl}" target="_blank" rel="noopener noreferrer" style="background:#fff;color:#111;font-weight:600;padding:9px 18px;border-radius:999px;text-decoration:none;font-size:14px;">&#9654; Watch on YouTube</a>
+        </div>
+    </div>`;
+}
+
+function watchTrailerEmbedErrors(bodyEl, ytId, thumbUrl) {
+    const iframe = bodyEl && bodyEl.querySelector('iframe');
+    if (!iframe) return;
+    loadYouTubeIframeApi().then(YT => {
+        if (!iframe.isConnected) return;
+        new YT.Player(iframe, {
+            events: {
+                onError: (e) => {
+                    // 100 = not found/private, 101/150 = embed not allowed (age-restricted-o eta),
+                    // 152/153 = embed restriction/config error
+                    if ([100, 101, 150, 152, 153].includes(e && e.data) && iframe.isConnected) {
+                        showTrailerEmbedBlocked(bodyEl, ytId, thumbUrl);
+                    }
+                }
+            }
+        });
+    }).catch(() => { /* API load na hole normal iframe-i cholbe */ });
+}
+
 // Modal-এর Trailer বক্সে ক্লিক করলে thumbnail-এর জায়গায় YouTube video embed করে
 // autoplay শুরু করে দেয় (আগে থেকে iframe লোড না করে শুধু thumbnail দেখিয়ে rakha হয়,
 // tai modal khulei extra network/video load hoy na)
@@ -2825,7 +2879,7 @@ function playModalTrailer(el) {
     if (!bodyEl) return;
     const ytId = box.getAttribute('data-ytid');
     if (!ytId) return;
-    const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0`;
+    const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
     // Ei site-e COOP/COEP header active thake (ffmpeg.wasm media-scan feature-er jonno
     // proyojon), r shei COEP-r karone third-party YouTube iframe-take browser default-e
     // block kore dei ("refused to connect" dekhায়) - eta youtube-r shomossha na.
@@ -2843,6 +2897,7 @@ function playModalTrailer(el) {
     bodyEl.innerHTML = `<div class="trailer-video-wrap" style="background-image:url('${thumbUrl}')">
         <iframe src="${embedUrl}" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen credentialless></iframe>
     </div>`;
+    watchTrailerEmbedErrors(bodyEl, ytId, thumbUrl);
 }
 
 // ==================== WATCH LINK REACHABILITY CHECK ====================
