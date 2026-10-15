@@ -124,11 +124,29 @@ async function getShowLevelTrailerKey(tvId) {
     return promise;
 }
 
+// Shudhu shei season-gulo return kore jar episode ase ebong release hoyeche.
+// TMDB-e notun season announce hole placeholder (episode_count = 0 / future air_date)
+// add hoye jay - segulo dropdown-e dekhano hobe na. Kono season-i na mile
+// (data incomplete) shob real season-i fallback hishebe return hoy.
+function getReleasedSeasons(detailData) {
+    if (!detailData || !Array.isArray(detailData.seasons)) return [];
+    const real = detailData.seasons.filter(s => s && typeof s.season_number === 'number' && s.season_number > 0);
+    const today = new Date().toISOString().slice(0, 10);
+    const released = real.filter(s => (s.episode_count || 0) > 0 && (!s.air_date || s.air_date <= today));
+    return released.length ? released : real;
+}
+
+function getReleasedSeasonCount(detailData) {
+    const list = getReleasedSeasons(detailData);
+    if (!list.length) return null;
+    return list.reduce((max, s) => (s.season_number > max ? s.season_number : max), 0);
+}
+
 function getLatestRealSeasonNumber(detailData) {
     if (!detailData || !Array.isArray(detailData.seasons) || !detailData.seasons.length) return null;
     // season_number 0 shadharonoto "Specials" - shei-ta baad diye asol shobcheye
     // notun season-take dhora hoy.
-    const real = detailData.seasons.filter(s => s && typeof s.season_number === 'number' && s.season_number > 0);
+    const real = getReleasedSeasons(detailData);
     const pool = real.length ? real : detailData.seasons;
     return pool.reduce((max, s) => (s.season_number > max ? s.season_number : max), pool[0].season_number);
 }
@@ -1861,7 +1879,7 @@ async function fetchFullTMDBDetailsUncached(movie) {
             year: year,
             releaseDate: releaseDate,
             runtime: runtime,
-            numberOfSeasons: detailData.number_of_seasons || null, 
+            numberOfSeasons: (mediaType === 'tv' ? getReleasedSeasonCount(detailData) : null) || detailData.number_of_seasons || null, 
             genre: genres,
             tagline: extractedTagline,
             director: director,
