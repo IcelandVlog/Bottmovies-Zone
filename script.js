@@ -2815,6 +2815,22 @@ function toggleAccordion(id) {
     }
 }
 
+// ==================== TRAILER <-> ONLINE WATCH: ekta chalu hole arekta thame ====================
+// Online Watch chalu korle trailer auto PAUSE hoy, r watch chalu thakar shomoy trailer-e
+// click/play korle watch box bondho hoye (thumbnail-e ferot giye) trailer chale.
+function pauseModalTrailer() {
+    const f = document.querySelector('#movieModalOverlay #trailerBoxBody iframe');
+    if (!f || !f.contentWindow) return;
+    try {
+        f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }), '*');
+    } catch (e) { /* iframe ekhono load na hole kichu korar nei */ }
+}
+function closeModalWatchIfPlaying() {
+    const f = document.querySelector('#movieModalOverlay .watch-box #watchBoxBody iframe');
+    if (!f) return;
+    resetWatchBoxToThumbnail(f.closest('.watch-box'));
+}
+
 // ==================== AGE-RESTRICTED / NON-EMBEDDABLE TRAILER FIX ====================
 // YouTube age-restricted (ba owner embed off kora) video kono website-e embed kore
 // chalano jay na - eta YouTube-er nijer niyom, code diye bypass kora shomvob na.
@@ -2857,6 +2873,10 @@ function watchTrailerEmbedErrors(bodyEl, ytId, thumbUrl) {
         if (!iframe.isConnected) return;
         new YT.Player(iframe, {
             events: {
+                onStateChange: (e) => {
+                    // 1 = playing: user iframe-er nijer play button-e chaple-o watch bondho hobe
+                    if (e && e.data === 1) closeModalWatchIfPlaying();
+                },
                 onError: (e) => {
                     // 100 = not found/private, 101/150 = embed not allowed (age-restricted-o eta),
                     // 152/153 = embed restriction/config error
@@ -2879,6 +2899,7 @@ function playModalTrailer(el) {
     if (!bodyEl) return;
     const ytId = box.getAttribute('data-ytid');
     if (!ytId) return;
+    closeModalWatchIfPlaying(); // watch chalu thakle bondho hoye thumbnail-e ferot jabe
     const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(ytId)}?autoplay=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
     // Ei site-e COOP/COEP header active thake (ffmpeg.wasm media-scan feature-er jonno
     // proyojon), r shei COEP-r karone third-party YouTube iframe-take browser default-e
@@ -3196,6 +3217,8 @@ function playModalWatch(el) {
     if (!bodyEl) return;
     const rawLink = box.getAttribute('data-link');
     if (!rawLink) return;
+
+    pauseModalTrailer(); // trailer chalu thakle pause hoye jabe
 
     showAdblockNotice();
 
