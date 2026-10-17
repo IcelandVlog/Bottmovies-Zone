@@ -3463,6 +3463,9 @@ function selectMassiveWatchResult(itemEl) {
     const input = document.getElementById('massiveWatchInput');
     const resultsEl = document.getElementById('massiveWatchResults');
     if (input) input.value = title;
+    // Programmatic value set input event trigger kore na, tai ✕ (clear) button-ta ekhane nijer hate dekhate hobe
+    const clearBtn = document.getElementById('massiveWatchClearBtn');
+    if (clearBtn) clearBtn.style.display = title ? 'flex' : 'none';
     if (resultsEl) resultsEl.innerHTML = '';
 
     // Player box-ta 16:9 shape-er, tai portrait "poster"-er bodole TMDB-r
@@ -3718,6 +3721,25 @@ function fuzzyMatchScore(query, target) {
         totalScore += best;
     });
     return totalScore / qWords.length;
+}
+
+// Search suggestion-e title-er moddhe user-er query-r shobdo gulo highlight kore dekhay
+function highlightSuggestionText(title, query) {
+    const raw = String(title || '');
+    const words = String(query || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return escapeHtml(raw);
+    const pattern = words
+        .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .sort((a, b) => b.length - a.length)
+        .join('|');
+    const re = new RegExp('(' + pattern + ')', 'gi');
+    let out = '', last = 0, m;
+    while ((m = re.exec(raw)) !== null) {
+        if (m[0].length === 0) { re.lastIndex++; continue; }
+        out += escapeHtml(raw.slice(last, m.index)) + '<mark class="suggestion-hl">' + escapeHtml(m[0]) + '</mark>';
+        last = m.index + m[0].length;
+    }
+    return out + escapeHtml(raw.slice(last));
 }
 
 function getSmartMatches(query) {
@@ -4213,10 +4235,10 @@ function initApp() {
                 searchSuggestions.style.display = 'none';
                 return;
             }
-            matches.slice(0, 6).forEach(movie => {
+            matches.forEach(movie => {
                 const item = document.createElement('div');
                 item.className = 'suggestion-item';
-                item.innerText = movie.title;
+                item.innerHTML = highlightSuggestionText(movie.title, query);
                 item.addEventListener('click', function() {
                     searchInput.value = movie.title;
                     searchSuggestions.style.display = 'none';
@@ -11825,3 +11847,280 @@ document.addEventListener('click', (e) => {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enhanceAll);
     else enhanceAll();
 })();
+
+// ==================== "Browse by genre" + "Browse by OTT" (TMDB) ====================
+// Homepage-er 500K+ section-er nicheo. Genre/OTT chip select korle TMDB discover
+// API theke oi genre/platform-er content ane. Ekadhik select korle "ya" (OR) logic.
+const BROWSE_OTT_PROVIDERS = [
+    { id: 8,    name: 'Netflix' },
+    { id: 9,    name: 'Amazon Prime Video' },
+    { id: 337,  name: 'Disney+' },
+    { id: 350,  name: 'Apple TV+' },
+    { id: 15,   name: 'Hulu' },
+    { id: 1899, name: 'Max' },
+    { id: 386,  name: 'Peacock' },
+    { id: 531,  name: 'Paramount+' }
+];
+const BROWSE_WATCH_REGION = 'US'; // OTT provider ID-gulo region onujayi alada, tai ekhane region ekta-i rakha holo
+const BROWSE_GENRE_COLLAPSED_COUNT = 10;
+const BROWSE_CHIP_COLORS = ['#ef4444', '#a78bfa', '#f59e0b', '#22c55e', '#f472b6', '#38bdf8', '#fb7185', '#60a5fa', '#2dd4bf', '#c084fc', '#facc15', '#34d399', '#f97316', '#818cf8'];
+
+const browseState = {
+    genres: [],          // [{ name, movieId, tvId }]
+    genreSel: new Set(), // genre name-er set
+    ottSel: new Set(),   // provider ID-er set
+    page: 1,
+    items: [],
+    seen: new Set(),
+    loading: false,
+    hasMore: false,
+    requestId: 0,
+    genreExpanded: false
+};
+
+function initBrowseTmdbSection() {
+    if (!document.getElementById('browseTmdbSection')) return;
+    renderBrowseOttChips();
+    renderBrowseResults();
+    loadBrowseGenres();
+    setupBrowseInfiniteScroll();
+}
+
+// "Load more" button screen-e aste-i porer page auto load hoy (infinite scroll),
+// jate content grid-er shesh row-e faka jaiga bhashi thake na.
+function setupBrowseInfiniteScroll() {
+    const btn = document.getElementById('browseLoadMore');
+    if (!btn || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && btn.style.display !== 'none' && !browseState.loading) {
+                loadBrowseResults(false);
+            }
+        });
+    }, { rootMargin: '400px 0px' });
+    observer.observe(btn);
+}
+
+async function loadBrowseGenres() {
+    if (!TMDB_API_KEY) return;
+    try {
+        const [movieRes, tvRes] = await Promise.all([
+            fetch(`${TMDB_BASE_URL}/genre/movie/list?api_key=${TMDB_API_KEY}`),
+            fetch(`${TMDB_BASE_URL}/genre/tv/list?api_key=${TMDB_API_KEY}`)
+        ]);
+        if (!movieRes.ok || !tvRes.ok) throw new Error('genre list failed');
+        const movieData = await movieRes.json();
+        const tvData = await tvRes.json();
+        const byName = new Map();
+        (movieData.genres || []).forEach(g => byName.set(g.name, { name: g.name, movieId: g.id, tvId: null }));
+        (tvData.genres || []).forEach(g => {
+            const existing = byName.get(g.name);
+            if (existing) existing.tvId = g.id;
+            else byName.set(g.name, { name: g.name, movieId: null, tvId: g.id });
+        });
+        browseState.genres = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+        renderGenreChips();
+    } catch (err) {
+        console.error('Browse genre load error:', err);
+        const row = document.getElementById('browseGenreChips');
+        if (row) row.innerHTML = '<div class="browse-status">Genre load kora jacche na.</div>';
+    }
+}
+
+function browseChipColor(index) {
+    return BROWSE_CHIP_COLORS[index % BROWSE_CHIP_COLORS.length];
+}
+
+function renderGenreChips() {
+    const row = document.getElementById('browseGenreChips');
+    if (!row) return;
+    if (!browseState.genres.length) { row.innerHTML = ''; return; }
+    const total = browseState.genres.length;
+    const showAll = browseState.genreExpanded || total <= BROWSE_GENRE_COLLAPSED_COUNT;
+    const visible = showAll ? browseState.genres : browseState.genres.slice(0, BROWSE_GENRE_COLLAPSED_COUNT);
+    let html = visible.map((g, i) => {
+        const selected = browseState.genreSel.has(g.name);
+        return `<button type="button" class="browse-chip" style="--c:${browseChipColor(i)}" aria-pressed="${selected}" data-genre="${escapeAttr(g.name)}" onclick="toggleBrowseGenre(this.dataset.genre)">${escapeHtml(g.name)}</button>`;
+    }).join('');
+    if (total > BROWSE_GENRE_COLLAPSED_COUNT) {
+        const label = browseState.genreExpanded ? 'Show less ▴' : `+ ${total - BROWSE_GENRE_COLLAPSED_COUNT} more ▾`;
+        html += `<button type="button" class="browse-chip browse-more-btn" onclick="toggleBrowseGenreExpand()">${label}</button>`;
+    }
+    row.innerHTML = html;
+}
+
+function renderBrowseOttChips() {
+    const row = document.getElementById('browseOttChips');
+    if (!row) return;
+    row.innerHTML = BROWSE_OTT_PROVIDERS.map((p, i) => {
+        const selected = browseState.ottSel.has(p.id);
+        return `<button type="button" class="browse-chip" style="--c:${browseChipColor(i + 5)}" aria-pressed="${selected}" onclick="toggleBrowseOtt(${p.id})">${escapeHtml(p.name)}</button>`;
+    }).join('');
+}
+
+function toggleBrowseGenreExpand() {
+    browseState.genreExpanded = !browseState.genreExpanded;
+    renderGenreChips();
+}
+
+function toggleBrowseGenre(name) {
+    if (browseState.genreSel.has(name)) browseState.genreSel.delete(name);
+    else browseState.genreSel.add(name);
+    renderGenreChips();
+    onBrowseFilterChanged();
+}
+
+function toggleBrowseOtt(id) {
+    if (browseState.ottSel.has(id)) browseState.ottSel.delete(id);
+    else browseState.ottSel.add(id);
+    renderBrowseOttChips();
+    onBrowseFilterChanged();
+}
+
+function clearBrowseFilters() {
+    browseState.genreSel.clear();
+    browseState.ottSel.clear();
+    renderGenreChips();
+    renderBrowseOttChips();
+    onBrowseFilterChanged();
+}
+
+function onBrowseFilterChanged() {
+    const summary = document.getElementById('browseSelectedLabel');
+    const clearBtn = document.getElementById('browseClearBtn');
+    const parts = [];
+    if (browseState.genreSel.size) parts.push([...browseState.genreSel].join(', '));
+    if (browseState.ottSel.size) {
+        parts.push(BROWSE_OTT_PROVIDERS.filter(p => browseState.ottSel.has(p.id)).map(p => p.name).join(', '));
+    }
+    if (summary) summary.textContent = parts.length ? 'Selected: ' + parts.join(' · ') : '';
+    if (clearBtn) clearBtn.style.display = parts.length ? 'inline-flex' : 'none';
+    loadBrowseResults(true);
+}
+
+// Ekta type (movie/tv)-er jonno discover URL banay. Genre select thakle oi type-er
+// jonno genre ID na thakle type-ta skip kora hoy (na hole sob content chole ashe).
+function buildBrowseQuery(type, page) {
+    const params = new URLSearchParams({
+        api_key: TMDB_API_KEY,
+        page: String(page),
+        include_adult: 'false',
+        sort_by: 'popularity.desc'
+    });
+    if (browseState.genreSel.size) {
+        const ids = [...browseState.genreSel]
+            .map(name => browseState.genres.find(g => g.name === name))
+            .filter(Boolean)
+            .map(g => (type === 'movie' ? g.movieId : g.tvId))
+            .filter(Boolean);
+        if (!ids.length) return null;
+        params.set('with_genres', ids.join('|'));
+    }
+    if (browseState.ottSel.size) {
+        params.set('with_watch_providers', [...browseState.ottSel].join('|'));
+        params.set('watch_region', BROWSE_WATCH_REGION);
+        params.set('with_watch_monetization_types', 'flatrate');
+    }
+    return `${TMDB_BASE_URL}/discover/${type}?${params.toString()}`;
+}
+
+async function loadBrowseResults(reset) {
+    const hasFilter = browseState.genreSel.size > 0 || browseState.ottSel.size > 0;
+    if (reset) {
+        browseState.requestId++;
+        browseState.page = 1;
+        browseState.items = [];
+        browseState.seen = new Set();
+        browseState.hasMore = false;
+        browseState.loading = false;
+        renderBrowseResults();
+    }
+    if (!hasFilter) return;
+    if (browseState.loading || !browseState.hasMore && !reset) return;
+    if (!TMDB_API_KEY) return;
+
+    const reqId = browseState.requestId;
+    const types = ['movie', 'tv'].map(t => ({ type: t, url: buildBrowseQuery(t, browseState.page) })).filter(x => x.url);
+    if (!types.length) {
+        browseState.hasMore = false;
+        renderBrowseResults();
+        return;
+    }
+
+    browseState.loading = true;
+    renderBrowseResults();
+    try {
+        const responses = await Promise.all(types.map(x => fetch(x.url).then(r => {
+            if (!r.ok) throw new Error('TMDB discover failed: ' + r.status);
+            return r.json();
+        })));
+        if (reqId !== browseState.requestId) return;
+
+        let merged = [];
+        responses.forEach((data, i) => {
+            (data.results || []).forEach(r => merged.push({ ...r, media_type: types[i].type }));
+        });
+        merged = merged.filter(r => r.poster_path);
+        merged.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        merged.forEach(r => {
+            const key = r.media_type + ':' + r.id;
+            if (browseState.seen.has(key)) return;
+            browseState.seen.add(key);
+            browseState.items.push(r);
+        });
+        browseState.hasMore = responses.some(d => (d.page || 0) < (d.total_pages || 0));
+        browseState.page++;
+    } catch (err) {
+        if (reqId !== browseState.requestId) return;
+        console.error('Browse discover error:', err);
+        browseState.hasMore = false;
+        const status = document.getElementById('browseStatus');
+        if (status) status.textContent = 'Content load kora jacche na, abar try korun.';
+    } finally {
+        if (reqId === browseState.requestId) {
+            browseState.loading = false;
+            renderBrowseResults();
+        }
+    }
+}
+
+function renderBrowseResults() {
+    const grid = document.getElementById('browseResults');
+    const status = document.getElementById('browseStatus');
+    const more = document.getElementById('browseLoadMore');
+    if (!grid) return;
+
+    const hasFilter = browseState.genreSel.size > 0 || browseState.ottSel.size > 0;
+    grid.innerHTML = browseState.items.map(item => {
+        const title = item.title || item.name || 'Untitled';
+        const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+        const type = item.media_type === 'tv' ? 'tv' : 'movie';
+        const poster = `https://image.tmdb.org/t/p/w342${item.poster_path}`;
+        const backdrop = item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : '';
+        return `
+            <div class="browse-card" role="button" tabindex="0" data-id="${item.id}" data-type="${type}" data-title="${escapeAttr(title)}" data-poster="${escapeAttr(poster)}" data-backdrop="${escapeAttr(backdrop)}" onclick="selectBrowseResult(this)">
+                <img src="${poster}" alt="${escapeAttr(title)}" loading="lazy" onerror="handlePosterImgError(this)">
+                <div class="browse-card-title">${escapeHtml(title)}</div>
+                <div class="browse-card-meta">${type === 'tv' ? 'TV Series' : 'Movie'}${year ? ' • ' + year : ''}</div>
+            </div>`;
+    }).join('');
+
+    if (status) {
+        if (!hasFilter) status.textContent = '';
+        else if (browseState.loading && !browseState.items.length) status.textContent = 'Loading...';
+        else if (!browseState.loading && !browseState.items.length) status.textContent = 'Ei selection-e kono content paoa jay nai.';
+        else status.textContent = '';
+    }
+    if (more) more.style.display = (hasFilter && browseState.hasMore && !browseState.loading && browseState.items.length) ? 'block' : 'none';
+}
+
+// Card-e click korle 500K+ section-er shei watch player-i khule
+function selectBrowseResult(el) {
+    const holder = document.createElement('div');
+    ['data-id', 'data-type', 'data-title', 'data-poster', 'data-backdrop'].forEach(attr => {
+        holder.setAttribute(attr, el.getAttribute(attr) || '');
+    });
+    selectMassiveWatchResult(holder);
+}
+
+document.addEventListener('DOMContentLoaded', initBrowseTmdbSection);

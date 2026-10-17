@@ -5306,3 +5306,91 @@ html.light-mode .site-search-clear { background: #eef1f5; color: #4b5563; }
 html.light-mode .site-search-clear:hover { background: #ea580c; color: #fff; }
 
 @media (max-width: 600px) { .site-search-box { height: 40px; } .site-search-box input[type="text"] { font-size: 13px; } }
+
+/* Search suggestion: matched query words highlight */
+.suggestion-item .suggestion-hl {
+    background: none;
+    color: var(--brand-green, #7ed321);
+    font-weight: 700;
+}
+html.light-mode .suggestion-item .suggestion-hl { color: #ea580c; }
+
+/* ==================== Browse by genre / OTT (TMDB) ==================== */
+.browse-tmdb-section { margin: 30px auto 40px; padding: 0 16px; max-width: 1200px; }
+.browse-block-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 20px; font-weight: 800; color: #ffffff;
+    margin: 28px 0 14px;
+}
+.browse-block-title::before {
+    content: ''; width: 4px; height: 22px; border-radius: 2px; background: #ff9f0a; flex-shrink: 0;
+}
+.browse-chip-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.browse-chip {
+    --c: #7ed321;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 999px;
+    border: 1.5px solid var(--c); background: rgba(0, 0, 0, 0.25);
+    color: var(--c); font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.browse-chip:hover { transform: translateY(-1px); box-shadow: 0 0 12px -3px var(--c); }
+.browse-chip[aria-pressed="true"] { background: var(--c); color: #0b0d12; box-shadow: 0 0 14px -2px var(--c); }
+.browse-more-btn, .browse-more-btn:hover {
+    background: #ff9f0a; border-color: #ff9f0a; color: #1a1200; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(255, 159, 10, 0.35);
+}
+.browse-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 26px 0 12px; min-height: 30px; }
+.browse-selected-label { color: #abb3c4; font-size: 13px; }
+.browse-clear-btn {
+    padding: 6px 14px; border-radius: 999px; border: 1px solid #ff9f0a; background: transparent;
+    color: #ff9f0a; font-size: 12px; font-weight: 700; cursor: pointer; align-items: center;
+}
+.browse-clear-btn:hover { background: #ff9f0a; color: #1a1200; }
+.browse-status { color: #8b93a7; font-size: 14px; padding: 6px 0 12px; min-height: 4px; }
+/* Flex + fixed card width: sesh row-er content majhkhane center hoy, jate ekpashe faka jaiga na thake */
+.browse-results-grid {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;
+}
+.browse-card {
+    cursor: pointer; min-width: 0; border-radius: 10px; transition: transform 0.15s;
+    flex: 0 0 calc((100% - 5 * 16px) / 6);
+}
+@media (max-width: 1000px) {
+    .browse-card { flex-basis: calc((100% - 3 * 16px) / 4); }
+}
+.browse-card:hover, .browse-card:focus-visible { transform: translateY(-3px); outline: none; }
+.browse-card img {
+    width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px;
+    background: #1c202b; display: block;
+}
+.browse-card:hover img { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 2px #ff9f0a; }
+.browse-card-title {
+    margin-top: 8px; font-size: 13px; font-weight: 700; color: #eceff1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.browse-card-meta { font-size: 11px; color: #8b93a7; margin-top: 2px; }
+.browse-load-more {
+    display: block; margin: 22px auto 0; padding: 10px 26px; border-radius: 999px; border: none;
+    background: #ff9f0a; color: #1a1200; font-weight: 700; cursor: pointer;
+}
+.browse-load-more:hover { filter: brightness(1.08); }
+
+html.light-mode .browse-block-title, html.light-mode .browse-card-title { color: #14161c; }
+html.light-mode .browse-chip { background: #ffffff; }
+html.light-mode .browse-selected-label, html.light-mode .browse-status, html.light-mode .browse-card-meta { color: #5b6472; }
+html.light-mode .browse-chip[aria-pressed="true"] { color: #0b0d12; }
+
+@media (max-width: 600px) {
+    .browse-tmdb-section { padding: 0 16px; }
+    .browse-block-title { font-size: 17px; }
+    .browse-chip { padding: 7px 13px; font-size: 12px; }
+    .browse-results-grid { gap: 12px; }
+    .browse-card { flex-basis: calc((100% - 2 * 12px) / 3); }
+}
+
+.browse-kicker {
+    margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #ff9f0a;
+}
+html.light-mode .browse-kicker { color: #c2410c; }

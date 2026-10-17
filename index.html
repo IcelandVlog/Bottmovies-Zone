@@ -158,6 +158,23 @@
     </div>
     <div class="massive-watch-player" id="massiveWatchPlayer"></div>
 </section>
+
+<section class="browse-tmdb-section" id="browseTmdbSection">
+    <p class="browse-kicker">Watch · Dual &amp; Single Audio Content</p>
+    <h3 class="browse-block-title">Browse by genre</h3>
+    <div class="browse-chip-row" id="browseGenreChips"></div>
+
+    <h3 class="browse-block-title">Browse by OTT</h3>
+    <div class="browse-chip-row" id="browseOttChips"></div>
+
+    <div class="browse-toolbar">
+        <span class="browse-selected-label" id="browseSelectedLabel"></span>
+        <button type="button" class="browse-clear-btn" id="browseClearBtn" style="display:none;" onclick="clearBrowseFilters()">Clear</button>
+    </div>
+    <div class="browse-status" id="browseStatus"></div>
+    <div class="browse-results-grid" id="browseResults"></div>
+    <button type="button" class="browse-load-more" id="browseLoadMore" style="display:none;" onclick="loadBrowseResults(false)">Load more</button>
+</section>
 </main>
 
 <div class="modal-overlay" id="movieModalOverlay">
