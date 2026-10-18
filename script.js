@@ -3567,7 +3567,7 @@ async function runMassiveWatchSearch(query) {
             const backdrop = item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : '';
             const typeLabel = item.media_type === 'tv' ? 'TV Series' : 'Movie';
             return `
-                <div class="massive-watch-suggestion-item" data-id="${item.id}" data-type="${item.media_type}" data-title="${escapeAttr(rawTitle)}" data-poster="${escapeAttr(fullPoster)}" data-backdrop="${escapeAttr(backdrop)}" onclick="selectMassiveWatchResult(this)">
+                <div class="massive-watch-suggestion-item" data-id="${item.id}" data-type="${item.media_type}" data-title="${escapeAttr(rawTitle)}" data-poster="${escapeAttr(fullPoster)}" data-backdrop="${escapeAttr(backdrop)}" data-release="${escapeAttr(item.release_date || item.first_air_date || '')}" onclick="selectMassiveWatchResult(this)">
                     <img src="${poster}" alt="${escapeAttr(rawTitle)}" loading="lazy">
                     <div class="massive-watch-suggestion-info">
                         <div class="massive-watch-suggestion-title">${escapeHtml(rawTitle)}</div>
@@ -3589,6 +3589,7 @@ function selectMassiveWatchResult(itemEl) {
     const title = itemEl.getAttribute('data-title');
     const poster = itemEl.getAttribute('data-poster');
     const backdrop = itemEl.getAttribute('data-backdrop');
+    const releaseDate = itemEl.getAttribute('data-release') || '';
 
     // Selection kora matro-i suggestion dropdown bondho hoye jay ar search
     // bar-e select kora naam-ta boshe jay (shadharon autocomplete UX-er moto-i),
@@ -3608,12 +3609,12 @@ function selectMassiveWatchResult(itemEl) {
     // (kichu title-er backdrop nao thakte pare) - poster-i fallback hishebe
     // byabohar hoy.
     const thumb = (backdrop && backdrop.trim()) || poster;
-    renderMassiveWatchPlayer(id, type, title, thumb);
+    renderMassiveWatchPlayer(id, type, title, thumb, releaseDate);
     const playerEl = document.getElementById('massiveWatchPlayer');
     if (playerEl) playerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster) {
+async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster, releaseDate) {
     const playerEl = document.getElementById('massiveWatchPlayer');
     if (!playerEl) return;
     const requestId = ++massiveWatchRequestId;
@@ -3642,15 +3643,24 @@ async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster) {
     const serverDownAttr = ok ? '' : ' data-server1-down="1"';
 
     playerEl.innerHTML = `
-        <div class="season-box-item watch-box massive-watch-box" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(poster)}" data-title="${escapeAttr(title)}" data-tmdb-id="${escapeAttr(tmdbId)}" data-tmdb-type="${mediaType === 'tv' ? 'tv' : 'movie'}"${serverDownAttr}>
+        <div class="season-box-item watch-box massive-watch-box" data-link="${escapeAttr(link)}" data-poster="${escapeAttr(poster)}" data-title="${escapeAttr(title)}" data-tmdb-id="${escapeAttr(tmdbId)}" data-tmdb-type="${mediaType === 'tv' ? 'tv' : 'movie'}" data-release="${escapeAttr(releaseDate || '')}"${serverDownAttr}>
             <div class="season-box-header" style="cursor:default;">
                 <span>⚡ ${escapeHtml(title)}</span>
             </div>
             <div class="season-download-body open">
+                ${isUnreleasedDate(releaseDate) ? `
+                <div class="trailer-thumb-wrap upcoming-thumb" onclick="playMassiveWatch(this)" role="button" tabindex="0" aria-label="Watch trailer">
+                    <img class="trailer-thumb-img" src="${poster}" alt="${escapeAttr(title)} Trailer" loading="lazy" onerror="handlePosterImgError(this)">
+                    <div class="upcoming-info">
+                        <span class="upcoming-badge">Coming Soon</span>
+                        <div class="upcoming-date">Release: ${escapeHtml(formatReleaseDateLabel(releaseDate))}</div>
+                        <div class="upcoming-trailer-label">▶ Trailer</div>
+                    </div>
+                </div>` : `
                 <div class="trailer-thumb-wrap" onclick="playMassiveWatch(this)">
                     <img class="trailer-thumb-img" src="${poster}" alt="${escapeAttr(title)} Watch" loading="lazy" onerror="handlePosterImgError(this)">
                     <button type="button" class="trailer-play-btn watch-play-btn" aria-label="Play watch">▶</button>
-                </div>
+                </div>`}
             </div>
         </div>
     `;
@@ -3661,12 +3671,103 @@ async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster) {
 // niye kaj kore. View count এখানে barano hoy na, karon eta admin database-e
 // thaka kono movie/series na - shudhu TMDB theke shorashori search kore paoa
 // arbitrary content.
+// Release date (YYYY-MM-DD) ekhono asheni hole null. Aj-er theke porer date hole
+// "Coming Soon" dekhano hobe.
+function isUnreleasedDate(dateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr || ''));
+    if (!m) return false;
+    const now = new Date();
+    const today = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+    const release = Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]);
+    return release > today;
+}
+
+function formatReleaseDateLabel(dateStr) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr || ''));
+    if (!m) return '';
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Ekhono release hoy nai emon content-er Trailer - pop-up-e YouTube trailer chole
+let upcomingTrailerRequestId = 0;
+function openUpcomingTrailer(box) {
+    const tmdbId = box.getAttribute('data-tmdb-id') || '';
+    const type = box.getAttribute('data-tmdb-type') === 'tv' ? 'tv' : 'movie';
+    const title = box.getAttribute('data-title') || '';
+    const releaseYear = (box.getAttribute('data-release') || '').slice(0, 4);
+    const reqId = ++upcomingTrailerRequestId;
+
+    let overlay = document.getElementById('upcomingTrailerOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'upcomingTrailerOverlay';
+        overlay.className = 'upcoming-trailer-overlay';
+        overlay.innerHTML = `
+            <div class="upcoming-trailer-dialog" role="dialog" aria-modal="true">
+                <button type="button" class="upcoming-trailer-close" aria-label="Close trailer">✕</button>
+                <div class="upcoming-trailer-title"></div>
+                <div class="upcoming-trailer-body"></div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeUpcomingTrailer(); });
+        overlay.querySelector('.upcoming-trailer-close').addEventListener('click', closeUpcomingTrailer);
+    }
+    overlay.querySelector('.upcoming-trailer-title').textContent = title + (releaseYear ? ` (${releaseYear})` : '');
+    const bodyEl = overlay.querySelector('.upcoming-trailer-body');
+    bodyEl.innerHTML = '<div class="upcoming-trailer-msg">Loading trailer...</div>';
+    overlay.classList.add('open');
+    document.body.classList.add('upcoming-trailer-open');
+
+    (async () => {
+        let key = null;
+        try {
+            if (tmdbId && TMDB_API_KEY) {
+                const res = await fetchWithTimeout(`${TMDB_BASE_URL}/${type}/${tmdbId}/videos?api_key=${TMDB_API_KEY}`, {}, 6000);
+                if (res.ok) {
+                    const data = await res.json();
+                    key = pickBestTrailerFromResults(data.results || []);
+                }
+            }
+            if (!key && title) key = await searchYoutubeTrailer(stripYearSuffix(title), releaseYear || null);
+        } catch (e) { key = null; }
+        if (reqId !== upcomingTrailerRequestId) return;
+        if (!key) {
+            bodyEl.innerHTML = '<div class="upcoming-trailer-msg">Trailer ekhono paoa jay nai.</div>';
+            return;
+        }
+        const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&rel=0`;
+        bodyEl.innerHTML = `<iframe src="${embedUrl}" title="Trailer" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen credentialless></iframe>`;
+    })();
+}
+
+function closeUpcomingTrailer() {
+    upcomingTrailerRequestId++;
+    const overlay = document.getElementById('upcomingTrailerOverlay');
+    if (overlay) {
+        overlay.classList.remove('open');
+        const bodyEl = overlay.querySelector('.upcoming-trailer-body');
+        if (bodyEl) bodyEl.innerHTML = ''; // iframe bondho hoye video thame
+    }
+    document.body.classList.remove('upcoming-trailer-open');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeUpcomingTrailer();
+});
+
 function playMassiveWatch(el) {
     const box = el.closest('.massive-watch-box');
     if (!box) return;
     const link = box.getAttribute('data-link');
     const bodyEl = box.querySelector('.season-download-body');
     if (!bodyEl || !link) return;
+
+    // Ekhono release hoy nai - player / server button chhara, shudhu trailer popup
+    if (isUnreleasedDate(box.getAttribute('data-release'))) {
+        openUpcomingTrailer(box);
+        return;
+    }
 
     showAdblockNotice();
 
@@ -12225,12 +12326,13 @@ function renderBrowseResults() {
     const hasFilter = browseState.genreSel.size > 0 || browseState.ottSel.size > 0;
     grid.innerHTML = browseState.items.map(item => {
         const title = item.title || item.name || 'Untitled';
-        const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+        const fullRelease = item.release_date || item.first_air_date || '';
+        const year = fullRelease.slice(0, 4);
         const type = item.media_type === 'tv' ? 'tv' : 'movie';
         const poster = `https://image.tmdb.org/t/p/w342${item.poster_path}`;
         const backdrop = item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : '';
         return `
-            <div class="browse-card" role="button" tabindex="0" data-id="${item.id}" data-type="${type}" data-title="${escapeAttr(title)}" data-poster="${escapeAttr(poster)}" data-backdrop="${escapeAttr(backdrop)}" onclick="selectBrowseResult(this)">
+            <div class="browse-card" role="button" tabindex="0" data-id="${item.id}" data-type="${type}" data-title="${escapeAttr(title)}" data-poster="${escapeAttr(poster)}" data-backdrop="${escapeAttr(backdrop)}" data-release="${escapeAttr(fullRelease)}" onclick="selectBrowseResult(this)">
                 <img src="${poster}" alt="${escapeAttr(title)}" loading="lazy" onerror="handlePosterImgError(this)">
                 <div class="browse-card-title">${escapeHtml(title)}</div>
                 <div class="browse-card-meta">${type === 'tv' ? 'TV Series' : 'Movie'}${year ? ' • ' + year : ''}</div>
@@ -12249,7 +12351,7 @@ function renderBrowseResults() {
 // Card-e click korle 500K+ section-er shei watch player-i khule
 function selectBrowseResult(el) {
     const holder = document.createElement('div');
-    ['data-id', 'data-type', 'data-title', 'data-poster', 'data-backdrop'].forEach(attr => {
+    ['data-id', 'data-type', 'data-title', 'data-poster', 'data-backdrop', 'data-release'].forEach(attr => {
         holder.setAttribute(attr, el.getAttribute(attr) || '');
     });
     selectMassiveWatchResult(holder);
