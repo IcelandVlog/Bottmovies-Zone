@@ -10815,7 +10815,7 @@ function renderAdminRequestsList(filter) {
                 <div class="admin-db-title">${escapeHtml(reqItem.movie_title || 'Untitled')}${yearPart}</div>
                 ${reqItem.reference_link ? `
                 <div class="admin-alert-url admin-request-link-row">
-                    <span class="admin-request-link-text">${escapeHtml(reqItem.reference_link)}</span>
+                    <span class="admin-request-link-text" title="${escapeAttr(reqItem.reference_link)}">${escapeHtml(formatLinkForDisplay(reqItem.reference_link))}</span>
                     ${referenceUrl ? `<button type="button" class="admin-request-link-btn" title="IMDb/TMDB-তে ওপেন করে দেখুন">🔗 Open Link</button>` : ''}
                 </div>` : ''}
                 <div class="admin-alert-meta-row">${alreadyOnSite ? '<span class="admin-alert-source-tag auto">✅ Already on Site</span>' : ''}<span class="admin-alert-time">${timeAgo}</span></div>
@@ -11024,7 +11024,7 @@ function renderAdminAlertsList() {
             <div class="admin-db-info">
                 <div class="admin-db-title">${escapeHtml(alert.movie_title || 'Untitled')}</div>
                 <div class="admin-db-meta">${escapeHtml(alert.link_label || 'Download Link')}</div>
-                <div class="admin-alert-url">${escapeHtml(alert.link_url || '')}</div>
+                <div class="admin-alert-url" title="${escapeAttr(alert.link_url || '')}">${escapeHtml(formatLinkForDisplay(alert.link_url || ''))}</div>
                 <div class="admin-alert-meta-row">${sourceTag}<span class="admin-alert-time">${timeAgo}</span></div>
             </div>
             <div class="admin-db-actions admin-alert-actions">
@@ -12134,3 +12134,38 @@ function selectBrowseResult(el) {
 }
 
 document.addEventListener('DOMContentLoaded', initBrowseTmdbSection);
+
+// Admin panel-er link text-ke chhoto kore dekhay.
+// - Bottmovies-er link (?movie=<id>) hole: movie -> https://bottmovies-zone.vercel.app/movie/<name>
+//   series (tv) hole: https://bottmovies-zone.vercel.app/series/<name>
+// - Onno link hole: https:// ar www. baad diye dekhay (jemon crunchyroll.com/series/hana-kimi)
+// Asol href-e kono change hoy na, shudhu screen-e dekhanor text-i bodle jay.
+function slugForLink(title) {
+    return String(title || '')
+        .toLowerCase()
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function formatLinkForDisplay(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+
+    const siteMatch = raw.match(/^(?:https?:\/\/)?(?:www\.)?bottmovies-zone\.vercel\.app\/?\?movie=([^&#\s]+)/i);
+    if (siteMatch) {
+        const id = decodeURIComponent(siteMatch[1]);
+        const movie = (Array.isArray(allMovies) ? allMovies : []).find(m => String(m.id) === id);
+        if (movie) {
+            const kind = movie.tmdbType === 'tv' ? 'series' : 'movie';
+            const name = slugForLink(movie.title) || id;
+            return `https://bottmovies-zone.vercel.app/${kind}/${name}`;
+        }
+        return `https://bottmovies-zone.vercel.app/movie/${id}`;
+    }
+
+    let text = raw.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+    text = text.replace(/\/?\?/, '/').replace(/=/g, '/');
+    text = text.replace(/\/{2,}/g, '/').replace(/\/+$/, '');
+    return text;
+}
