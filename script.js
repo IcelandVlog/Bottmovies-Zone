@@ -2175,6 +2175,11 @@ function renderPaginationControls(movies, page) {
 function renderMoviesByPage(movies, page) {
     const grid = document.getElementById('movieGrid');
     if (!grid) return;
+    // Grid khali kore notun card bosanor majhe page-er height hothat kome gele browser scroll-ta
+    // nicher section (Browse/500K+) e tene niye jay. Tai age-r height dhore rakha hoy, render shesh hole chharha hoy.
+    const keepHeight = grid.offsetHeight;
+    if (keepHeight) grid.style.minHeight = keepHeight + 'px';
+    requestAnimationFrame(() => { grid.style.minHeight = ''; });
     grid.innerHTML = '';
     currentPage = page;
 

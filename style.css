@@ -5401,3 +5401,11 @@ html.light-mode .movie-card-year { color: #6b7280; }
 
 .suggestion-item .suggestion-year { color: #8b93a7; font-weight: 500; }
 html.light-mode .suggestion-item .suggestion-year { color: #6b7280; }
+
+/* Choto device-e server button gula ek line-e thakbe, size-o choto */
+@media (max-width: 600px) {
+    .watch-server-bar { flex-wrap: nowrap; gap: 5px; padding-left: 6px; padding-right: 6px; }
+    .watch-server-label { font-size: 10px; letter-spacing: 0.4px; margin-right: 0; }
+    .watch-server-btn { height: 26px; padding: 0 8px; gap: 4px; font-size: 10px; white-space: nowrap; min-width: 0; flex-shrink: 1; }
+    .watch-server-dot { width: 5px; height: 5px; }
+}
