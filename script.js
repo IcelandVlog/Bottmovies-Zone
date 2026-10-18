@@ -858,6 +858,11 @@ function getHeroCategoryLabel(movie) {
     return String(cats[0]).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// Title-er sheshe "(2024)" ba "(2019-24)" thakle shegulo bad diye dekhay (display-only)
+function stripYearSuffix(title) {
+    const t = String(title || '');
+    return t.replace(/\s*\(\s*\d{4}(?:\s*[-–]\s*\d{2,4})?\s*\)\s*$/, '').trim() || t;
+}
 function getYearFromTitle(title) {
     const m = String(title || '').match(/\((\d{4}(?:-\d{2,4})?)\)\s*$/);
     return m ? m[1] : '';
@@ -1401,8 +1406,8 @@ function movieUrlBaseSlug(title) {
 // Ekই naam-er ekadhik content thakle "-<id>" jog kore alada kore deya hoy
 function getMovieUrlPath(movie) {
     const list = Array.isArray(allMovies) ? allMovies : [];
-    const base = movieUrlBaseSlug(movie.title) || String(movie.id);
-    const dup = list.some(m => String(m.id) !== String(movie.id) && movieUrlBaseSlug(m.title) === base);
+    const base = movieUrlBaseSlug(stripYearSuffix(movie.title)) || String(movie.id);
+    const dup = list.some(m => String(m.id) !== String(movie.id) && movieUrlBaseSlug(stripYearSuffix(m.title)) === base);
     return {
         kind: movie.tmdbType === 'tv' ? 'series' : 'movie',
         slug: dup ? `${base}-${movie.id}` : base
@@ -2152,9 +2157,9 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
-            <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${movie.title}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
+            <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${escapeAttr(stripYearSuffix(movie.title))}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
-        <div class="movie-details"><p class="movie-title">${serialNumber}. ${movie.title}</p></div>
+        <div class="movie-details"><p class="movie-title">${serialNumber}. ${escapeHtml(stripYearSuffix(movie.title))}</p></div>
         `;
 
         card.addEventListener('click', () => openMovieModal(movie));
@@ -2231,7 +2236,7 @@ async function openMovieModal(movie) {
         </div>
     `;
 
-    let title = movie.title || "N/A";
+    let title = stripYearSuffix(movie.title) || "N/A";
     let poster = movie.poster || POSTER_PLACEHOLDER_MISSING;
     let year = movie.year || "N/A";
     let genre = movie.genre || "Drama";
@@ -4288,7 +4293,7 @@ function initApp() {
             matches.forEach(movie => {
                 const item = document.createElement('div');
                 item.className = 'suggestion-item';
-                item.innerHTML = highlightSuggestionText(movie.title, query);
+                item.innerHTML = highlightSuggestionText(stripYearSuffix(movie.title), query);
                 item.addEventListener('click', function() {
                     searchInput.value = movie.title;
                     searchSuggestions.style.display = 'none';
