@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* /movie/<name> ar /series/<name> URL-e relative asset (style.css, logo.png...) ঠিক path-e load korar jonno base */
+if (location.protocol !== 'file:') { document.write('<base href="/">'); }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bottmovies Zone</title>

@@ -1388,24 +1388,57 @@ function closeMovieModal() {
 // "?movie=<id>" jure deya hoy, jate কেউ page REFRESH korleo shei details
 // page-i thake, home-e ferot chole na jay. Modal bondho korle (closeMovieModal)
 // ei param URL theke sorie deya hoy.
+// URL format: https://bottmovies-zone.vercel.app/movie/<movie-name>
+//             https://bottmovies-zone.vercel.app/series/<series-name>
+// (movie na paile purono "?movie=<id>" format-o kaj kore - backward compatible)
+function movieUrlBaseSlug(title) {
+    return String(title || '')
+        .toLowerCase()
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+// Ekই naam-er ekadhik content thakle "-<id>" jog kore alada kore deya hoy
+function getMovieUrlPath(movie) {
+    const list = Array.isArray(allMovies) ? allMovies : [];
+    const base = movieUrlBaseSlug(movie.title) || String(movie.id);
+    const dup = list.some(m => String(m.id) !== String(movie.id) && movieUrlBaseSlug(m.title) === base);
+    return {
+        kind: movie.tmdbType === 'tv' ? 'series' : 'movie',
+        slug: dup ? `${base}-${movie.id}` : base
+    };
+}
+function findMovieByUrlSlug(slug) {
+    const list = Array.isArray(allMovies) ? allMovies : [];
+    return list.find(m => getMovieUrlPath(m).slug === slug) || null;
+}
+function isMoviePathname(pathname) {
+    return /^\/(movie|series)\/[^/]+\/?$/.test(pathname);
+}
+
 function setMovieModalUrlParam(movie) {
     if (!movie || movie.id == null) return;
+    const { kind, slug } = getMovieUrlPath(movie);
+    const target = `/${kind}/${slug}`;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('movie') === String(movie.id)) return; // already thik ache
-    params.set('movie', String(movie.id));
+    params.delete('movie');
     // Movie details modal ar dashboard/auth page - dutoi ekshathe URL-e rakha
     // hoy na (ekbar-e ekta-i "full page overlay" active thaka uchit).
     params.delete('dashboard');
     params.delete('auth');
-    const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+    const qs = params.toString();
+    const newUrl = target + (qs ? '?' + qs : '') + window.location.hash;
+    if (window.location.pathname + window.location.search + window.location.hash === newUrl) return;
     history.replaceState(null, '', newUrl);
 }
 function clearMovieModalUrlParam() {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has('movie')) return;
+    const onMoviePath = isMoviePathname(window.location.pathname);
+    if (!onMoviePath && !params.has('movie')) return;
     params.delete('movie');
-    const newSearch = params.toString();
-    const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    const basePath = onMoviePath ? '/' : window.location.pathname;
+    const qs = params.toString();
+    const newUrl = basePath + (qs ? '?' + qs : '') + window.location.hash;
     history.replaceState(null, '', newUrl);
 }
 // Movies data load hওয়ার পর ekbar call kora hoy (fetchMoviesFromSupabase theke) -
@@ -1414,6 +1447,13 @@ function clearMovieModalUrlParam() {
 // modal-ta abar khule dey.
 function restoreMovieModalFromUrl() {
     try {
+        if (isMoviePathname(window.location.pathname)) {
+            const slug = decodeURIComponent(window.location.pathname.split('/').filter(Boolean)[1] || '');
+            const foundByPath = findMovieByUrlSlug(slug);
+            if (foundByPath) openMovieModal(foundByPath);
+            else clearMovieModalUrlParam();
+            return;
+        }
         const params = new URLSearchParams(window.location.search);
         const movieIdParam = params.get('movie');
         if (!movieIdParam) return;
@@ -12157,9 +12197,8 @@ function formatLinkForDisplay(url) {
         const id = decodeURIComponent(siteMatch[1]);
         const movie = (Array.isArray(allMovies) ? allMovies : []).find(m => String(m.id) === id);
         if (movie) {
-            const kind = movie.tmdbType === 'tv' ? 'series' : 'movie';
-            const name = slugForLink(movie.title) || id;
-            return `https://bottmovies-zone.vercel.app/${kind}/${name}`;
+            const { kind, slug } = getMovieUrlPath(movie);
+            return `https://bottmovies-zone.vercel.app/${kind}/${slug}`;
         }
         return `https://bottmovies-zone.vercel.app/movie/${id}`;
     }

@@ -13,5 +13,15 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/movie/:slug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/series/:slug",
+      "destination": "/index.html"
+    }
   ]
 }
