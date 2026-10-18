@@ -4333,7 +4333,10 @@ function initApp() {
             matches.forEach(movie => {
                 const item = document.createElement('div');
                 item.className = 'suggestion-item';
-                item.innerHTML = highlightSuggestionText(stripYearSuffix(movie.title), query);
+                const suggestionYear = getCardYearLabel(movie);
+                // Title + year duitai highlight hobe (jemon "2018" likhle year-o green hobe)
+                const fullLabel = stripYearSuffix(movie.title) + (suggestionYear ? ` (${suggestionYear})` : '');
+                item.innerHTML = highlightSuggestionText(fullLabel, query);
                 item.addEventListener('click', function() {
                     searchInput.value = movie.title;
                     searchSuggestions.style.display = 'none';
