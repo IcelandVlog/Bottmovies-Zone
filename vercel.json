@@ -22,6 +22,14 @@
     {
       "source": "/series/:slug",
       "destination": "/index.html"
+    },
+    {
+      "source": "/anime/:slug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/:category",
+      "destination": "/index.html"
     }
   ]
 }

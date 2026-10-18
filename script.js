@@ -758,17 +758,16 @@ async function fetchMoviesFromSupabase() {
             allMovies = applyManualSerialPositions(allMovies);
             // category নামের ঠিক পরে ?page= বসানো থাকে (যেমন #anime?page=2),
             // তাই hash কে category আর page — এই দুই ভাগে ভেঙে পড়া হচ্ছে
-            let initialCategory = window.location.hash.replace('#', '');
+            let initialCategory = document.body.getAttribute('data-category') || 'all';
             let initialPage = 1;
-            const initialQIndex = initialCategory.indexOf('?');
-            if (initialQIndex !== -1) {
-                const hashPageParams = new URLSearchParams(initialCategory.substring(initialQIndex + 1));
-                const p = parseInt(hashPageParams.get('page'), 10);
-                if (p && p > 0) initialPage = p;
-                initialCategory = initialCategory.substring(0, initialQIndex);
-            }
-            if (!initialCategory) {
-                initialCategory = document.body.getAttribute('data-category') || 'all';
+            const pathRoute = readCategoryFromLocation();
+            if (pathRoute) { initialCategory = pathRoute.category; initialPage = pathRoute.page; }
+            // Purono "#anime" link hole sheta-o path-e niye jabe (/anime)
+            const legacyRoute = readLegacyHashRoute();
+            if (legacyRoute) {
+                initialCategory = legacyRoute.category;
+                initialPage = legacyRoute.page;
+                history.replaceState(null, '', buildCategoryUrl(legacyRoute.category, legacyRoute.page));
             }
             switchCategory(initialCategory, initialPage);
             restoreMovieModalFromUrl(); // ?movie=<id> URL-e thakle (refresh) shei details page abar khule dao
@@ -1427,6 +1426,44 @@ function findMovieByUrlSlug(slug) {
     const list = Array.isArray(allMovies) ? allMovies : [];
     return list.find(m => getMovieUrlPath(m).slug === slug) || null;
 }
+// ---------- Path-based category routing: /, /anime, /english-movies?page=2 ----------
+function categoryBasePath(category) {
+    return (!category || category === 'all') ? '/' : '/' + encodeURIComponent(category);
+}
+// Category + page URL banay. Onno query param (dashboard/auth) thakle rakhe.
+function buildCategoryUrl(category, page) {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('page');
+    if (page > 1) params.set('page', String(page));
+    const qs = params.toString();
+    return categoryBasePath(category) + (qs ? '?' + qs : '');
+}
+// URL theke category/page pora. Movie details path hole null.
+function readCategoryFromLocation() {
+    if (isMoviePathname(window.location.pathname)) return null;
+    const seg = window.location.pathname.split('/').filter(Boolean);
+    let category = seg.length ? decodeURIComponent(seg[0]) : 'all';
+    if (/\.html$/i.test(category)) category = 'all';
+    const p = parseInt(new URLSearchParams(window.location.search).get('page'), 10);
+    return { category, page: p > 0 ? p : 1 };
+}
+// Purono "#anime?page=2" format theke category/page (shudhu valid category hole)
+function readLegacyHashRoute() {
+    const raw = window.location.hash.replace('#', '');
+    if (!raw) return null;
+    const qIndex = raw.indexOf('?');
+    const category = qIndex === -1 ? raw : raw.substring(0, qIndex);
+    if (!category) return null;
+    const isKnown = category === 'all' || category === 'home' || !!document.querySelector(`.nav-link[data-target="${category}"]`);
+    if (!isKnown) return null;
+    let page = 1;
+    if (qIndex !== -1) {
+        const p = parseInt(new URLSearchParams(raw.substring(qIndex + 1)).get('page'), 10);
+        if (p > 0) page = p;
+    }
+    return { category: category === 'home' ? 'all' : category, page };
+}
+
 function isMoviePathname(pathname) {
     return /^\/(movie|series|anime)\/[^/]+\/?$/.test(pathname);
 }
@@ -1453,7 +1490,7 @@ function clearMovieModalUrlParam() {
     params.delete('movie');
     const basePath = onMoviePath ? '/' : window.location.pathname;
     const qs = params.toString();
-    const newUrl = basePath + (qs ? '?' + qs : '') + window.location.hash;
+    const newUrl = basePath + (qs ? '?' + qs : '');
     history.replaceState(null, '', newUrl);
 }
 // Movies data load hওয়ার পর ekbar call kora hoy (fetchMoviesFromSupabase theke) -
@@ -2127,15 +2164,9 @@ function renderMoviesByPage(movies, page) {
     currentPage = page;
 
     const pageUrlParams = new URLSearchParams(window.location.search);
-    if (!pageUrlParams.has('dashboard') && !pageUrlParams.has('auth')) {
-        const rawHash = window.location.hash.replace('#', '');
-        const hashQIndex = rawHash.indexOf('?');
-        const hashCategory = hashQIndex === -1 ? rawHash : rawHash.substring(0, hashQIndex);
-        const newHash = page > 1
-            ? '#' + hashCategory + '?page=' + page
-            : (hashCategory ? '#' + hashCategory : '');
-        const newUrl = window.location.pathname + window.location.search + newHash;
-        history.replaceState(null, '', newUrl);
+    if (!pageUrlParams.has('dashboard') && !pageUrlParams.has('auth') && !isMoviePathname(window.location.pathname)) {
+        const currentCategory = document.body.getAttribute('data-category') || 'all';
+        history.replaceState(null, '', buildCategoryUrl(currentCategory, page));
     }
 
     if (movies.length === 0) {
@@ -3936,20 +3967,11 @@ function switchCategory(category, initialPage) {
 
     updateNoticeBannerText(category, targetLink);
 
-    const currentHashCategory = window.location.hash.replace('#', '').split('?')[0];
-    const targetHash = category === 'all' ? '' : `#${category}`;
-    if (window.location.protocol === 'file:') {
-        if (currentHashCategory !== (category === 'all' ? '' : category)) {
-            if (category === 'all') {
-                history.replaceState(null, '', window.location.pathname + window.location.search);
-            } else {
-                window.location.hash = category;
-            }
-        }
-    } else {
-        const cleanPath = window.location.pathname.replace(/index\.html$/, '');
-        if (currentHashCategory !== (category === 'all' ? '' : category) || window.location.pathname.includes('index.html')) {
-            history.pushState(null, '', cleanPath + targetHash);
+    // URL: home = "/", baki category = "/<category>" (kono # tag nei). Movie details page-e thakle URL bodlano hoy na.
+    if (!isMoviePathname(window.location.pathname)) {
+        const targetPath = categoryBasePath(category);
+        if (window.location.pathname !== targetPath) {
+            history.pushState(null, '', targetPath);
         }
     }
 
@@ -4212,17 +4234,10 @@ function setupNavigation() {
     });
 
     window.addEventListener('popstate', function() {
-        // hash এখন "category?page=N" ফরম্যাটে থাকে, তাই back/forward এ গেলে দুটোই আলাদা করে পড়া হচ্ছে
-        let currentHash = window.location.hash.replace('#', '');
-        let currentPageFromHash = 1;
-        const qIndex = currentHash.indexOf('?');
-        if (qIndex !== -1) {
-            const hashParams = new URLSearchParams(currentHash.substring(qIndex + 1));
-            const p = parseInt(hashParams.get('page'), 10);
-            if (p && p > 0) currentPageFromHash = p;
-            currentHash = currentHash.substring(0, qIndex);
-        }
-        switchCategory(currentHash || 'all', currentPageFromHash);
+        // URL path (/anime) ar ?page=N theke back/forward-e category ferot ana hoy
+        const route = readCategoryFromLocation();
+        if (!route) return;
+        switchCategory(route.category || 'all', route.page);
     });
 }
 
@@ -4734,7 +4749,7 @@ function closeAuthModal() {
     if (params.has('auth')) {
         params.delete('auth');
         const newSearch = params.toString();
-        const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+        const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '');
         history.replaceState(null, '', newUrl);
     }
 }
@@ -4783,7 +4798,7 @@ function switchAuthTab(tab) {
         const params = new URLSearchParams(window.location.search);
         params.set('auth', isSignup ? 'signup' : 'signin');
         params.delete('dashboard'); // auth আর dashboard একসাথে URL এ থাকবে না
-        const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+        const newUrl = window.location.pathname + '?' + params.toString();
         history.replaceState(null, '', newUrl);
     }
 }
@@ -6249,7 +6264,7 @@ function setDashboardUrlParam() {
     if (params.get('dashboard') === '1' && !params.has('auth')) return; // ইতিমধ্যেই ঠিক আছে
     params.set('dashboard', '1');
     params.delete('auth');
-    const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+    const newUrl = window.location.pathname + '?' + params.toString();
     history.replaceState(null, '', newUrl);
 }
 function clearDashboardUrlParam() {
@@ -6258,7 +6273,7 @@ function clearDashboardUrlParam() {
     params.delete('dashboard');
     params.delete('tab'); // panel বন্ধ হলে কোন ট্যাব খোলা ছিল সেই তথ্যও মুছে দাও
     const newSearch = params.toString();
-    const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '') + window.location.hash;
+    const newUrl = window.location.pathname + (newSearch ? '?' + newSearch : '');
     history.replaceState(null, '', newUrl);
 }
 
@@ -6274,7 +6289,7 @@ function setAdminTabUrlParam(tab) {
         if (params.get('tab') === tab) return;
         params.set('tab', tab);
     }
-    const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+    const newUrl = window.location.pathname + '?' + params.toString();
     history.replaceState(null, '', newUrl);
 }
 

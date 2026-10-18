@@ -1,2 +1,4 @@
 /movie/*  /index.html  200
 /series/*  /index.html  200
+/anime/*  /index.html  200
+/:category  /index.html  200
