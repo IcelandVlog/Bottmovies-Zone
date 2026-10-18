@@ -3216,7 +3216,7 @@ async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
     // (playModalWatch()) barbe, jate accordion-ta shudhu open kore dekhleই
     // "view" count na hoye jay.
     container.innerHTML = `
-        <div class="season-box-item watch-box" id="watchBox" data-default-server="${Number(movie && movie.watchServer) === 2 ? 2 : 1}"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
+        <div class="season-box-item watch-box" id="watchBox" data-default-server="${[2, 3].includes(Number(movie && movie.watchServer)) ? Number(movie.watchServer) : 1}"${tmdbInfo && tmdbInfo.id ? ` data-tmdb-id="${escapeAttr(tmdbInfo.id)}" data-tmdb-type="${tmdbInfo.isTV ? 'tv' : 'movie'}"` : ''} data-link="${escapeAttr(link)}" data-poster="${escapeAttr(watchThumbUrl)}" data-fallback-thumb="${escapeAttr(fallbackThumbUrl)}" data-title="${escapeAttr(title)}" data-season="${defaultWatchSeason != null ? defaultWatchSeason : ''}" data-episode="${defaultWatchEpisode != null ? defaultWatchEpisode : ''}">
             <div class="season-box-header" onclick="toggleAccordion('watchAccordionBody')">
                 <span>⚡ Online Watch</span>
                 <div class="season-badges-right">
@@ -3252,7 +3252,10 @@ function showAdblockNotice() {
 // Server 02 = nxsha.space embed:
 //   Movie  -> https://nxsha.space/embed/movie/{tmdbId}
 //   Series -> https://nxsha.space/embed/tv/{tmdbId}/{season}/{episode}
-// Player box-e data-tmdb-id + data-tmdb-type thakle-i Server 02 dekhano hoy.
+// Server 03 = vidrift.net embed (TMDB ID diye):
+//   Movie  -> https://embed.vidrift.net/embed/movie/{tmdbId}?brandLogo=...
+//   Series -> https://embed.vidrift.net/embed/tv/{tmdbId}/{season}/{episode}?brandLogo=...
+// Player box-e data-tmdb-id + data-tmdb-type thakle-i Server 02 o 03 dekhano hoy.
 
 function resolveWatchEmbedUrl(link) {
     const ytId = extractYoutubeVideoId(link);
@@ -3277,7 +3280,7 @@ function getBoxDefaultServer(box) {
             : null;
         n = m ? parseInt(m.watchServer, 10) : 1;
     }
-    return n === 2 ? 2 : 1;
+    return (n === 2 || n === 3) ? n : 1;
 }
 function getWatchServerUrl(box, server) {
     if (server === 2 && boxHasServer2(box)) {
@@ -3290,21 +3293,43 @@ function getWatchServerUrl(box, server) {
         }
         return `${SERVER2_EMBED_BASE}/movie/${id}`;
     }
+    if (server === 3 && boxHasServer2(box)) {
+        const SERVER3_EMBED_BASE = 'https://embed.vidrift.net/embed';
+        const SERVER3_BRAND_LOGO = '?brandLogo=https%3A%2F%2Fbottmovies-zone.vercel.app%2Flogo.png';
+        const id = encodeURIComponent(box.getAttribute('data-tmdb-id'));
+        if (box.getAttribute('data-tmdb-type') === 'tv') {
+            const season = parseInt(box.getAttribute('data-season'), 10);
+            const episode = parseInt(box.getAttribute('data-episode'), 10);
+            return `${SERVER3_EMBED_BASE}/tv/${id}/${Number.isFinite(season) && season > 0 ? season : 1}/${Number.isFinite(episode) && episode > 0 ? episode : 1}${SERVER3_BRAND_LOGO}`;
+        }
+        return `${SERVER3_EMBED_BASE}/movie/${id}${SERVER3_BRAND_LOGO}`;
+    }
     return resolveWatchEmbedUrl(box.getAttribute('data-link'));
 }
 function buildWatchServerBarHTML(box, active) {
     if (!boxHasServer2(box)) return '';
     const btn = (n, label) => `<button type="button" class="watch-server-btn${active === n ? ' active' : ''}" data-server="${n}" onclick="switchWatchServer(this)"><span class="watch-server-dot"></span>${label}</button>`;
-    return `<div class="watch-server-bar"><span class="watch-server-label">Server</span>${btn(1, 'Server 01')}${btn(2, 'Server 02')}<span class="watch-server-hint">Video not working? Try another server.</span></div>`;
+    return `<div class="watch-server-bar"><span class="watch-server-label">Server</span>${btn(1, 'Server 01')}${btn(2, 'Server 02')}${btn(3, 'Server 03')}<span class="watch-server-hint">Video not working? Try another server.</span></div>`;
+}
+// Player-er ভেতরের HTML. Server 03 (vidrift) -er jonno official snippet use kora hoy
+// (credentialless/referrerpolicy chara, 16:9 wrapper-e). Server 01/02 ager moto-i.
+function buildWatchPlayerInner(url, server) {
+    if (server === 3) {
+        return `<div style="position:relative;padding-bottom:56.25%;height:0">
+            <iframe src="${escapeAttr(url)}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen allow="autoplay; fullscreen"></iframe>
+        </div>`;
+    }
+    return `<iframe src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>`;
 }
 function switchWatchServer(btnEl) {
     const box = btnEl.closest('.watch-box');
     if (!box) return;
-    const server = parseInt(btnEl.getAttribute('data-server'), 10) === 2 ? 2 : 1;
-    const iframe = box.querySelector('.trailer-video-wrap iframe');
-    if (!iframe) return;
+    const rawServer = parseInt(btnEl.getAttribute('data-server'), 10);
+    const server = (rawServer === 2 || rawServer === 3) ? rawServer : 1;
+    const wrap = box.querySelector('.trailer-video-wrap');
+    if (!wrap || !wrap.querySelector('iframe')) return;
     box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
-    iframe.src = getWatchServerUrl(box, server);
+    wrap.innerHTML = buildWatchPlayerInner(getWatchServerUrl(box, server), server);
 }
 
 // "Watch Now" box-e click korle - thik trailer-er moto-i - thumbnail-er jaygay
@@ -3345,7 +3370,7 @@ function playModalWatch(el) {
         <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeModalWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
     </div>
     <div class="trailer-video-wrap">
-        <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>
+        ${buildWatchPlayerInner(embedUrl, activeServer)}
     </div>`;
 
     incrementMovieViews(currentModalMovie);
@@ -3651,7 +3676,7 @@ function playMassiveWatch(el) {
             <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeMassiveWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
         </div>
         <div class="trailer-video-wrap">
-            <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>
+            ${buildWatchPlayerInner(embedUrl, activeServer)}
         </div>
     `;
 }
@@ -9685,7 +9710,7 @@ function refreshWatchBulkServerUI() {
 }
 
 async function setAllWatchDefaultServer(n) {
-    n = n === 2 ? 2 : 1;
+    n = (n === 2 || n === 3) ? n : 1;
     const list = Array.isArray(allMovies) ? allMovies : [];
     if (!list.length) return;
     const manualCount = list.filter(m => m.watchServerManual === true).length;
@@ -10234,7 +10259,7 @@ function renderAdminServerList(filter) {
         const hasTmdb = !!movie.tmdbId;
         const card = document.createElement('div');
         card.className = 'admin-db-card admin-server-card';
-        const current = Number(movie.watchServer) === 2 ? 2 : 1;
+        const current = [2, 3].includes(Number(movie.watchServer)) ? Number(movie.watchServer) : 1;
         card.innerHTML = `
             <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
             <div class="admin-db-info">
@@ -10245,6 +10270,7 @@ function renderAdminServerList(filter) {
                 <div class="admin-watch-server-seg" role="group" aria-label="Default server">
                     <button type="button" class="admin-watch-server-btn ${current === 1 ? 'active' : ''}" data-server="1">Server 01</button>
                     <button type="button" class="admin-watch-server-btn ${current === 2 ? 'active' : ''}" data-server="2">Server 02</button>
+                    <button type="button" class="admin-watch-server-btn ${current === 3 ? 'active' : ''}" data-server="3">Server 03</button>
                 </div>
                 <span class="admin-server-save-status" aria-live="polite"></span>
             </div>
@@ -10253,8 +10279,9 @@ function renderAdminServerList(filter) {
         const statusEl = card.querySelector('.admin-server-save-status');
         const sync = (n) => btns.forEach(b => b.classList.toggle('active', parseInt(b.getAttribute('data-server'), 10) === n));
         btns.forEach(btn => btn.addEventListener('click', async () => {
-            const prev = Number(movie.watchServer) === 2 ? 2 : 1;
-            const next = parseInt(btn.getAttribute('data-server'), 10) === 2 ? 2 : 1;
+            const prev = [2, 3].includes(Number(movie.watchServer)) ? Number(movie.watchServer) : 1;
+            const rawNext = parseInt(btn.getAttribute('data-server'), 10);
+            const next = (rawNext === 2 || rawNext === 3) ? rawNext : 1;
             if (next === prev) return;
             sync(next);
             const ok = await saveAdminServerSetting(movie, next, statusEl);
