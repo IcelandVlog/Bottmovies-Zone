@@ -3319,11 +3319,11 @@ function buildWatchServerBarHTML(box, active) {
 // Player-er ভেতরের HTML. Server 03 (vidrift) -er jonno official snippet use kora hoy
 // (credentialless/referrerpolicy chara, 16:9 wrapper-e). Server 01/02 ager moto-i.
 // Server 03 (vidrift) site-er COEP setting-er karone iframe-e chalano jay na - tai alada tab-e khola hoy.
-function buildWatchPlayerInner(url, server) {
+function buildWatchPlayerInner(url, server, poster) {
     if (server === 3) {
-        return `<div class="watch-server3-panel">
-            <p>Server 03 alada tab-e khulbe.</p>
-            <a class="watch-server3-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">▶ Server 03 e Watch Korun</a>
+        const bg = poster ? ` style="background-image:url('${escapeAttr(poster)}')"` : '';
+        return `<div class="watch-server3-panel"${bg}>
+            <a class="watch-server3-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">▶ Watch</a>
         </div>`;
     }
     return `<iframe src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>`;
@@ -3336,7 +3336,7 @@ function switchWatchServer(btnEl) {
     const wrap = box.querySelector('.trailer-video-wrap');
     if (!wrap || !wrap.querySelector('iframe, .watch-server3-panel')) return;
     box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
-    wrap.innerHTML = buildWatchPlayerInner(getWatchServerUrl(box, server), server);
+    wrap.innerHTML = buildWatchPlayerInner(getWatchServerUrl(box, server), server, box.getAttribute('data-poster') || '');
 }
 
 // "Watch Now" box-e click korle - thik trailer-er moto-i - thumbnail-er jaygay
@@ -3377,7 +3377,7 @@ function playModalWatch(el) {
         <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeModalWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
     </div>
     <div class="trailer-video-wrap">
-        ${buildWatchPlayerInner(embedUrl, activeServer)}
+        ${buildWatchPlayerInner(embedUrl, activeServer, box.getAttribute('data-poster') || '')}
     </div>`;
 
     incrementMovieViews(currentModalMovie);
@@ -3683,7 +3683,7 @@ function playMassiveWatch(el) {
             <button type="button" class="watch-close-btn" aria-label="Close video" title="Close video" onclick="closeMassiveWatch(this)"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
         </div>
         <div class="trailer-video-wrap">
-            ${buildWatchPlayerInner(embedUrl, activeServer)}
+            ${buildWatchPlayerInner(embedUrl, activeServer, box.getAttribute('data-poster') || '')}
         </div>
     `;
 }

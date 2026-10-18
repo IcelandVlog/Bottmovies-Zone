@@ -5410,16 +5410,21 @@ html.light-mode .suggestion-item .suggestion-year { color: #6b7280; }
     .watch-server-dot { width: 5px; height: 5px; }
 }
 
-/* Server 03 - alada tab-e khular panel */
+/* Server 03 - poster-er upor Watch button, click korle alada tab-e khulbe */
 .watch-server3-panel {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; min-height: 220px; padding: 24px; text-align: center;
-    background: #0b0d12; color: #c4cbd8; font-size: 14px;
+    position: relative; width: 100%; height: 100%; min-height: 220px;
+    display: flex; align-items: center; justify-content: center;
+    background-color: #0b0d12; background-size: cover; background-position: center;
+}
+.watch-server3-panel::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.45);
 }
 .watch-server3-open {
-    display: inline-block; padding: 10px 20px; border-radius: 999px;
+    position: relative; display: inline-flex; align-items: center; gap: 6px;
+    padding: 12px 26px; border-radius: 999px;
     background: linear-gradient(135deg, #b6f36a, #7ed321); color: #0b1a02;
-    font-weight: 800; font-size: 13px; text-decoration: none;
-    box-shadow: 0 4px 14px rgba(126, 211, 33, 0.3);
+    font-weight: 800; font-size: 15px; text-decoration: none;
+    box-shadow: 0 6px 20px rgba(126, 211, 33, 0.35);
 }
-.watch-server3-open:hover { filter: brightness(1.05); }
+.watch-server3-open:hover { filter: brightness(1.06); }
