@@ -1404,21 +1404,31 @@ function movieUrlBaseSlug(title) {
         .replace(/^-+|-+$/g, '');
 }
 // Ekই naam-er ekadhik content thakle "-<id>" jog kore alada kore deya hoy
+// Anime category-r content hole URL-e "anime" thakbe (series/movie na)
+function isAnimeMovie(movie) {
+    const cats = Array.isArray(movie.category)
+        ? movie.category
+        : (movie.category ? String(movie.category).split('|') : []);
+    return cats.some(c => {
+        const slug = String(c || '').trim().toLowerCase();
+        return slug === 'anime' || slug.startsWith('anime-');
+    });
+}
 function getMovieUrlPath(movie) {
     const list = Array.isArray(allMovies) ? allMovies : [];
     const base = movieUrlBaseSlug(stripYearSuffix(movie.title)) || String(movie.id);
     const dup = list.some(m => String(m.id) !== String(movie.id) && movieUrlBaseSlug(stripYearSuffix(m.title)) === base);
-    return {
-        kind: movie.tmdbType === 'tv' ? 'series' : 'movie',
-        slug: dup ? `${base}-${movie.id}` : base
-    };
+    let kind = 'movie';
+    if (isAnimeMovie(movie)) kind = 'anime';
+    else if (movie.tmdbType === 'tv') kind = 'series';
+    return { kind, slug: dup ? `${base}-${movie.id}` : base };
 }
 function findMovieByUrlSlug(slug) {
     const list = Array.isArray(allMovies) ? allMovies : [];
     return list.find(m => getMovieUrlPath(m).slug === slug) || null;
 }
 function isMoviePathname(pathname) {
-    return /^\/(movie|series)\/[^/]+\/?$/.test(pathname);
+    return /^\/(movie|series|anime)\/[^/]+\/?$/.test(pathname);
 }
 
 function setMovieModalUrlParam(movie) {
@@ -1432,8 +1442,8 @@ function setMovieModalUrlParam(movie) {
     params.delete('dashboard');
     params.delete('auth');
     const qs = params.toString();
-    const newUrl = target + (qs ? '?' + qs : '') + window.location.hash;
-    if (window.location.pathname + window.location.search + window.location.hash === newUrl) return;
+    const newUrl = target + (qs ? '?' + qs : ''); // hash (#anime) URL-e rakha hoy na
+    if (window.location.pathname + window.location.search === newUrl) return;
     history.replaceState(null, '', newUrl);
 }
 function clearMovieModalUrlParam() {
