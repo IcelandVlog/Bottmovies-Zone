@@ -5364,7 +5364,8 @@ html.light-mode .suggestion-item .suggestion-hl { color: #ea580c; }
     width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px;
     background: #1c202b; display: block;
 }
-.browse-card:hover img { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 2px #ff9f0a; }
+.browse-card:hover img { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 2px #7ed321; }
+html.light-mode .browse-card:hover img { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 2px #ff9f0a; }
 .browse-card-title {
     margin-top: 8px; font-size: 13px; font-weight: 700; color: #eceff1;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
