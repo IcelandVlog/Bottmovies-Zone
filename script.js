@@ -767,7 +767,7 @@ async function fetchMoviesFromSupabase() {
             if (legacyRoute) {
                 initialCategory = legacyRoute.category;
                 initialPage = legacyRoute.page;
-                history.replaceState(null, '', buildCategoryUrl(legacyRoute.category, legacyRoute.page));
+                safeSetUrl('replaceState', buildCategoryUrl(legacyRoute.category, legacyRoute.page));
             }
             switchCategory(initialCategory, initialPage);
             restoreMovieModalFromUrl(); // ?movie=<id> URL-e thakle (refresh) shei details page abar khule dao
@@ -861,6 +861,12 @@ function getHeroCategoryLabel(movie) {
 function stripYearSuffix(title) {
     const t = String(title || '');
     return t.replace(/\s*\(\s*\d{4}(?:\s*[-–]\s*\d{2,4})?\s*\)\s*$/, '').trim() || t;
+}
+// Card-er jonno year: movie.year theke 4-digit bochor, na thakle title-er shesh theke
+function getCardYearLabel(movie) {
+    const fromField = String(movie && movie.year != null ? movie.year : '').match(/\d{4}/);
+    if (fromField) return fromField[0];
+    return getYearFromTitle(movie && movie.title);
 }
 function getYearFromTitle(title) {
     const m = String(title || '').match(/\((\d{4}(?:-\d{2,4})?)\)\s*$/);
@@ -1427,6 +1433,13 @@ function findMovieByUrlSlug(slug) {
     return list.find(m => getMovieUrlPath(m).slug === slug) || null;
 }
 // ---------- Path-based category routing: /, /anime, /english-movies?page=2 ----------
+// Browser URL bodlanor safe wrapper. file:// (local-e index.html kholle) pathname bodlanо jay na,
+// tai sheshane URL bodlano skip hoy - nahole SecurityError-e switchCategory-r baki kaj (grid render) thame.
+function safeSetUrl(method, url) {
+    if (window.location.protocol === 'file:') return;
+    try { history[method](null, '', url); } catch (e) { console.warn('URL update skipped:', e && e.message); }
+}
+
 function categoryBasePath(category) {
     return (!category || category === 'all') ? '/' : '/' + encodeURIComponent(category);
 }
@@ -1440,6 +1453,8 @@ function buildCategoryUrl(category, page) {
 }
 // URL theke category/page pora. Movie details path hole null.
 function readCategoryFromLocation() {
+    // file:// (local index.html) hole file-er folder path-ke category bhabe na
+    if (window.location.protocol === 'file:') return { category: 'all', page: 1 };
     if (isMoviePathname(window.location.pathname)) return null;
     const seg = window.location.pathname.split('/').filter(Boolean);
     let category = seg.length ? decodeURIComponent(seg[0]) : 'all';
@@ -1481,7 +1496,7 @@ function setMovieModalUrlParam(movie) {
     const qs = params.toString();
     const newUrl = target + (qs ? '?' + qs : ''); // hash (#anime) URL-e rakha hoy na
     if (window.location.pathname + window.location.search === newUrl) return;
-    history.replaceState(null, '', newUrl);
+    safeSetUrl('replaceState', newUrl);
 }
 function clearMovieModalUrlParam() {
     const params = new URLSearchParams(window.location.search);
@@ -1491,7 +1506,7 @@ function clearMovieModalUrlParam() {
     const basePath = onMoviePath ? '/' : window.location.pathname;
     const qs = params.toString();
     const newUrl = basePath + (qs ? '?' + qs : '');
-    history.replaceState(null, '', newUrl);
+    safeSetUrl('replaceState', newUrl);
 }
 // Movies data load hওয়ার পর ekbar call kora hoy (fetchMoviesFromSupabase theke) -
 // URL-e "?movie=<id>" thakle (age kono details page khola obosthay refresh
@@ -2166,7 +2181,7 @@ function renderMoviesByPage(movies, page) {
     const pageUrlParams = new URLSearchParams(window.location.search);
     if (!pageUrlParams.has('dashboard') && !pageUrlParams.has('auth') && !isMoviePathname(window.location.pathname)) {
         const currentCategory = document.body.getAttribute('data-category') || 'all';
-        history.replaceState(null, '', buildCategoryUrl(currentCategory, page));
+        safeSetUrl('replaceState', buildCategoryUrl(currentCategory, page));
     }
 
     if (movies.length === 0) {
@@ -2200,7 +2215,7 @@ function renderMoviesByPage(movies, page) {
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
             <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${escapeAttr(stripYearSuffix(movie.title))}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
-        <div class="movie-details"><p class="movie-title">${serialNumber}. ${escapeHtml(stripYearSuffix(movie.title))}</p></div>
+        <div class="movie-details"><p class="movie-title">${serialNumber}. ${escapeHtml(stripYearSuffix(movie.title) || 'Untitled')}${getCardYearLabel(movie) ? ` <span class="movie-card-year">(${escapeHtml(getCardYearLabel(movie))})</span>` : ''}</p></div>
         `;
 
         card.addEventListener('click', () => openMovieModal(movie));
@@ -2575,7 +2590,7 @@ fastServersList.forEach((fs, fIdx) => {
                 <img src="${upgradePosterQuality(poster)}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
             </div>
             <div class="card-header-info">
-                <h1 class="card-movie-title">${title}</h1>
+                <h1 class="card-movie-title">${title}${getCardYearLabel(movie) ? ` <span class="movie-card-year">(${escapeHtml(getCardYearLabel(movie))})</span>` : ''}</h1>
                 <p class="card-tagline" id="modalTagline">${tagline}</p>
                 <p class="card-meta-subtitle">${genre} ${releaseDate !== "N/A" ? '| ' + releaseDate : ''}</p>                <div class="card-stats-row">
                     ${uploadedAtLabel ? `
@@ -2619,9 +2634,9 @@ fastServersList.forEach((fs, fIdx) => {
             </div>
         </div>
         <div class="download-info-section">
-            <div class="section-green-heading">Download ${title} Info:</div>
+            <div class="section-green-heading">Download ${escapeHtml(title)}${getCardYearLabel(movie) ? ' (' + escapeHtml(getCardYearLabel(movie)) + ')' : ''} Info:</div>
             <ul class="series-info-list">
-                <li>• <strong>Full Name:</strong> ${title}</li>
+                <li>• <strong>Full Name:</strong> ${escapeHtml(title)}${getCardYearLabel(movie) ? ' (' + escapeHtml(getCardYearLabel(movie)) + ')' : ''}</li>
                 <li>
                     <div class="clamped-text-box" id="audioLangText">• <strong>Audio:</strong> ${movie.languages || 'N/A'}</div>
                     <button type="button" class="toggle-more-btn" id="audioLangToggleBtn" onclick="toggleMoreLess('audioLangText','audioLangToggleBtn')">More</button>
@@ -3971,7 +3986,7 @@ function switchCategory(category, initialPage) {
     if (!isMoviePathname(window.location.pathname)) {
         const targetPath = categoryBasePath(category);
         if (window.location.pathname !== targetPath) {
-            history.pushState(null, '', targetPath);
+            safeSetUrl('pushState', targetPath);
         }
     }
 

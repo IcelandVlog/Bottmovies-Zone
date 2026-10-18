@@ -5394,3 +5394,7 @@ html.light-mode .browse-chip[aria-pressed="true"] { color: #0b0d12; }
     text-transform: uppercase; color: #ff9f0a;
 }
 html.light-mode .browse-kicker { color: #c2410c; }
+
+/* Card-er title-er pashe year (jemon "1. Alpha (2024)") */
+.movie-card-year { color: #9aa4b8; font-weight: 500; }
+html.light-mode .movie-card-year { color: #6b7280; }
