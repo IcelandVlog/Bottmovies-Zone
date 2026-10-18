@@ -9802,18 +9802,19 @@ function refreshWatchBulkServerUI() {
         return;
     }
     statusEl.classList.remove('warn');
-    const s2 = list.filter(m => Number(m.watchServer) === 2).length;
-    const s1 = list.length - s2;
+    const serverOf = m => [2, 3].includes(Number(m.watchServer)) ? Number(m.watchServer) : 1;
+    const s2 = list.filter(m => serverOf(m) === 2).length;
+    const s3 = list.filter(m => serverOf(m) === 3).length;
+    const s1 = list.length - s2 - s3;
     const manual = list.filter(m => m.watchServerManual === true).length;
     statusEl.textContent = list.length
-        ? ('Server 01: ' + s1 + '  |  Server 02: ' + s2 + (manual ? '  |  Manual: ' + manual : ''))
+        ? ('Server 01: ' + s1 + '  |  Server 02: ' + s2 + '  |  Server 03: ' + s3 + (manual ? '  |  Manual: ' + manual : ''))
         : '';
     // Bulk button active = every NON-manual title is on that server (manual titles keep their own choice)
     const auto = list.filter(m => m.watchServerManual !== true);
-    const a2 = auto.filter(m => Number(m.watchServer) === 2).length;
     btns.forEach(b => {
         const n = parseInt(b.getAttribute('data-server'), 10);
-        b.classList.toggle('active', auto.length > 0 && (n === 2 ? a2 === auto.length : a2 === 0));
+        b.classList.toggle('active', auto.length > 0 && auto.every(m => serverOf(m) === n));
     });
 }
 
