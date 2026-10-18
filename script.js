@@ -3851,6 +3851,15 @@ function markActiveNavTrail(link) {
     }
 }
 
+// "Browse by genre / OTT" ar "500K+ Movies & TV Shows" section sudhu home page-e (category 'all') dekhabe
+function updateBrowseSectionVisibility(category) {
+    const isHome = category === 'all';
+    ['browseTmdbSection', 'massiveWatchSection'].forEach(id => {
+        const sec = document.getElementById(id);
+        if (sec) sec.style.display = isHome ? '' : 'none';
+    });
+}
+
 function switchCategory(category, initialPage) {
     if (!category) return;
 
@@ -3868,6 +3877,7 @@ function switchCategory(category, initialPage) {
     });
 
     document.body.setAttribute('data-category', category);
+    updateBrowseSectionVisibility(category);
 
     updateNoticeBannerText(category, targetLink);
 
