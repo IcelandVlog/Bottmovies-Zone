@@ -3318,10 +3318,12 @@ function buildWatchServerBarHTML(box, active) {
 }
 // Player-er ভেতরের HTML. Server 03 (vidrift) -er jonno official snippet use kora hoy
 // (credentialless/referrerpolicy chara, 16:9 wrapper-e). Server 01/02 ager moto-i.
+// Server 03 (vidrift) site-er COEP setting-er karone iframe-e chalano jay na - tai alada tab-e khola hoy.
 function buildWatchPlayerInner(url, server) {
     if (server === 3) {
-        return `<div style="position:relative;padding-bottom:56.25%;height:0">
-            <iframe src="${escapeAttr(url)}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allowfullscreen allow="autoplay; fullscreen"></iframe>
+        return `<div class="watch-server3-panel">
+            <p>Server 03 alada tab-e khulbe.</p>
+            <a class="watch-server3-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">▶ Server 03 e Watch Korun</a>
         </div>`;
     }
     return `<iframe src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless></iframe>`;
@@ -3332,7 +3334,7 @@ function switchWatchServer(btnEl) {
     const rawServer = parseInt(btnEl.getAttribute('data-server'), 10);
     const server = (rawServer === 2 || rawServer === 3) ? rawServer : 1;
     const wrap = box.querySelector('.trailer-video-wrap');
-    if (!wrap || !wrap.querySelector('iframe')) return;
+    if (!wrap || !wrap.querySelector('iframe, .watch-server3-panel')) return;
     box.querySelectorAll('.watch-server-btn').forEach(b => b.classList.toggle('active', b === btnEl));
     wrap.innerHTML = buildWatchPlayerInner(getWatchServerUrl(box, server), server);
 }
