@@ -794,6 +794,9 @@ async function fetchMoviesFromSupabase() {
                 } else if (currentAdminTab === 'server') {
                     const searchInput = document.getElementById('adminServerSearchInput');
                     renderAdminServerList(searchInput ? searchInput.value.trim() : '');
+                } else if (currentAdminTab === 'original') {
+                    const searchInput = document.getElementById('adminOriginalSearchInput');
+                    renderAdminOriginalList(searchInput ? searchInput.value.trim() : '');
                 } else if (currentAdminTab === 'banner') {
                     const searchInput = document.getElementById('adminBannerSearchInput');
                     renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -1837,10 +1840,27 @@ async function fetchOriginalTitle(movie) {
 // jate purono kono content-o baad na pore ei feature theke. API rate-limit-e
 // giye jate quota shesh na hoy, tai ekta chhoto delay diye ekta ekta kore
 // call kora hocche (parallel na kore).
+// Details page-e main title-er niche "Original title: ..." line. Original title
+// main title-er sathe same hole (case-insensitive) dekhano hoy na.
+function buildOriginalTitleLineHTML(movie) {
+    const original = (movie && movie.originalTitle ? String(movie.originalTitle) : '').trim();
+    if (!original) return '';
+    const mainTitle = stripYearSuffix(movie.title || '').trim();
+    if (original.toLowerCase() === mainTitle.toLowerCase()) return '';
+    return `<p class="card-original-title">Original title: <span>${escapeHtml(original)}</span></p>`;
+}
+
+// Database + Original Title tab-er duita fetch button/status-i ekshathe update hoy
+const backfillStatusProxy = {
+    set textContent(v) {
+        document.querySelectorAll('.admin-backfill-status').forEach(el => { el.textContent = v; });
+    }
+};
+
 async function backfillOriginalTitles() {
-    const btn = document.getElementById('adminBackfillBtn');
-    const statusEl = document.getElementById('adminBackfillStatus');
-    if (!btn || !statusEl) return;
+    const btns = document.querySelectorAll('.admin-backfill-btn');
+    const statusEl = backfillStatusProxy;
+    if (!btns.length) return;
 
     const pending = (allMovies || []).filter(m => !m.deleted_at && !m.originalTitle);
     if (pending.length === 0) {
@@ -1848,7 +1868,7 @@ async function backfillOriginalTitles() {
         return;
     }
 
-    btn.disabled = true;
+    btns.forEach(b => { b.disabled = true; });
     let done = 0, updated = 0, failed = 0;
 
     for (const movie of pending) {
@@ -1870,8 +1890,9 @@ async function backfillOriginalTitles() {
         await new Promise(r => setTimeout(r, 250));
     }
 
-    btn.disabled = false;
+    btns.forEach(b => { b.disabled = false; });
     statusEl.textContent = `✅ Done. Checked ${done}, updated ${updated}${failed ? `, failed ${failed}` : ''}.`;
+    renderAdminOriginalList((document.getElementById('adminOriginalSearchInput') || {}).value || '');
 }
 
 async function fetchFullTMDBDetailsUncached(movie) {
@@ -2596,6 +2617,7 @@ fastServersList.forEach((fs, fIdx) => {
             </div>
             <div class="card-header-info">
                 <h1 class="card-movie-title">${title}${getCardYearLabel(movie) ? ` <span class="movie-card-year">(${escapeHtml(getCardYearLabel(movie))})</span>` : ''}</h1>
+                ${buildOriginalTitleLineHTML(movie)}
                 <p class="card-tagline" id="modalTagline">${tagline}</p>
                 <p class="card-meta-subtitle">${genre} ${releaseDate !== "N/A" ? '| ' + releaseDate : ''}</p>                <div class="card-stats-row">
                     ${uploadedAtLabel ? `
@@ -6563,6 +6585,7 @@ const ADMIN_TAB_TITLES = {
     trailer: 'Trailer / Teaser',
     watch: 'Watch Button',
     server: 'Server',
+    original: 'Original Title',
     banner: 'Hero Banner',
     navigation: 'Navigation Menu',
     comments: 'Comments',
@@ -6573,7 +6596,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'original', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -6602,6 +6625,9 @@ function switchAdminTab(tab) {
     } else if (validTab === 'server') {
         const searchInput = document.getElementById('adminServerSearchInput');
         renderAdminServerList(searchInput ? searchInput.value.trim() : '');
+    } else if (validTab === 'original') {
+        const searchInput = document.getElementById('adminOriginalSearchInput');
+        renderAdminOriginalList(searchInput ? searchInput.value.trim() : '');
     } else if (validTab === 'banner') {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -6773,6 +6799,13 @@ function setupAdminPanel() {
     if (adminServerSearchInput) {
         adminServerSearchInput.addEventListener('input', function() {
             renderAdminServerList(this.value.trim());
+        });
+    }
+
+    const adminOriginalSearchInput = document.getElementById('adminOriginalSearchInput');
+    if (adminOriginalSearchInput) {
+        adminOriginalSearchInput.addEventListener('input', function() {
+            renderAdminOriginalList(this.value.trim());
         });
     }
 
@@ -10403,6 +10436,85 @@ function renderAdminServerList(filter) {
     refreshWatchBulkServerUI();
 }
 
+
+// Original Title tab - content-er original title dekha, edit kora ar save kora
+function renderAdminOriginalList(filter) {
+    const container = document.getElementById('adminOriginalList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const q = (filter || '').toLowerCase().trim();
+    const source = Array.isArray(allMovies) ? allMovies.filter(m => !m.deleted_at) : [];
+    const filtered = q ? source.filter(m => {
+        const t = (m.title || '').toLowerCase();
+        const sn = (m.searchName || '').toLowerCase();
+        const o = (m.originalTitle || '').toLowerCase();
+        return t.includes(q) || sn.includes(q) || o.includes(q);
+    }) : source;
+
+    if (filtered.length === 0) {
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">No content found.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
+        return;
+    }
+
+    filtered.forEach(movie => {
+        const isTv = movie.tmdbType === 'tv';
+        const card = document.createElement('div');
+        card.className = 'admin-db-card admin-original-card';
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(stripYearSuffix(movie.title) || 'Untitled')}</div>
+                <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'}${movie.originalTitle ? '' : ' · original title not set'}</div>
+            </div>
+            <div class="admin-original-actions">
+                <input type="text" class="admin-original-input" placeholder="Original title..." value="${escapeAttr(movie.originalTitle || '')}">
+                <span class="admin-server-save-status" aria-live="polite"></span>
+            </div>
+        `;
+        // Auto save: type korar ektu pore (debounce) ba field chharle ba Enter chaple nijei save hoy
+        const input = card.querySelector('.admin-original-input');
+        const statusEl = card.querySelector('.admin-server-save-status');
+        let timer = null;
+        const autoSave = () => {
+            clearTimeout(timer);
+            saveAdminOriginalTitle(movie, input.value.trim(), statusEl);
+        };
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Typing...'; }
+            timer = setTimeout(autoSave, 900);
+        });
+        input.addEventListener('blur', autoSave);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); autoSave(); input.blur(); } });
+        container.appendChild(card);
+    });
+}
+
+async function saveAdminOriginalTitle(movie, value, statusEl) {
+    if (!movie || !movie.id) return false;
+    const next = value || null;
+    if ((movie.originalTitle || null) === next) {
+        if (statusEl) { statusEl.className = 'admin-server-save-status ok'; statusEl.textContent = 'Saved'; }
+        return true;
+    }
+    if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Saving...'; }
+    try {
+        const { error } = await supabaseClient.from('movies').update({ originalTitle: next }).eq('id', movie.id);
+        if (error) throw error;
+        movie.originalTitle = next;
+        if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Saved'; }
+        showToast('Original title saved for "' + (movie.title || 'this item') + '"');
+        return true;
+    } catch (err) {
+        console.error('Save original title error:', err);
+        if (statusEl) { statusEl.classList.add('err'); statusEl.textContent = 'Failed'; }
+        showToast('Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        return false;
+    }
+}
 
 function renderAdminBannerList(filter) {
     const container = document.getElementById('adminBannerList');

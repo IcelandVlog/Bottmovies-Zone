@@ -5474,3 +5474,23 @@ body.upcoming-trailer-open { overflow: hidden; }
 /* Light mode-e upcoming badge + Trailer label orange */
 html.light-mode .upcoming-badge { background: #ea580c; color: #fff; }
 html.light-mode .upcoming-trailer-label { color: #fb923c; }
+
+/* Details page: main title-er niche original title (label white, naam halka color) */
+.card-original-title { margin: 2px 0 0; font-size: 14px; color: #ffffff; }
+.card-original-title span { color: #9aa4b8; font-style: italic; }
+html.light-mode .card-original-title { color: #14161c; }
+html.light-mode .card-original-title span { color: #6b7280; }
+/* Main title-er sathe (year) ektu kacher-e thakbe - space kom */
+.card-movie-title .movie-card-year { margin-left: -0.3em; }
+
+/* Admin Original Title tab */
+.admin-original-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.admin-original-input {
+    width: 260px; max-width: 100%; height: 34px; padding: 0 10px; border-radius: 8px;
+    border: 1px solid #2a3142; background: #111521; color: #eceff1; font-size: 13px;
+}
+.admin-original-input:focus { outline: none; border-color: #7ed321; }
+@media (max-width: 600px) {
+    .admin-original-actions { width: 100%; margin-left: 0; }
+    .admin-original-input { flex: 1; width: auto; }
+}

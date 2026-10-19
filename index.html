@@ -533,6 +533,7 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                 <button type="button" class="admin-nav-btn" id="adminNavBtnTrailer" onclick="switchAdminTab('trailer')">🎬 <span>Trailer / Teaser</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnWatch" onclick="switchAdminTab('watch')">▶️ <span>Watch Button</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnServer" onclick="switchAdminTab('server')">🖥️ <span>Server</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnOriginal" onclick="switchAdminTab('original')">🔤 <span>Original Title</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎞️ <span>Hero Banner</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnNavigation" onclick="switchAdminTab('navigation')">🧭 <span>Navigation</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
@@ -744,6 +745,18 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                         <input type="text" id="adminWatchSearchInput" placeholder="🔍 Search content to add/edit Watch Button...">
                     </div>
                     <div class="admin-database-list" id="adminWatchList"></div>
+                </div>
+
+                <!-- ORIGINAL TITLE TAB (details page-e main title-er niche original title dekhay; ekhane dekha / edit / fetch kora jay) -->
+                <div class="admin-tab-content" id="adminTabOriginal" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminOriginalSearchInput" placeholder="🔍 Search content to set its original title...">
+                    </div>
+                    <div class="admin-backfill-box">
+                        <button type="button" class="admin-backfill-btn admin-original-fetch-btn" onclick="backfillOriginalTitles()">🔄 Fetch Original Titles For Existing Content</button>
+                        <div class="admin-backfill-status admin-original-status"></div>
+                    </div>
+                    <div class="admin-database-list" id="adminOriginalList"></div>
                 </div>
 
                 <!-- SERVER TAB (choose which server is the DEFAULT in the "Online Watch" player: Server 01 or Server 02 - for each title, or for all titles at once) -->
