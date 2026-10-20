@@ -96,29 +96,6 @@
 
     .page-subtitle { font-size: 24px; color: var(--danger-color); font-weight: normal; margin: 0; }
 
-    /* BN/EN Toggle - segmented control, active side is highlighted */
-    .lang-toggle-group {
-        display: flex;
-        background-color: var(--lang-btn-bg);
-        border: 1px solid var(--lang-btn-border);
-        border-radius: 20px;
-        padding: 3px;
-        gap: 2px;
-    }
-    .lang-toggle-option {
-        background: transparent;
-        border: none;
-        color: var(--text-muted);
-        padding: 7px 16px;
-        border-radius: 16px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 13px;
-        transition: background 0.2s, color 0.2s;
-    }
-    .lang-toggle-option:hover { color: var(--text-strong); }
-    .lang-toggle-option.active { background-color: var(--accent-color); color: #ffffff; }
-
     /* Step Card Styles */
     .step-card {
         background-color: var(--card-bg);
@@ -519,16 +496,12 @@
     <!-- Section Header with Subtitle and BN/EN Button -->
     <div class="section-header-flex">
         <h2 class="page-subtitle" id="pageSubtitle">Steps to Download:</h2>
-        <div class="lang-toggle-group" id="langToggleGroup">
-            <button type="button" class="lang-toggle-option active" data-lang="en" onclick="setLanguage('en')">EN</button>
-            <button type="button" class="lang-toggle-option" data-lang="bn" onclick="setLanguage('bn')">বাং</button>
-        </div>
     </div>
 
     <!-- Steps Container -->
     <div id="steps-container">
         <div class="step-card" data-step="1">
-            <div class="step-text" data-en="▪ <strong>Step 1:</strong> First, from the specific content page on the bottmovies site, click on the download link button to click on <strong>Download File / Zip</strong> or copy the link." data-bn="▪ <strong>ধাপ ১:</strong> প্রথমে bottmovies সাইটের নির্দিষ্ট কন্টেন্ট পেজ থেকে download link বাটনে ক্লিক করে <strong>Download File / Zip</strong> অথবা Copy Link অপশনে ক্লিক করতে হবে।">
+            <div class="step-text">
                 ▪ <strong>Step 1:</strong> First, from the specific content page on the bottmovies site, click on the download link button to click on <strong>Download File / Zip</strong> or copy the link.
             </div>
             <div class="step-image-container">
@@ -537,7 +510,7 @@
         </div>
 
         <div class="step-card" data-step="2">
-            <div class="step-text" data-en="▪ <strong>Step 2:</strong> If you clicked the download file/zip button, you need to copy the terabox link from your browser." data-bn="▪ <strong>ধাপ ২:</strong> যদি download file/zip বাটনে ক্লিক করেন তাহলে ব্রাউজার থেকে terabox লিংক কপি করতে হবে।">
+            <div class="step-text">
                 ▪ <strong>Step 2:</strong> If you clicked the download file/zip button, you need to copy the terabox link from your browser.
             </div>
             <div class="step-image-container">
@@ -546,7 +519,7 @@
         </div>
 
         <div class="step-card" data-step="3">
-            <div class="step-text" data-en="▪ <strong>Step 3:</strong> Go back to the bottmovies website, navigate to that content again, click the <strong>server-1</strong> or <strong>server-2</strong> button, and then click the <strong>downloader web</strong> button." data-bn="▪ <strong>ধাপ ৩:</strong> আবার bottmovies ওয়েবসাইটে গিয়ে ওই কন্টেন্ট থেকে <strong>server-1</strong> অথবা <strong>server-2</strong> বাটনে ক্লিক করে <strong>downloader web</strong> বাটনে ক্লিক করতে হবে।">
+            <div class="step-text">
                 ▪ <strong>Step 3:</strong> Go back to the bottmovies website, navigate to that content again, click the <strong>server-1</strong> or <strong>server-2</strong> button, and then click the <strong>downloader web</strong> button.
             </div>
             <div class="step-image-container">
@@ -555,7 +528,7 @@
         </div>
 
         <div class="step-card" data-step="4">
-            <div class="step-text" data-en="▪ <strong>Step 4:</strong> Now, paste the copied url/link and click the <strong>download</strong> button." data-bn="▪ <strong>ধাপ ৪:</strong> কপি করা url/link টা এখন পেস্ট করে <strong>download</strong> বাটনে ক্লিক করতে হবে।">
+            <div class="step-text">
                 ▪ <strong>Step 4:</strong> Now, paste the copied url/link and click the <strong>download</strong> button.
             </div>
             <div class="step-image-container">
@@ -564,7 +537,7 @@
         </div>
 
         <div class="step-card" data-step="5">
-            <div class="step-text" data-en="▪ <strong>Step 5:</strong> After clicking the download button, the link will be processed. Click on <strong>download file</strong> below to start your download." data-bn="▪ <strong>ধাপ ৫:</strong> download বাটনে ক্লিক করার পরে লিংক প্রসেস হয়ে নিচে <strong>download file</strong> এ ক্লিক করলে ডাউনলোড শুরু হয়ে যাবে।">
+            <div class="step-text">
                 ▪ <strong>Step 5:</strong> After clicking the download button, the link will be processed. Click on <strong>Download</strong> below to start your download.
             </div>
             <div class="step-image-container">
@@ -573,7 +546,7 @@
         </div>
     </div>
 
-    <div class="note-text" id="noteText" data-en="Note, if you face any Problem please comment down." data-bn="নোটঃ কোনো সমস্যা হলে নিচে কমেন্ট করুন।">
+    <div class="note-text" id="noteText">
         Note, if you face any Problem please comment down.
     </div>
 </main>
@@ -663,46 +636,6 @@
 </div>
 
 <script>
-    /* =========================================
-       LANGUAGE TOGGLE LOGIC
-       ========================================= */
-    let currentLang = 'en';
-
-    function setLanguage(lang) {
-        if (lang !== 'bn' && lang !== 'en') return;
-        currentLang = lang;
-
-        document.querySelectorAll('.lang-toggle-option').forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('data-lang') === currentLang);
-        });
-
-        const pageTitle = document.getElementById('pageTitle');
-        const pageSubtitle = document.getElementById('pageSubtitle');
-        const breadcrumbText = document.getElementById('breadcrumbText');
-        const noteText = document.getElementById('noteText');
-
-        if (currentLang === 'bn') {
-            pageTitle.innerText = "কীভাবে ডাউনলোড করবেন।";
-            pageSubtitle.innerText = "ডাউনলোড করার নিয়ম:";
-            breadcrumbText.innerHTML = '<a href="index.html">হোম</a> » <span class="breadcrumb-current">কীভাবে ডাউনলোড করবেন</span> » <a href="report-broken-links.html">রিপোর্ট ব্রোকেন লিংকস</a>';
-            noteText.innerHTML = noteText.getAttribute('data-bn');
-        } else {
-            pageTitle.innerText = "How to Download.";
-            pageSubtitle.innerText = "Steps to Download:";
-            breadcrumbText.innerHTML = '<a href="index.html">Home</a> » <span class="breadcrumb-current">How to Download</span> » <a href="report-broken-links.html">Report Broken Links</a>';
-            noteText.innerHTML = noteText.getAttribute('data-en');
-        }
-
-        const stepTexts = document.querySelectorAll('.step-text');
-        stepTexts.forEach(el => {
-            if (currentLang === 'bn') {
-                el.innerHTML = el.getAttribute('data-bn');
-            } else {
-                el.innerHTML = el.getAttribute('data-en');
-            }
-        });
-    }
-
     /* =========================================
        LIGHT / DARK THEME TOGGLE
        ========================================= */

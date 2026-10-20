@@ -96,29 +96,6 @@
 
     .page-subtitle { font-size: 24px; color: var(--danger-color); font-weight: normal; margin: 0; }
 
-    /* BN/EN Toggle - segmented control, active side is highlighted */
-    .lang-toggle-group {
-        display: flex;
-        background-color: var(--lang-btn-bg);
-        border: 1px solid var(--lang-btn-border);
-        border-radius: 20px;
-        padding: 3px;
-        gap: 2px;
-    }
-    .lang-toggle-option {
-        background: transparent;
-        border: none;
-        color: var(--text-muted);
-        padding: 7px 16px;
-        border-radius: 16px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 13px;
-        transition: background 0.2s, color 0.2s;
-    }
-    .lang-toggle-option:hover { color: var(--text-strong); }
-    .lang-toggle-option.active { background-color: var(--accent-color); color: #ffffff; }
-
     /* Step Card Styles */
     .step-card {
         background-color: var(--card-bg);
@@ -604,51 +581,47 @@
     <!-- Section Header with Subtitle and BN/EN Button -->
     <div class="section-header-flex">
         <h2 class="page-subtitle" id="pageSubtitle">How to Report:</h2>
-        <div class="lang-toggle-group" id="langToggleGroup">
-            <button type="button" class="lang-toggle-option active" data-lang="en" onclick="setLanguage('en')">EN</button>
-            <button type="button" class="lang-toggle-option" data-lang="bn" onclick="setLanguage('bn')">বাং</button>
-        </div>
     </div>
 
     <!-- Steps Container -->
     <div id="steps-container">
         <div class="step-card" data-step="1">
-            <div class="step-text" data-en="▪ <strong>Step 1:</strong> Make sure the link is really broken - refresh the page or try a different browser first." data-bn="▪ <strong>ধাপ ১:</strong> প্রথমে নিশ্চিত হন লিংকটি সত্যিই কাজ করছে না - পেজ রিফ্রেশ করে বা অন্য ব্রাউজারে চেষ্টা করে দেখুন।">
+            <div class="step-text">
                 ▪ <strong>Step 1:</strong> Make sure the link is really broken - refresh the page or try a different browser first.
             </div>
         </div>
 
         <div class="step-card" data-step="2">
-            <div class="step-text" data-en="▪ <strong>Step 2:</strong> Copy the full download link URL from the movie/series page." data-bn="▪ <strong>ধাপ ২:</strong> মুভি/সিরিজ পেজ থেকে ভাঙা ডাউনলোড লিংকের সম্পূর্ণ URL টি কপি করুন।">
+            <div class="step-text">
                 ▪ <strong>Step 2:</strong> Copy the full download link URL from the movie/series page.
             </div>
         </div>
 
         <div class="step-card" data-step="3">
-            <div class="step-text" data-en="▪ <strong>Step 3:</strong> Write down exactly what's wrong - for example: won't play, black screen, or link not found." data-bn="▪ <strong>ধাপ ৩:</strong> ঠিক কী সমস্যা হচ্ছে তা লিখুন - যেমন: ভিডিও লোড হচ্ছে না, শুধু কালো স্ক্রিন দেখাচ্ছে, বা লিংক পাওয়া যাচ্ছে না।">
+            <div class="step-text">
                 ▪ <strong>Step 3:</strong> Write down exactly what's wrong - for example: won't play, black screen, or link not found.
             </div>
         </div>
 
         <div class="step-card" data-step="4">
-            <div class="step-text" data-en="▪ <strong>Step 4:</strong> Mention it in this format:" data-bn="▪ <strong>ধাপ ৪:</strong> নিচের ফরম্যাটে উল্লেখ করুন:">
+            <div class="step-text">
                 ▪ <strong>Step 4:</strong> Mention it in this format:
             </div>
             <ul class="step-text" id="formatList">
-                <li data-en="Movie / Series Name (with the year) [ Season and Episode, if series ]" data-bn="Movie / Series Name (সাথে সাল) [ Season ও Episode নাম্বার, যদি সিরিজ হয় ]">Movie / Series Name (with the year) [ Season and Episode, if series ]</li>
-                <li data-en="Print Type (e.g. 480p, 720p or 1080p)" data-bn="Print Type (যেমন - 480p, 720p বা 1080p)">Print Type (e.g. 480p, 720p or 1080p)</li>
-                <li data-en="Link Type (Gdrive, Fast Server, Direct Download, Resume Download)" data-bn="Link Type (Gdrive, Fast Server, Direct Download, Resume Download)">Link Type (Gdrive, Fast Server, Direct Download, Resume Download)</li>
+                <li>Movie / Series Name (with the year) [ Season and Episode, if series ]</li>
+                <li>Print Type (e.g. 480p, 720p or 1080p)</li>
+                <li>Link Type (Gdrive, Fast Server, Direct Download, Resume Download)</li>
             </ul>
         </div>
 
         <div class="step-card" data-step="5">
-            <div class="step-text" data-en="▪ <strong>Step 5:</strong> Fill out the report form below and submit - no email needed. We usually fix it within 24-48 hours." data-bn="▪ <strong>ধাপ ৫:</strong> নিচের রিপোর্ট ফর্মটি পূরণ করে সাবমিট করুন - কোনো ইমেইল লাগবে না। সাধারণত ২৪-৪৮ ঘণ্টার মধ্যে লিংক ঠিক করা হয়।">
+            <div class="step-text">
                 ▪ <strong>Step 5:</strong> Fill out the report form below and submit - no email needed. We usually fix it within 24-48 hours.
             </div>
         </div>
     </div>
 
-    <div class="note-text" id="noteText" data-en="Note, if you face any Problem please use the report form below." data-bn="নোটঃ কোনো সমস্যা হলে নিচের রিপোর্ট ফর্মটি ব্যবহার করুন।">
+    <div class="note-text" id="noteText">
         Note, if you face any Problem please use the report form below.
     </div>
 
@@ -774,82 +747,6 @@
 </div>
 
 <script>
-    /* =========================================
-       LANGUAGE TOGGLE LOGIC
-       ========================================= */
-    let currentLang = 'en';
-
-    function setLanguage(lang) {
-        if (lang !== 'bn' && lang !== 'en') return;
-        currentLang = lang;
-
-        document.querySelectorAll('.lang-toggle-option').forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('data-lang') === currentLang);
-        });
-
-        const pageTitle = document.getElementById('pageTitle');
-        const pageSubtitle = document.getElementById('pageSubtitle');
-        const breadcrumbText = document.getElementById('breadcrumbText');
-        const noteText = document.getElementById('noteText');
-        const rcComposerTitle = document.getElementById('rcComposerTitle');
-        const rcComposerText = document.getElementById('rcComposerText');
-        const rcComposerName = document.getElementById('rcComposerName');
-        const rcComposerSubmitBtn = document.getElementById('rcComposerSubmitBtn');
-        const brFormTitle = document.getElementById('brFormTitle');
-        const brMovieInput = document.getElementById('brMovieInput');
-        const brQualitySelect = document.getElementById('brQualitySelect');
-        const brLinkTypeSelect = document.getElementById('brLinkTypeSelect');
-        const brLinkUrlInput = document.getElementById('brLinkUrlInput');
-        const brProblemText = document.getElementById('brProblemText');
-        const brNameInput = document.getElementById('brNameInput');
-        const brSubmitBtn = document.getElementById('brSubmitBtn');
-
-        if (currentLang === 'bn') {
-            pageTitle.innerText = "রিপোর্ট ব্রোকেন লিংকস।";
-            pageSubtitle.innerText = "রিপোর্ট করার নিয়ম:";
-            breadcrumbText.innerHTML = '<a href="index.html">হোম</a> » <a href="How-to-Download.html">কীভাবে ডাউনলোড করবেন</a> » <span class="breadcrumb-current">রিপোর্ট ব্রোকেন লিংকস</span>';
-            noteText.innerHTML = noteText.getAttribute('data-bn');
-            if (rcComposerTitle) rcComposerTitle.innerText = "কমেন্ট যোগ করুন";
-            if (rcComposerText) rcComposerText.placeholder = "কমেন্ট টেক্সট*";
-            if (rcComposerName) rcComposerName.placeholder = "নাম*";
-            if (rcComposerSubmitBtn) rcComposerSubmitBtn.innerText = "কমেন্ট সাবমিট করুন";
-            if (brFormTitle) brFormTitle.innerText = "🔔 ব্রোকেন লিংক রিপোর্ট করুন";
-            if (brMovieInput) brMovieInput.placeholder = "মুভি / সিরিজের নাম*";
-            if (brQualitySelect && brQualitySelect.options[0]) brQualitySelect.options[0].text = "প্রিন্ট টাইপ (ঐচ্ছিক)";
-            if (brLinkTypeSelect && brLinkTypeSelect.options[0]) brLinkTypeSelect.options[0].text = "লিংক টাইপ (ঐচ্ছিক)";
-            if (brLinkUrlInput) brLinkUrlInput.placeholder = "ব্রোকেন লিংকের URL (ঐচ্ছিক)";
-            if (brProblemText) brProblemText.placeholder = "কী সমস্যা হচ্ছে? (যেমন: চলছে না, কালো স্ক্রিন, লিংক পাওয়া যাচ্ছে না)*";
-            if (brNameInput) brNameInput.placeholder = "আপনার নাম (ঐচ্ছিক)";
-            if (brSubmitBtn) brSubmitBtn.innerText = "রিপোর্ট সাবমিট করুন";
-        } else {
-            pageTitle.innerText = "Report Broken Links.";
-            pageSubtitle.innerText = "How to Report:";
-            breadcrumbText.innerHTML = '<a href="index.html">Home</a> » <a href="How-to-Download.html">How to Download</a> » <span class="breadcrumb-current">Report Broken Links</span>';
-            noteText.innerHTML = noteText.getAttribute('data-en');
-            if (rcComposerTitle) rcComposerTitle.innerText = "ADD COMMENT";
-            if (rcComposerText) rcComposerText.placeholder = "Comment Text*";
-            if (rcComposerName) rcComposerName.placeholder = "Name*";
-            if (rcComposerSubmitBtn) rcComposerSubmitBtn.innerText = "SUBMIT COMMENT";
-            if (brFormTitle) brFormTitle.innerText = "🔔 Report a Broken Link";
-            if (brMovieInput) brMovieInput.placeholder = "Movie / Series Name*";
-            if (brQualitySelect && brQualitySelect.options[0]) brQualitySelect.options[0].text = "Print Type (optional)";
-            if (brLinkTypeSelect && brLinkTypeSelect.options[0]) brLinkTypeSelect.options[0].text = "Link Type (optional)";
-            if (brLinkUrlInput) brLinkUrlInput.placeholder = "Broken Link URL (optional)";
-            if (brProblemText) brProblemText.placeholder = "What's wrong? (e.g. won't play, black screen, link not found)*";
-            if (brNameInput) brNameInput.placeholder = "Your Name (optional)";
-            if (brSubmitBtn) brSubmitBtn.innerText = "SUBMIT REPORT";
-        }
-
-        document.querySelectorAll('.step-text').forEach(el => {
-            if (el.hasAttribute('data-bn') || el.hasAttribute('data-en')) {
-                el.innerHTML = el.getAttribute(currentLang === 'bn' ? 'data-bn' : 'data-en');
-            }
-        });
-        document.querySelectorAll('#formatList li').forEach(el => {
-            el.innerText = el.getAttribute(currentLang === 'bn' ? 'data-bn' : 'data-en');
-        });
-    }
-
     /* =========================================
        LIGHT / DARK THEME TOGGLE
        ========================================= */
@@ -1379,7 +1276,7 @@
             console.error('Reply error:', error);
             btn.disabled = false;
             btn.textContent = 'Reply';
-            alert("দুঃখিত, রিপ্লাই পোস্ট করা যায়নি। একটু পর আবার চেষ্টা করুন।");
+            alert("Sorry, the reply could not be posted. Please try again shortly.");
             return;
         }
 
@@ -1399,8 +1296,8 @@
         const name = (nameInput.value || '').trim().slice(0, 40);
         const text = (textInput.value || '').trim();
 
-        if (!name) { if (msgEl) { msgEl.textContent = 'অনুগ্রহ করে আপনার নাম লিখুন।'; msgEl.className = 'rc-form-msg'; } nameInput.focus(); return; }
-        if (!text) { if (msgEl) { msgEl.textContent = 'অনুগ্রহ করে কমেন্ট লিখুন।'; msgEl.className = 'rc-form-msg'; } textInput.focus(); return; }
+        if (!name) { if (msgEl) { msgEl.textContent = 'Please enter your name.'; msgEl.className = 'rc-form-msg'; } nameInput.focus(); return; }
+        if (!text) { if (msgEl) { msgEl.textContent = 'Please enter a comment.'; msgEl.className = 'rc-form-msg'; } textInput.focus(); return; }
 
         btn.disabled = true;
         btn.textContent = 'Posting…';
@@ -1415,13 +1312,13 @@
 
         if (error) {
             console.error('Submit report comment error:', error);
-            if (msgEl) { msgEl.textContent = 'দুঃখিত, পোস্ট করা যায়নি। একটু পর আবার চেষ্টা করুন।'; msgEl.className = 'rc-form-msg'; }
+            if (msgEl) { msgEl.textContent = 'Sorry, the comment could not be posted. Please try again shortly.'; msgEl.className = 'rc-form-msg'; }
             return;
         }
 
         lastGuestName = name;
         textInput.value = '';
-        if (msgEl) { msgEl.textContent = 'ধন্যবাদ, আপনার রিপোর্ট পোস্ট হয়েছে!'; msgEl.className = 'rc-form-msg success'; }
+        if (msgEl) { msgEl.textContent = 'Thanks, your report has been posted!'; msgEl.className = 'rc-form-msg success'; }
 
         const listEl = document.getElementById('rcList');
         if (listEl && data && data[0]) {
@@ -1480,11 +1377,11 @@
         const problem = (problemText.value || '').trim();
         const reporterName = (nameInput.value || '').trim().slice(0, 40);
 
-        if (!movieTitle) { showBrMsg(currentLang === 'bn' ? 'অনুগ্রহ করে মুভি/সিরিজের নাম লিখুন।' : 'Please enter the movie/series name.'); movieInput.focus(); return; }
-        if (!problem) { showBrMsg(currentLang === 'bn' ? 'অনুগ্রহ করে সমস্যাটি লিখুন।' : "Please describe what's wrong."); problemText.focus(); return; }
+        if (!movieTitle) { showBrMsg('Please enter the movie/series name.'); movieInput.focus(); return; }
+        if (!problem) { showBrMsg("Please describe what's wrong."); problemText.focus(); return; }
 
         btn.disabled = true;
-        btn.textContent = currentLang === 'bn' ? 'পাঠানো হচ্ছে…' : 'Submitting…';
+        btn.textContent = 'Submitting…';
         showBrMsg('');
 
         const matchedId = movieTitleMap[movieTitle.toLowerCase()] || null;
@@ -1503,12 +1400,12 @@
         }]);
 
         btn.disabled = false;
-        btn.textContent = currentLang === 'bn' ? 'রিপোর্ট সাবমিট করুন' : 'SUBMIT REPORT';
+        btn.textContent = 'SUBMIT REPORT';
 
         if (error) {
             console.error('Submit broken link report error:', error);
             const detail = error.message ? ` (${error.message})` : '';
-            showBrMsg((currentLang === 'bn' ? 'দুঃখিত, রিপোর্ট পাঠানো যায়নি। একটু পর আবার চেষ্টা করুন।' : "Sorry, couldn't submit the report. Please try again shortly.") + detail);
+            showBrMsg(("Sorry, couldn't submit the report. Please try again shortly.") + detail);
             return;
         }
 
@@ -1517,7 +1414,7 @@
         linkTypeSelect.value = '';
         urlInput.value = '';
         problemText.value = '';
-        showBrMsg(currentLang === 'bn' ? 'ধন্যবাদ! আপনার রিপোর্ট admin এর কাছে পৌঁছে গেছে।' : 'Thanks! Your report has been sent to the admin.', true);
+        showBrMsg('Thanks! Your report has been sent to the admin.', true);
     };
 
     async function init() {

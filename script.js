@@ -3755,7 +3755,7 @@ function openUpcomingTrailer(box) {
         } catch (e) { key = null; }
         if (reqId !== upcomingTrailerRequestId) return;
         if (!key) {
-            bodyEl.innerHTML = '<div class="upcoming-trailer-msg">Trailer ekhono paoa jay nai.</div>';
+            bodyEl.innerHTML = '<div class="upcoming-trailer-msg">Trailer is not available yet.</div>';
             return;
         }
         const embedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&rel=0`;
@@ -5324,7 +5324,7 @@ async function regenerateSignupUsername(btn) {
     // Full Name আর Email দুটোই খালি থাকলে suggest করার মতো কিছু নেই - "user123" এর মতো
     // ভিত্তিহীন random নাম না বসিয়ে ইউজারকে জানিয়ে দাও
     if (!(nameInput?.value || '').trim() && !(emailInput?.value || '').trim()) {
-        if (msgEl) { msgEl.textContent = 'Username সাজেস্ট করতে আগে Full Name অথবা Email লিখুন।'; msgEl.className = 'auth-field-msg'; }
+        if (msgEl) { msgEl.textContent = 'Please enter your Full Name or Email first to suggest a username.'; msgEl.className = 'auth-field-msg'; }
         return;
     }
     if (btn) btn.classList.add('spinning');
@@ -5343,7 +5343,7 @@ async function regenerateDashboardUsername(btn) {
     const msgEl = document.getElementById('userDashUsernameMsg');
     if (!usernameInput) return;
     if (!(nameInput?.value || '').trim() && !(emailInput?.value || '').trim()) {
-        if (msgEl) { msgEl.textContent = 'Username সাজেস্ট করতে আগে Full Name অথবা Email লিখুন।'; msgEl.className = 'auth-field-msg'; }
+        if (msgEl) { msgEl.textContent = 'Please enter your Full Name or Email first to suggest a username.'; msgEl.className = 'auth-field-msg'; }
         return;
     }
     if (btn) btn.classList.add('spinning');
@@ -7841,13 +7841,13 @@ async function renameAdminCategory(oldSlug) {
     const typed = await showPromptModal('Rename category "' + escapeHtml(oldSlug) + '" to:', oldSlug);
     if (typed === null) return;
     const newSlug = normalizeCategorySlug(slugifyCategory(typed));
-    if (!newSlug) { showToast('❌ Category name lekha lagbe', 'error'); return; }
+    if (!newSlug) { showToast('❌ Category name is required', 'error'); return; }
     if (newSlug === oldSlug) return;
 
     const mergingIntoExisting = getAllKnownCategories().includes(newSlug);
     if (mergingIntoExisting) {
         const merge = await showConfirmModal(
-            `"${escapeHtml(newSlug)}" already ache. "${escapeHtml(oldSlug)}"-ke er sathe merge korte chao? Shob movie-r tag update hoye jabe.`,
+            `"${escapeHtml(newSlug)}" already exists. Do you want to merge "${escapeHtml(oldSlug)}" into it? All movie tags will be updated.`,
             { confirmText: 'Merge', danger: false }
         );
         if (!merge) return;
@@ -7885,7 +7885,7 @@ async function renameAdminCategory(oldSlug) {
 
         renderAdminCategoryBox();
         refreshAdminCategoryBannerListIfVisible();
-        showToast(`✅ "${oldSlug}" ke "${newSlug}" e rename kora hoyeche (${affectedMovies.length}টা title update hoyeche)`);
+        showToast(`✅ Renamed "${oldSlug}" to "${newSlug}" (${affectedMovies.length} title(s) updated)`);
     } catch (err) {
         console.error('renameAdminCategory error:', err);
         showToast('❌ Rename failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
@@ -7896,8 +7896,8 @@ async function renameAdminCategory(oldSlug) {
 async function deleteAdminCategory(slug) {
     const affectedMovies = (Array.isArray(allMovies) ? allMovies : []).filter(m => Array.isArray(m.category) && m.category.includes(slug));
     const warnMsg = affectedMovies.length
-        ? `"${escapeHtml(slug)}" category ${affectedMovies.length}টা title theke remove hobe (title gulo delete hobe na, shudhu category tag ta uthe jabe). Continue?`
-        : `"${escapeHtml(slug)}" category delete korte chao?`;
+        ? `The "${escapeHtml(slug)}" category will be removed from ${affectedMovies.length} title(s) (titles are not deleted, only the category tag is removed). Continue?`
+        : `Do you want to delete the "${escapeHtml(slug)}" category?`;
     const confirmed = await showConfirmModal(warnMsg, { confirmText: 'Delete', danger: true });
     if (!confirmed) return;
 
@@ -7923,7 +7923,7 @@ async function deleteAdminCategory(slug) {
 
         renderAdminCategoryBox();
         refreshAdminCategoryBannerListIfVisible();
-        showToast(`✅ "${slug}" category delete kora hoyeche`, null, {
+        showToast(`✅ "${slug}" category deleted`, null, {
             actionLabel: '↩ Undo',
             duration: 8000,
             onAction: () => undoDeleteAdminCategory(slug, snapshot, bannerLabelSnapshot)
@@ -7953,7 +7953,7 @@ async function undoDeleteAdminCategory(slug, snapshot, bannerLabel) {
         if (bannerLabel) categoryBannerLabels[slug] = bannerLabel;
         renderAdminCategoryBox();
         refreshAdminCategoryBannerListIfVisible();
-        showToast(`✅ "${slug}" category firiye ana hoyeche`);
+        showToast(`✅ "${slug}" category restored`);
     } catch (err) {
         console.error('undoDeleteAdminCategory error:', err);
         showToast('❌ Undo failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
@@ -8037,7 +8037,7 @@ async function saveCategoryBannerLabel(slug, label, btn) {
                 if (insErr.code === '23505') {
                     // Row already ache, tao update-e 0 count — mane row update
                     // korar RLS policy nai (SELECT policy thakleo UPDATE policy alada)
-                    throw new Error('Row ache kintu update hocche na — Supabase-e "categories" table-er UPDATE policy check korun (RLS)');
+                    throw new Error('Row exists but the update did not apply — please check the UPDATE policy on the "categories" table in Supabase (RLS)');
                 }
                 throw insErr;
             }
@@ -8058,7 +8058,7 @@ async function saveCategoryBannerLabel(slug, label, btn) {
     } catch (err) {
         console.error('saveCategoryBannerLabel error:', err);
         if (btn) { btn.disabled = false; btn.textContent = '⚠️ Retry'; }
-        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error') + ' — Supabase-e "categories" table-er RLS (Row Level Security) UPDATE policy check korun', 'error');
+        showToast('❌ Save failed: ' + (err && err.message ? err.message : 'Unknown error') + ' — please check the RLS (Row Level Security) UPDATE policy on the "categories" table in Supabase', 'error');
     }
 }
 
@@ -8094,7 +8094,7 @@ function setPosterMode(mode) {
 function friendlyTrailerToggleError(err) {
     const msg = (err && err.message) ? err.message : '';
     if (/trailerEnabled/i.test(msg)) {
-        return 'Supabase-e "trailerEnabled" column nei. Supabase → SQL Editor-e ei ta ekbar run koro: ALTER TABLE movies ADD COLUMN IF NOT EXISTS "trailerEnabled" boolean DEFAULT true;';
+        return 'The "trailerEnabled" column does not exist in Supabase. In Supabase → SQL Editor, run this once: ALTER TABLE movies ADD COLUMN IF NOT EXISTS "trailerEnabled" boolean DEFAULT true;';
     }
     return msg || 'Unknown error';
 }
@@ -8280,13 +8280,13 @@ function collectSeasonTrailers() {
 
         const seasonNum = parseInt(seasonRaw, 10);
         if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
-            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link/thumbnail "${link || thumb || '(khali)'}" er jonno eta lagbe.`);
+            throw new Error(`Please enter a valid "Season" number (1 or higher) for the Season Trailer row - it is needed for the link/thumbnail "${link || thumb || '(empty)'}".`);
         }
         // YouTube link OPTIONAL - na dile video-r jonno auto (TMDB/YouTube)
         // trailer-i use hobe (thumbnail thakle seta-o kaje lagbe). Shudhu
         // link dile-i seta valid YouTube link/ID kina check kora hoy.
         if (link && !extractYoutubeVideoId(link)) {
-            throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro (poro YouTube link ba khali 11-character video ID dite paro), ba link-ta khali rekhe dao.`);
+            throw new Error(`Could not extract a valid YouTube video ID from the Season ${seasonNum} Trailer Link ("${link}") - please check the link again (you can paste a full YouTube link or just the 11-character video ID), or leave the link empty.`);
         }
 
         result.push({ season: seasonNum, link: link || null, thumb: thumb || null });
@@ -8478,7 +8478,7 @@ function loadMovieIntoAdminForm(movie) {
     adminOriginalTmdbId = movie.tmdbId || null;
     if (isAutoTmdbPoster) {
         posterLinkInput.value = '';
-        posterLinkInput.placeholder = '✓ Auto TMDB poster already set - khali rakhle eta-i thakbe, notun link dile replace hobe';
+        posterLinkInput.placeholder = '✓ Auto TMDB poster already set - leave empty to keep it, or add a new link to replace it';
     } else {
         posterLinkInput.value = movie.poster || '';
         posterLinkInput.placeholder = 'https://... poster image link';
@@ -8537,7 +8537,7 @@ async function submitAdminContent() {
 
     const title = document.getElementById('adminTitle').value.trim();
     if (!title) {
-        msgEl.textContent = 'Title লেখা আবশ্যক (Title is required).';
+        msgEl.textContent = 'Title is required.';
         msgEl.className = 'admin-form-msg error';
         return;
     }
@@ -8685,7 +8685,7 @@ async function submitAdminContent() {
 
         msgEl.textContent = editingId ? '✅ Content updated successfully!' : '✅ Content added successfully!';
         if (posterRefreshFailed) {
-            msgEl.textContent += ' ⚠️ IMDb/TMDB ID change hoyeche - notun ID diye auto poster khuje paoa jayni, tai poster khali/purono thakte pare. Poster Link field-e manually shothik poster link/file din.';
+            msgEl.textContent += ' ⚠️ IMDb/TMDB ID was changed - no poster could be found automatically for the new ID, so the poster may be empty or still the old one. Please manually enter a valid poster link/file in the Poster Link field.';
         }
         msgEl.className = 'admin-form-msg success';
 
@@ -8937,7 +8937,7 @@ async function updateMovieDisplayOrder(movie, rawValue, btn) {
     const trimmed = String(rawValue ?? '').trim();
     const value = trimmed === '' ? null : parseInt(trimmed, 10);
     if (trimmed !== '' && Number.isNaN(value)) {
-        showToast('❌ Serial-e sudhu number likho', 'error');
+        showToast('❌ Enter only a number for the serial', 'error');
         return;
     }
 
@@ -9046,7 +9046,7 @@ async function renderAdminNavList() {
     selectEl.innerHTML = buildNavParentSelectOptions(items);
 
     if (!items.length) {
-        listEl.innerHTML = '<div class="admin-db-empty">Ekhono kono custom navigation item add kora hoyni. Upore form theke notun item add koro.</div>';
+        listEl.innerHTML = '<div class="admin-db-empty">No custom navigation items have been added yet. Use the form above to add a new item.</div>';
         return;
     }
 
@@ -9066,7 +9066,7 @@ async function renderAdminNavList() {
             <div class="admin-db-card">
                 <div class="admin-db-info">
                     <div class="admin-db-title">${escapeHtml(item.label)}</div>
-                    <div class="admin-db-meta">Parent: ${escapeHtml(parentLabel)}${item.category_slug ? ' · slug: ' + escapeHtml(item.category_slug) : ' · (container/toggle only, click hobe na)'}</div>
+                    <div class="admin-db-meta">Parent: ${escapeHtml(parentLabel)}${item.category_slug ? ' · slug: ' + escapeHtml(item.category_slug) : ' · (container/toggle only, not clickable)'}</div>
                 </div>
                 <div class="admin-db-actions">
                     <button type="button" class="admin-banner-move-btn" data-nav-move-id="${item.id}" data-dir="up" ${posIndex <= 0 ? 'disabled' : ''} title="Move earlier">▲</button>
@@ -9140,7 +9140,7 @@ async function saveAdminNavItem() {
     if (!parentSelect || !labelInput) return;
 
     const label = labelInput.value.trim();
-    if (!label) { showToast('❌ Label lekha lagbe', 'error'); return; }
+    if (!label) { showToast('❌ Label is required', 'error'); return; }
 
     const parentVal = parentSelect.value;
     let parent_id = null, parent_manifest_id = null;
@@ -9153,7 +9153,7 @@ async function saveAdminNavItem() {
     try {
         if (editingId) {
             // নিজেকেই নিজের parent বানানো আটকানো
-            if (parent_id === editingId) { showToast('❌ Ekta item nijer parent hote pare na', 'error'); return; }
+            if (parent_id === editingId) { showToast('❌ An item cannot be its own parent', 'error'); return; }
             if (addBtn) { addBtn.disabled = true; addBtn.textContent = 'Updating...'; }
 
             const { error } = await supabaseClient.from('nav_items').update({
@@ -9165,7 +9165,7 @@ async function saveAdminNavItem() {
             }).eq('id', editingId);
             if (error) throw error;
 
-            showToast('✅ Navigation item update hoyeche');
+            showToast('✅ Navigation item updated');
             cancelEditAdminNavItem();
         } else {
             const items = window.__customNavItems || [];
@@ -9187,7 +9187,7 @@ async function saveAdminNavItem() {
             labelInput.value = '';
             if (slugInput) slugInput.value = '';
             if (bannerInput) bannerInput.value = '';
-            showToast('✅ Navigation item add hoyeche');
+            showToast('✅ Navigation item added');
         }
         await renderAdminNavList();
         renderCustomNavItems();
@@ -9200,7 +9200,7 @@ async function saveAdminNavItem() {
 }
 
 async function deleteAdminNavItem(id) {
-    const confirmed = await showConfirmModal('Ei navigation item ta delete korte chao? Nicher shob sub-item o delete hoye jabe.', { confirmText: 'Delete', danger: true });
+    const confirmed = await showConfirmModal('Do you want to delete this navigation item? All sub-items below it will also be deleted.', { confirmText: 'Delete', danger: true });
     if (!confirmed) return;
     try {
         const { error } = await supabaseClient.from('nav_items').delete().eq('id', id);
@@ -9411,14 +9411,14 @@ function collectAdminTrailerSeasonRows(card) {
 
         const seasonNum = parseInt(seasonRaw, 10);
         if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
-            throw new Error(`Season Trailer row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link/thumbnail "${link || thumb || '(khali)'}" er jonno eta lagbe.`);
+            throw new Error(`Please enter a valid "Season" number (1 or higher) for the Season Trailer row - it is needed for the link/thumbnail "${link || thumb || '(empty)'}".`);
         }
         // Link na diyeও shudhu Thumbnail-i deya jete pare - tokhon video-r
         // jonno auto (TMDB/YouTube) trailer-i use hobe, kintu thumbnail-ta
         // admin-er deya custom-ta-i dekhabe (ei row-take r khali "link nei"
         // bole error dekhiye reject kora hoy na).
         if (link && !extractYoutubeVideoId(link)) {
-            throw new Error(`Season ${seasonNum}-er Trailer Link ("${link}") theke valid YouTube video ID ber kora gelo na - link-ta abar check koro.`);
+            throw new Error(`Could not extract a valid YouTube video ID from the Season ${seasonNum} Trailer Link ("${link}") - please check the link again.`);
         }
 
         result.push({ season: seasonNum, link: link || null, thumb: thumb || null });
@@ -9469,7 +9469,7 @@ async function saveAdminTrailerSettings(movie, card, btn) {
             const linkRaw = card.querySelector('.admin-trailer-movie-link').value.trim() || null;
             const thumbRaw = card.querySelector('.admin-trailer-movie-thumb').value.trim() || null;
             if (linkRaw && !extractYoutubeVideoId(linkRaw)) {
-                throw new Error('Trailer Link-e valid YouTube link ba video ID dao - eta theke video ID ber kora gelo na.');
+                throw new Error('Please enter a valid YouTube link or video ID for the Trailer Link - no video ID could be extracted from it.');
             }
             payload = { trailerLink: linkRaw, trailerThumb: thumbRaw };
         }
@@ -9765,7 +9765,7 @@ function collectAdminWatchSeasonRows(card) {
 
         const seasonNum = parseInt(seasonRaw, 10);
         if (!seasonRaw || Number.isNaN(seasonNum) || seasonNum < 1) {
-            throw new Error(`Watch Link row-e "Season" number sothik bhabe dao (1 ba tar beshi) - link/thumbnail "${link || thumb || '(khali)'}" er jonno eta lagbe.`);
+            throw new Error(`Please enter a valid "Season" number (1 or higher) for the Watch Link row - it is needed for the link/thumbnail "${link || thumb || '(empty)'}".`);
         }
 
         // "Episode" field-e ekhon shudhu number na - je kono TEXT-o lekha jay
@@ -9938,7 +9938,7 @@ function renderAdminWatchList(filter) {
                     <select class="admin-watch-season-select"></select>
                     <button type="button" class="admin-mini-btn admin-watch-add-season-inline-btn" title="Add a new season">+ Season</button>
                 </div>
-                <input type="text" class="admin-watch-season-label-input" placeholder="Season name (optional) — e.g. Season 5 / সিজন ৫">
+                <input type="text" class="admin-watch-season-label-input" placeholder="Season name (optional) — e.g. Season 5">
                 <input type="text" class="admin-watch-season-badge-input" placeholder="Poster label for this season (optional) — e.g. EP-(01-02)" style="display:none;">
                 <div class="admin-watch-season-rows"></div>
                 <button type="button" class="admin-add-row-btn admin-watch-add-season-btn">+ Add Episode</button>
@@ -11152,7 +11152,7 @@ function renderAdminRequestsList(filter) {
                 ${reqItem.reference_link ? `
                 <div class="admin-alert-url admin-request-link-row">
                     <span class="admin-request-link-text" title="${escapeAttr(reqItem.reference_link)}">${escapeHtml(formatLinkForDisplay(reqItem.reference_link))}</span>
-                    ${referenceUrl ? `<button type="button" class="admin-request-link-btn" title="IMDb/TMDB-তে ওপেন করে দেখুন">🔗 Open Link</button>` : ''}
+                    ${referenceUrl ? `<button type="button" class="admin-request-link-btn" title="Open on IMDb/TMDB">🔗 Open Link</button>` : ''}
                 </div>` : ''}
                 <div class="admin-alert-meta-row">${alreadyOnSite ? '<span class="admin-alert-source-tag auto">✅ Already on Site</span>' : ''}<span class="admin-alert-time">${timeAgo}</span></div>
             </div>
@@ -11194,7 +11194,7 @@ async function deleteAdminRequest(reqItem) {
         renderAdminRequestsList(searchInput ? searchInput.value.trim() : '');
     } catch (err) {
         console.error('Delete request error:', err);
-        showNoticeModal('❌ Request ডিলিট করা যায়নি: ' + (err && err.message ? err.message : 'Unknown error'));
+        showNoticeModal('❌ Could not delete request: ' + (err && err.message ? err.message : 'Unknown error'));
     }
 }
 
@@ -11281,7 +11281,7 @@ async function deleteAdminMessage(msg) {
         renderAdminMessagesList();
     } catch (err) {
         console.error('Delete message error:', err);
-        showNoticeModal('❌ Message ডিলিট করা যায়নি: ' + (err && err.message ? err.message : 'Unknown error'));
+        showNoticeModal('❌ Could not delete message: ' + (err && err.message ? err.message : 'Unknown error'));
     }
 }
 
@@ -11387,7 +11387,7 @@ async function resolveLinkAlert(alert, isDismiss) {
         renderAdminAlertsList();
     } catch (err) {
         console.error('Resolve alert error:', err);
-        showNoticeModal('❌ Alert আপডেট করা যায়নি: ' + (err && err.message ? err.message : 'Unknown error'));
+        showNoticeModal('❌ Could not update alert: ' + (err && err.message ? err.message : 'Unknown error'));
     }
 }
 
@@ -11397,7 +11397,7 @@ function openLinkAlertInEditor(alert) {
         || (Array.isArray(allDeletedMovies) ? allDeletedMovies.find(m => m.id === alert.movie_id) : null);
 
     if (!movie) {
-        showNoticeModal('এই কন্টেন্টটি ডাটাবেজে খুঁজে পাওয়া যায়নি — সম্ভবত এটি স্থায়ীভাবে ডিলিট হয়ে গেছে।');
+        showNoticeModal('This content was not found in the database — it may have been permanently deleted.');
         return;
     }
 
@@ -11406,7 +11406,7 @@ function openLinkAlertInEditor(alert) {
 
     const msgEl = document.getElementById('adminFormMsg');
     if (msgEl) {
-        msgEl.textContent = `🔔 রিপোর্ট হওয়া লিংক: "${alert.link_label || 'Download Link'}" — নিচের লিংকগুলো চেক করে নতুন লিংক দিন, তারপর Update Content চাপুন।`;
+        msgEl.textContent = `🔔 Reported link: "${alert.link_label || 'Download Link'}" — check the links below and enter a new link, then click Update Content.`;
         msgEl.className = 'admin-form-msg error';
     }
 }
@@ -12216,6 +12216,8 @@ const BROWSE_TYPE_OPTIONS = [
     { key: 'tv',    label: 'Series' }
 ];
 const BROWSE_ANIME_COLOR = '#fb923c';
+// Genre jeta TMDB-te ei type-e nei, tar bodole keyword ID (TMDB keyword: horror = 10292)
+const BROWSE_KEYWORD_FALLBACK = { 'Horror': 10292, 'Romance': 9799 };
 const BROWSE_CHIP_COLORS = ['#ef4444', '#a78bfa', '#f59e0b', '#22c55e', '#f472b6', '#38bdf8', '#fb7185', '#60a5fa', '#2dd4bf', '#c084fc', '#facc15', '#34d399', '#f97316', '#818cf8'];
 
 const browseState = {
@@ -12230,7 +12232,8 @@ const browseState = {
     loading: false,
     hasMore: false,
     requestId: 0,
-    genreExpanded: false
+    genreExpanded: false,
+    autoPages: 0         // khali page-e auto next-page load-er count
 };
 
 function initBrowseTmdbSection() {
@@ -12279,7 +12282,7 @@ async function loadBrowseGenres() {
     } catch (err) {
         console.error('Browse genre load error:', err);
         const row = document.getElementById('browseGenreChips');
-        if (row) row.innerHTML = '<div class="browse-status">Genre load kora jacche na.</div>';
+        if (row) row.innerHTML = '<div class="browse-status">Could not load genres.</div>';
     }
 }
 
@@ -12399,13 +12402,19 @@ function buildBrowseQuery(type, page) {
         sort_by: 'popularity.desc'
     });
     if (browseState.genreSel.size) {
-        const ids = [...browseState.genreSel]
-            .map(name => browseState.genres.find(g => g.name === name))
-            .filter(Boolean)
-            .map(g => (type === 'movie' ? g.movieId : g.tvId))
-            .filter(Boolean);
-        if (!ids.length) return null;
-        params.set('with_genres', ids.join('|'));
+        // TMDB-te kichu genre shudhu movie-te (jemon Horror) ba shudhu series-te ache.
+        // Jei type-e genre ID nei, tar jonno keyword diye filter kora hoy.
+        const ids = [];
+        const kws = [];
+        [...browseState.genreSel].forEach(name => {
+            const g = browseState.genres.find(x => x.name === name);
+            const id = g ? (type === 'movie' ? g.movieId : g.tvId) : null;
+            if (id) ids.push(id);
+            else if (BROWSE_KEYWORD_FALLBACK[name]) kws.push(BROWSE_KEYWORD_FALLBACK[name]);
+        });
+        if (!ids.length && !kws.length) return null;
+        if (ids.length) params.set('with_genres', ids.join('|'));
+        else params.set('with_keywords', kws.join('|'));
     }
     // Anime = Japanese-language Animation (TMDB-te alada "anime" genre nei)
     if (browseState.animeSel) {
@@ -12429,6 +12438,7 @@ async function loadBrowseResults(reset) {
         browseState.seen = new Set();
         browseState.hasMore = false;
         browseState.loading = false;
+        browseState.autoPages = 0;
         renderBrowseResults();
     }
     if (!hasFilter) return;
@@ -12471,11 +12481,19 @@ async function loadBrowseResults(reset) {
         console.error('Browse discover error:', err);
         browseState.hasMore = false;
         const status = document.getElementById('browseStatus');
-        if (status) status.textContent = 'Content load kora jacche na, abar try korun.';
+        if (status) status.textContent = 'Could not load content, please try again.';
     } finally {
         if (reqId === browseState.requestId) {
             browseState.loading = false;
             renderBrowseResults();
+            // Ei page-e poster-wala result na paoa gele (filter-er jonno) porer page-e auto
+            // chole jai, jate "not found" ekhane bhul kore na dekhay. Ektu limit rakha hoyeche.
+            if (!browseState.items.length && browseState.hasMore && browseHasFilter() && browseState.autoPages < 5) {
+                browseState.autoPages++;
+                loadBrowseResults(false);
+            } else if (browseState.items.length) {
+                browseState.autoPages = 0;
+            }
         }
     }
 }
@@ -12504,8 +12522,8 @@ function renderBrowseResults() {
 
     if (status) {
         if (!hasFilter) status.textContent = '';
-        else if (browseState.loading && !browseState.items.length) status.textContent = 'Loading...';
-        else if (!browseState.loading && !browseState.items.length) status.textContent = 'Ei selection-e kono content paoa jay nai.';
+        else if ((browseState.loading || browseState.hasMore) && !browseState.items.length) status.textContent = 'Loading...';
+        else if (!browseState.loading && !browseState.hasMore && !browseState.items.length) status.textContent = 'No content found for this selection.';
         else status.textContent = '';
     }
     if (more) more.style.display = (hasFilter && browseState.hasMore && !browseState.loading && browseState.items.length) ? 'block' : 'none';

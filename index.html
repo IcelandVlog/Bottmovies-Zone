@@ -697,7 +697,7 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                     </div>
 
                     <div class="admin-field" id="adminSeasonTrailersField" style="display:none;">
-                        <label>Season Trailers <span class="admin-hint">(optional — series-er প্রতিটা season-এর জন্য আলাদা trailer link দিতে পারেন; কোনো season খালি রাখলে সেই season select করলে auto trailer (TMDB/YouTube) খোঁজা হবে)</span></label>
+                        <label>Season Trailers <span class="admin-hint">(optional — you can add a separate trailer link for each season of a series; if a season is left empty, selecting that season will search for an automatic trailer (TMDB/YouTube))</span></label>
                         <div id="adminSeasonTrailersList"></div>
                         <button type="button" class="admin-add-row-btn" onclick="addSeasonTrailerRow()">+ Add Season Trailer</button>
                     </div>
@@ -789,11 +789,11 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
 
                 <!-- NAVIGATION MENU TAB (header MOVIES / WEB SERIES / OTT SHOWS dropdown & sub-dropdown editor) -->
                 <div class="admin-tab-content" id="adminTabNavigation" style="display:none;">
-                    <div class="admin-nav-note">Header-এর dropdown menu-তে notun item add/delete/reorder korte parben. "Parent" hisebe age theke thaka je kono item, ba notun kore add kora item-o select kora jay (sub-dropdown ba nested item banate).</div>
+                    <div class="admin-nav-note">You can add, delete and reorder items in the header dropdown menu. Any existing item can be selected as the "Parent", or a newly added item can be selected too (to create sub-dropdowns or nested items).</div>
                     <div class="admin-nav-form">
                         <select id="adminNavParentSelect"></select>
                         <input type="text" id="adminNavLabelInput" placeholder="Label (e.g. French Movies)">
-                        <input type="text" id="adminNavSlugInput" placeholder="Category slug (data-target, e.g. french) — blank = shudhu container/toggle">
+                        <input type="text" id="adminNavSlugInput" placeholder="Category slug (data-target, e.g. french) — blank = container/toggle only">
                         <input type="text" id="adminNavBannerInput" placeholder="Custom banner text (optional)">
                         <button type="button" class="admin-banner-save-btn" id="adminNavAddBtn" onclick="saveAdminNavItem()">➕ Add Item</button>
                         <button type="button" class="admin-mini-btn" id="adminNavCancelEditBtn" onclick="cancelEditAdminNavItem()" style="display:none;">✕ Cancel Edit</button>
@@ -801,7 +801,7 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                     <div class="admin-database-list" id="adminNavList"></div>
 
                     <!-- সব CATEGORY-র জন্য আলাদা banner text — category page-e gele upore notice banner-e ei lekha ta dekhabe -->
-                    <div class="admin-nav-note" style="margin-top:22px;">প্রতিটা category-র নিজস্ব banner text এখান থেকে add/edit/update kora zabe — sheita category-r page-e gele upore notice banner-e show hobe. Khali rakhle default lekha/category naam dekhabe.</div>
+                    <div class="admin-nav-note" style="margin-top:22px;">Each category's own banner text can be added, edited and updated here — it will be shown in the notice banner at the top when visitors open that category's page. If left empty, the default text / category name will be shown.</div>
                     <div class="admin-manage-search">
                         <input type="text" id="adminCategoryBannerSearchInput" placeholder="🔍 Search category...">
                     </div>
