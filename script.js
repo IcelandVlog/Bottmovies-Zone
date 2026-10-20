@@ -12198,6 +12198,7 @@ document.addEventListener('click', (e) => {
 // Homepage-er 500K+ section-er nicheo. Genre/OTT chip select korle TMDB discover
 // API theke oi genre/platform-er content ane. Ekadhik select korle "ya" (OR) logic.
 const BROWSE_OTT_PROVIDERS = [
+    { id: 283,  name: 'Crunchyroll' },
     { id: 8,    name: 'Netflix' },
     { id: 9,    name: 'Amazon Prime Video' },
     { id: 337,  name: 'Disney+' },
@@ -12209,12 +12210,20 @@ const BROWSE_OTT_PROVIDERS = [
 ];
 const BROWSE_WATCH_REGION = 'US'; // OTT provider ID-gulo region onujayi alada, tai ekhane region ekta-i rakha holo
 const BROWSE_GENRE_COLLAPSED_COUNT = 10;
+const BROWSE_TYPE_OPTIONS = [
+    { key: 'all',   label: 'All' },
+    { key: 'movie', label: 'Movies' },
+    { key: 'tv',    label: 'Series' }
+];
+const BROWSE_ANIME_COLOR = '#fb923c';
 const BROWSE_CHIP_COLORS = ['#ef4444', '#a78bfa', '#f59e0b', '#22c55e', '#f472b6', '#38bdf8', '#fb7185', '#60a5fa', '#2dd4bf', '#c084fc', '#facc15', '#34d399', '#f97316', '#818cf8'];
 
 const browseState = {
     genres: [],          // [{ name, movieId, tvId }]
     genreSel: new Set(), // genre name-er set
     ottSel: new Set(),   // provider ID-er set
+    typeSel: 'all',      // 'all' | 'movie' | 'tv'
+    animeSel: false,     // Anime filter (Japanese-language Animation)
     page: 1,
     items: [],
     seen: new Set(),
@@ -12226,6 +12235,7 @@ const browseState = {
 
 function initBrowseTmdbSection() {
     if (!document.getElementById('browseTmdbSection')) return;
+    renderBrowseTypeChips();
     renderBrowseOttChips();
     renderBrowseResults();
     loadBrowseGenres();
@@ -12280,11 +12290,11 @@ function browseChipColor(index) {
 function renderGenreChips() {
     const row = document.getElementById('browseGenreChips');
     if (!row) return;
-    if (!browseState.genres.length) { row.innerHTML = ''; return; }
     const total = browseState.genres.length;
     const showAll = browseState.genreExpanded || total <= BROWSE_GENRE_COLLAPSED_COUNT;
     const visible = showAll ? browseState.genres : browseState.genres.slice(0, BROWSE_GENRE_COLLAPSED_COUNT);
-    let html = visible.map((g, i) => {
+    let html = `<button type="button" class="browse-chip${browseState.animeSel ? ' is-active' : ''}" style="--c:${BROWSE_ANIME_COLOR}" aria-pressed="${browseState.animeSel}" onclick="toggleBrowseAnime()">Anime</button>`;
+    html += visible.map((g, i) => {
         const selected = browseState.genreSel.has(g.name);
         return `<button type="button" class="browse-chip" style="--c:${browseChipColor(i)}" aria-pressed="${selected}" data-genre="${escapeAttr(g.name)}" onclick="toggleBrowseGenre(this.dataset.genre)">${escapeHtml(g.name)}</button>`;
     }).join('');
@@ -12293,6 +12303,32 @@ function renderGenreChips() {
         html += `<button type="button" class="browse-chip browse-more-btn" onclick="toggleBrowseGenreExpand()">${label}</button>`;
     }
     row.innerHTML = html;
+}
+
+function renderBrowseTypeChips() {
+    const row = document.getElementById('browseTypeChips');
+    if (!row) return;
+    row.innerHTML = BROWSE_TYPE_OPTIONS.map((t, i) => {
+        const selected = browseState.typeSel === t.key;
+        return `<button type="button" class="browse-chip" style="--c:${browseChipColor(i + 12)}" aria-pressed="${selected}" onclick="toggleBrowseType('${t.key}')">${escapeHtml(t.label)}</button>`;
+    }).join('');
+}
+
+function toggleBrowseType(key) {
+    browseState.typeSel = key;
+    renderBrowseTypeChips();
+    onBrowseFilterChanged();
+}
+
+function toggleBrowseAnime() {
+    browseState.animeSel = !browseState.animeSel;
+    renderGenreChips();
+    onBrowseFilterChanged();
+}
+
+function browseHasFilter() {
+    return browseState.genreSel.size > 0 || browseState.ottSel.size > 0
+        || browseState.animeSel || browseState.typeSel !== 'all';
 }
 
 function renderBrowseOttChips() {
@@ -12326,6 +12362,9 @@ function toggleBrowseOtt(id) {
 function clearBrowseFilters() {
     browseState.genreSel.clear();
     browseState.ottSel.clear();
+    browseState.animeSel = false;
+    browseState.typeSel = 'all';
+    renderBrowseTypeChips();
     renderGenreChips();
     renderBrowseOttChips();
     onBrowseFilterChanged();
@@ -12335,6 +12374,10 @@ function onBrowseFilterChanged() {
     const summary = document.getElementById('browseSelectedLabel');
     const clearBtn = document.getElementById('browseClearBtn');
     const parts = [];
+    if (browseState.typeSel !== 'all') {
+        parts.push(BROWSE_TYPE_OPTIONS.find(t => t.key === browseState.typeSel).label);
+    }
+    if (browseState.animeSel) parts.push('Anime');
     if (browseState.genreSel.size) parts.push([...browseState.genreSel].join(', '));
     if (browseState.ottSel.size) {
         parts.push(BROWSE_OTT_PROVIDERS.filter(p => browseState.ottSel.has(p.id)).map(p => p.name).join(', '));
@@ -12347,6 +12390,8 @@ function onBrowseFilterChanged() {
 // Ekta type (movie/tv)-er jonno discover URL banay. Genre select thakle oi type-er
 // jonno genre ID na thakle type-ta skip kora hoy (na hole sob content chole ashe).
 function buildBrowseQuery(type, page) {
+    // Type chip (Movies/Series) select korle onno type-er URL skip hoy
+    if (browseState.typeSel !== 'all' && browseState.typeSel !== type) return null;
     const params = new URLSearchParams({
         api_key: TMDB_API_KEY,
         page: String(page),
@@ -12362,6 +12407,11 @@ function buildBrowseQuery(type, page) {
         if (!ids.length) return null;
         params.set('with_genres', ids.join('|'));
     }
+    // Anime = Japanese-language Animation (TMDB-te alada "anime" genre nei)
+    if (browseState.animeSel) {
+        params.set('with_original_language', 'ja');
+        if (!browseState.genreSel.size) params.set('with_genres', '16');
+    }
     if (browseState.ottSel.size) {
         params.set('with_watch_providers', [...browseState.ottSel].join('|'));
         params.set('watch_region', BROWSE_WATCH_REGION);
@@ -12371,7 +12421,7 @@ function buildBrowseQuery(type, page) {
 }
 
 async function loadBrowseResults(reset) {
-    const hasFilter = browseState.genreSel.size > 0 || browseState.ottSel.size > 0;
+    const hasFilter = browseHasFilter();
     if (reset) {
         browseState.requestId++;
         browseState.page = 1;
@@ -12436,7 +12486,7 @@ function renderBrowseResults() {
     const more = document.getElementById('browseLoadMore');
     if (!grid) return;
 
-    const hasFilter = browseState.genreSel.size > 0 || browseState.ottSel.size > 0;
+    const hasFilter = browseHasFilter();
     grid.innerHTML = browseState.items.map(item => {
         const title = item.title || item.name || 'Untitled';
         const fullRelease = item.release_date || item.first_air_date || '';
