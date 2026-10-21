@@ -536,6 +536,7 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                 <button type="button" class="admin-nav-btn" id="adminNavBtnWatch" onclick="switchAdminTab('watch')">▶️ <span>Watch Button</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnServer" onclick="switchAdminTab('server')">🖥️ <span>Server</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnOriginal" onclick="switchAdminTab('original')">🔤 <span>Original Title</span></button>
+                <button type="button" class="admin-nav-btn" id="adminNavBtnOngoing" onclick="switchAdminTab('ongoing')">📺 <span>Ongoing</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnBanner" onclick="switchAdminTab('banner')">🎞️ <span>Hero Banner</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnNavigation" onclick="switchAdminTab('navigation')">🧭 <span>Navigation</span></button>
                 <button type="button" class="admin-nav-btn" id="adminNavBtnComments" onclick="switchAdminTab('comments')">💬 <span>Comments</span></button>
@@ -759,6 +760,15 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                         <div class="admin-backfill-status admin-original-status"></div>
                     </div>
                     <div class="admin-database-list" id="adminOriginalList"></div>
+                </div>
+
+                <!-- ONGOING TAB (series ongoing flag: ongoing thakle season-er sob episode release hoa obdhi ongoing thake, ar page-er 1 no jaigay thake) -->
+                <div class="admin-tab-content" id="adminTabOngoing" style="display:none;">
+                    <div class="admin-manage-search">
+                        <input type="text" id="adminOngoingSearchInput" placeholder="🔍 Search content to set Ongoing...">
+                    </div>
+                    <div class="admin-watch-bulk-status warn" id="adminOngoingWarn" style="display:none;"></div>
+                    <div class="admin-database-list" id="adminOngoingList"></div>
                 </div>
 
                 <!-- SERVER TAB (choose which server is the DEFAULT in the "Online Watch" player: Server 01 or Server 02 - for each title, or for all titles at once) -->

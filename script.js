@@ -572,7 +572,259 @@ function applyManualSerialPositions(list) {
         if (pos > result.length) pos = result.length;
         result.splice(pos, 0, item);
     });
-    return result;
+    // Ongoing (ekhono season shesh hoyni) content sob-er upore (1 no position) thake.
+    // Ekadhik ongoing hole sheta-r shesh release-er tarikh-er shomoy-er ulto krome (notun episode aage).
+    // Ar je kono series-er notun episode gotoy NEW_EPISODE_WINDOW_DAYS-er moddhe release hoyeche, tarao 1 no-te.
+    const pinned = result.filter(m => getPinDate(m))
+        .sort((a, b) => String(getPinDate(b)).localeCompare(String(getPinDate(a))));
+    if (!pinned.length) return result;
+    const pinnedIds = new Set(pinned.map(m => m.id));
+    return [...pinned, ...result.filter(m => !pinnedIds.has(m.id))];
+}
+
+// ==================== Ongoing (TV series) ====================
+// Admin Ongoing tab theke movie.ongoing = true + (optional) ongoingSeason set kora thakle,
+// TMDB-theke season-er episode air_date neya hoy. Shesh episode release hole ongoing shesh.
+// DB column: ongoing (boolean), ongoingSeason (smallint) - Supabase SQL editor-e ONGOING_SQL run korte hobe.
+const ONGOING_SQL = 'alter table public.movies add column if not exists "ongoing" boolean default false; alter table public.movies add column if not exists "ongoingSeason" smallint; alter table public.movies add column if not exists "linkUpdatedAt" timestamptz;';
+const ongoingInfoMap = new Map();   // movie.id -> { season, total, released, lastAired, finalAired } | null
+const ongoingPendingMap = new Map(); // movie.id -> in-flight promise
+
+function todayYMD() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+function getOngoingInfoField(movie, field) {
+    const info = movie ? ongoingInfoMap.get(movie.id) : null;
+    return info ? info[field] : null;
+}
+
+// Ekhono ongoing ki na: flag on hole-o season-er shesh episode-er tarikh ekhono aseni thakle ongoing
+function isOngoingActive(movie) {
+    if (!movie || movie.ongoing !== true || movie.tmdbType !== 'tv') return false;
+    const info = ongoingInfoMap.get(movie.id);
+    if (!info) return true; // TMDB data ekhono aseni - manual flag-i dhore rakhi
+    return todayYMD() <= info.finalAired;
+}
+
+// TMDB tv id + season number theke episode air-date info (season na dile latest season)
+async function fetchSeasonAirInfo(tmdbId, seasonNumber) {
+    if (!TMDB_API_KEY || !tmdbId) return null;
+    let season = Number(seasonNumber) || null;
+    if (!season) {
+        const detailRes = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}`, {}, 6000);
+        if (!detailRes.ok) return null;
+        const detail = await detailRes.json();
+        season = Number(detail.number_of_seasons) || null;
+        if (!season) return null;
+    }
+    const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${tmdbId}/season/${season}?api_key=${TMDB_API_KEY}`, {}, 6000);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const dates = (data.episodes || []).map(e => e.air_date).filter(Boolean).sort();
+    if (!dates.length) return null;
+    const today = todayYMD();
+    const released = dates.filter(d => d <= today);
+    return {
+        season,
+        total: dates.length,
+        released: released.length,
+        lastAired: released.length ? released[released.length - 1] : null,
+        finalAired: dates[dates.length - 1]
+    };
+}
+
+// Naya series add korar por: TMDB-te latest season-er kono episode ekhono release hocche
+// (kichu aired, shesh episode ekhono ashe nai) tahole automatically ongoing on korе deya hoy.
+async function autoSetOngoingForNewSeries(movieId, tmdbId, tmdbType) {
+    if (!movieId || tmdbType !== 'tv' || !tmdbId || !ongoingColumnExists()) return false;
+    try {
+        const info = await fetchSeasonAirInfo(tmdbId, null);
+        if (!info || info.released === 0 || info.finalAired < todayYMD()) return false;
+        const { error } = await supabaseClient.from('movies')
+            .update({ ongoing: true, ongoingSeason: info.season })
+            .eq('id', movieId);
+        if (error) throw error;
+        return true;
+    } catch (e) {
+        console.error('Auto ongoing detect error:', e);
+        return false;
+    }
+}
+
+async function loadOngoingEpisodeInfo(movie) {
+    if (!movie || !movie.id) return null;
+    if (ongoingPendingMap.has(movie.id)) return ongoingPendingMap.get(movie.id);
+    const promise = (async () => {
+        try {
+            if (movie.tmdbType !== 'tv') return null;
+            const resolved = await resolveTmdbMatch(movie);
+            if (!resolved || resolved.mediaType !== 'tv') return null;
+            return await fetchSeasonAirInfo(resolved.matchId, movie.ongoingSeason);
+        } catch (e) {
+            console.error('Ongoing episode info error:', e);
+            return null;
+        }
+    })();
+    ongoingPendingMap.set(movie.id, promise);
+    const info = await promise;
+    ongoingPendingMap.delete(movie.id);
+    ongoingInfoMap.set(movie.id, info);
+    return info;
+}
+
+// Sob ongoing content-er episode data load kore, tarpor order + homepage + admin list refresh kore
+async function refreshOngoingData() {
+    if (!Array.isArray(allMovies)) return;
+    const applyOrder = () => {
+        sortAllMoviesByDisplayOrder();
+        reorderFilteredMoviesToMatchAllMovies();
+        if (Array.isArray(currentFilteredMovies) && currentFilteredMovies.length) {
+            renderMoviesByPage(currentFilteredMovies, currentPage);
+        }
+        if (currentAdminTab === 'ongoing') {
+            const q = (document.getElementById('adminOngoingSearchInput') || {}).value || '';
+            renderAdminOngoingList(q.trim());
+        }
+    };
+    const ongoingMovies = allMovies.filter(m => m && m.ongoing === true && m.tmdbType === 'tv' && !m.deleted_at);
+    if (ongoingMovies.length) await Promise.all(ongoingMovies.map(m => loadOngoingEpisodeInfo(m)));
+    applyOrder();
+    // Baki series-er notun episode check (background) - hole abar order thik kore dey
+    loadRecentEpisodeInfo().then(applyOrder);
+}
+
+// ---- Notun episode release (je kono series) -> 1 no position ----
+const NEW_EPISODE_WINDOW_DAYS = 7;   // ei kotodin por pinned soriye dewa hobe
+const RECENT_EP_CACHE_KEY = 'bm_recent_episode_v1';
+const recentEpisodeMap = new Map();  // movie.id -> 'YYYY-MM-DD' (latest episode air date)
+let recentEpisodeRunning = false;
+
+function daysAgoYMD(days) {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+// Ongoing series hole shesh episode-er tarikh; na hole notun episode gotoy window-er moddhe
+// release hole sheta. Na hole null (pin hobe na).
+function getPinDate(movie) {
+    if (!movie) return null;
+    const windowStart = daysAgoYMD(NEW_EPISODE_WINDOW_DAYS);
+    const today = todayYMD();
+    const candidates = [];
+    // 1) Ongoing series-er shesh release
+    if (isOngoingActive(movie)) {
+        const last = getOngoingInfoField(movie, 'lastAired');
+        candidates.push(last || '0000-00-00');
+    }
+    // 2) Series-er notun episode (TMDB) - shudhu series
+    if (movie.tmdbType === 'tv') {
+        const recent = recentEpisodeMap.get(movie.id);
+        if (recent && recent >= windowStart && recent <= today) candidates.push(recent);
+    }
+    // 3) Link change / notun link add (admin theke)
+    if (movie.linkUpdatedAt) {
+        const d = new Date(movie.linkUpdatedAt);
+        if (!isNaN(d.getTime())) {
+            const pad = n => String(n).padStart(2, '0');
+            const ymd = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+            if (ymd >= windowStart && ymd <= today) candidates.push(ymd);
+        }
+    }
+    if (!candidates.length) return null;
+    return candidates.sort().pop(); // sob-er notun tarikh
+}
+
+function readRecentEpisodeCache() {
+    try {
+        const raw = localStorage.getItem(RECENT_EP_CACHE_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+}
+
+function writeRecentEpisodeCache(obj) {
+    try { localStorage.setItem(RECENT_EP_CACHE_KEY, JSON.stringify(obj)); } catch (e) { /* storage na thakle skip */ }
+}
+
+// Sob series-er latest episode air-date TMDB theke ane (din-e ekbar cache). Ekta ekta kore, alpo alpo.
+async function loadRecentEpisodeInfo() {
+    if (recentEpisodeRunning || !TMDB_API_KEY || !Array.isArray(allMovies)) return;
+    recentEpisodeRunning = true;
+    try {
+        const today = todayYMD();
+        const cache = readRecentEpisodeCache();
+        const targets = allMovies.filter(m => m && m.tmdbType === 'tv' && m.tmdbId && !m.deleted_at);
+        let changed = false;
+        for (const m of targets) {
+            const cached = cache[m.id];
+            if (cached && cached.day === today) {
+                recentEpisodeMap.set(m.id, cached.lastAir || null);
+                continue;
+            }
+            try {
+                const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${m.tmdbId}?api_key=${TMDB_API_KEY}`, {}, 6000);
+                if (!res.ok) continue;
+                const data = await res.json();
+                const lastAir = (data.last_episode_to_air && data.last_episode_to_air.air_date) || null;
+                cache[m.id] = { day: today, lastAir };
+                recentEpisodeMap.set(m.id, lastAir);
+                changed = true;
+            } catch (e) { /* ek-ta fail hole baaki gulo chalbe */ }
+            await new Promise(r => setTimeout(r, 120)); // TMDB rate limit-er jonno choto gap
+        }
+        if (changed) writeRecentEpisodeCache(cache);
+    } finally {
+        recentEpisodeRunning = false;
+    }
+}
+
+function ongoingBadgeHTML(movie) {
+    return isOngoingActive(movie)
+        ? '<span class="ongoing-badge"><span class="ongoing-dot"></span>Ongoing</span>'
+        : '';
+}
+
+function ongoingColumnExists() {
+    return Array.isArray(allMovies) && allMovies.length > 0
+        && Object.prototype.hasOwnProperty.call(allMovies[0], 'ongoing')
+        && Object.prototype.hasOwnProperty.call(allMovies[0], 'ongoingSeason');
+}
+
+function linkUpdatedColumnExists() {
+    return Array.isArray(allMovies) && allMovies.length > 0
+        && Object.prototype.hasOwnProperty.call(allMovies[0], 'linkUpdatedAt');
+}
+
+// Download/link blocks theke shob URL ber kore (signature) - link change/add detect korar jonno
+function collectAllLinkUrls(blocks) {
+    const urls = new Set();
+    const walk = (node) => {
+        if (Array.isArray(node)) node.forEach(walk);
+        else if (node && typeof node === 'object') {
+            Object.keys(node).forEach(k => {
+                if (k === 'link' && typeof node[k] === 'string' && node[k].trim()) urls.add(node[k].trim());
+                else walk(node[k]);
+            });
+        }
+    };
+    walk(blocks);
+    return [...urls];
+}
+
+function parseDownloadBlocksValue(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    try { return JSON.parse(val) || []; } catch (e) { return []; }
+}
+
+// Ager list-e je link chhilo na, emon link add/change hole TRUE
+function hasNewLinks(oldBlocks, newBlocks) {
+    const oldSet = new Set(collectAllLinkUrls(oldBlocks));
+    return collectAllLinkUrls(newBlocks).some(u => !oldSet.has(u));
 }
 let moviesPerPage = 10; // recalculated responsively before every render - see getMoviesPerPage()
 let currentFilteredMovies = [];
@@ -770,6 +1022,7 @@ async function fetchMoviesFromSupabase() {
                 safeSetUrl('replaceState', buildCategoryUrl(legacyRoute.category, legacyRoute.page));
             }
             switchCategory(initialCategory, initialPage);
+            refreshOngoingData(); // ongoing content-er episode data load kore page-er 1 no jaigay bosay
             restoreMovieModalFromUrl(); // ?movie=<id> URL-e thakle (refresh) shei details page abar khule dao
 
             const adminOverlayEl = document.getElementById('adminOverlay');
@@ -2619,7 +2872,9 @@ fastServersList.forEach((fs, fIdx) => {
                 <h1 class="card-movie-title">${title}${getCardYearLabel(movie) ? ` <span class="movie-card-year">(${escapeHtml(getCardYearLabel(movie))})</span>` : ''}</h1>
                 ${buildOriginalTitleLineHTML(movie)}
                 <p class="card-tagline" id="modalTagline">${tagline}</p>
-                <p class="card-meta-subtitle">${genre} ${releaseDate !== "N/A" ? '| ' + releaseDate : ''}</p>                <div class="card-stats-row">
+                <p class="card-meta-subtitle">${genre} ${releaseDate !== "N/A" ? '| ' + releaseDate : ''}</p>
+                ${ongoingBadgeHTML(movie)}
+                <div class="card-stats-row">
                     ${uploadedAtLabel ? `
                     <span class="stat-item">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7V12L15.5 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -6586,6 +6841,7 @@ const ADMIN_TAB_TITLES = {
     watch: 'Watch Button',
     server: 'Server',
     original: 'Original Title',
+    ongoing: 'Ongoing',
     banner: 'Hero Banner',
     navigation: 'Navigation Menu',
     comments: 'Comments',
@@ -6596,7 +6852,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'original', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'original', 'ongoing', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -6628,6 +6884,9 @@ function switchAdminTab(tab) {
     } else if (validTab === 'original') {
         const searchInput = document.getElementById('adminOriginalSearchInput');
         renderAdminOriginalList(searchInput ? searchInput.value.trim() : '');
+    } else if (validTab === 'ongoing') {
+        const searchInput = document.getElementById('adminOngoingSearchInput');
+        renderAdminOngoingList(searchInput ? searchInput.value.trim() : '');
     } else if (validTab === 'banner') {
         const searchInput = document.getElementById('adminBannerSearchInput');
         renderAdminBannerList(searchInput ? searchInput.value.trim() : '');
@@ -6806,6 +7065,13 @@ function setupAdminPanel() {
     if (adminOriginalSearchInput) {
         adminOriginalSearchInput.addEventListener('input', function() {
             renderAdminOriginalList(this.value.trim());
+        });
+    }
+
+    const adminOngoingSearchInput = document.getElementById('adminOngoingSearchInput');
+    if (adminOngoingSearchInput) {
+        adminOngoingSearchInput.addEventListener('input', function() {
+            renderAdminOngoingList(this.value.trim());
         });
     }
 
@@ -8621,6 +8887,13 @@ async function submitAdminContent() {
         const seasonTrailers = isTvType ? collectSeasonTrailers() : [];
 
         const downloadBlocks = (adminTmdbType === 'tv') ? collectSeasons() : collectMovieLinks();
+        // Edit-er shomoy notun link add/change hole content 1 no-te jabe (linkUpdatedAt stamp)
+        let linkStampPatch = {};
+        if (editingId && linkUpdatedColumnExists()) {
+            const oldMovie = allMovies.find(m => String(m.id) === String(editingId));
+            const oldBlocks = oldMovie ? parseDownloadBlocksValue(oldMovie.downloadBlocks) : [];
+            if (hasNewLinks(oldBlocks, downloadBlocks)) linkStampPatch = { linkUpdatedAt: new Date().toISOString() };
+        }
 
         const payload = {
             title: title,
@@ -8634,6 +8907,7 @@ async function submitAdminContent() {
             poster: posterUrl,
             seasonTrailers: isTvType ? JSON.stringify(seasonTrailers) : null,
             downloadBlocks: JSON.stringify(downloadBlocks),
+            ...linkStampPatch,
             originalTitle: originalTitle
         };
 
@@ -8675,13 +8949,21 @@ async function submitAdminContent() {
         }
 
         let error;
+        let insertedId = null;
         if (editingId) {
             ({ error } = await supabaseClient.from('movies').update(payload).eq('id', editingId));
         } else {
-            ({ error } = await supabaseClient.from('movies').insert([payload]));
+            const insertRes = await supabaseClient.from('movies').insert([payload]).select('id');
+            error = insertRes.error;
+            insertedId = insertRes.data && insertRes.data[0] ? insertRes.data[0].id : null;
         }
 
         if (error) throw error;
+
+        // Notun series add korle TMDB-te episode ekhono release holei auto ongoing
+        if (!editingId && insertedId) {
+            await autoSetOngoingForNewSeries(insertedId, payload.tmdbId, payload.tmdbType);
+        }
 
         msgEl.textContent = editingId ? '✅ Content updated successfully!' : '✅ Content added successfully!';
         if (posterRefreshFailed) {
@@ -10510,6 +10792,107 @@ async function saveAdminOriginalTitle(movie, value, statusEl) {
         return true;
     } catch (err) {
         console.error('Save original title error:', err);
+        if (statusEl) { statusEl.classList.add('err'); statusEl.textContent = 'Failed'; }
+        showToast('Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        return false;
+    }
+}
+
+// Ongoing tab - content-er ongoing on/off + season set kora, status dekhano
+function getOngoingStatusText(movie) {
+    if (!movie.ongoing) return 'Not ongoing';
+    if (!ongoingInfoMap.has(movie.id)) return 'Ongoing · checking episodes...';
+    const info = ongoingInfoMap.get(movie.id);
+    if (!info) return 'Ongoing · manual (TMDB episode data not found)';
+    const seasonLabel = 'Season ' + info.season;
+    if (todayYMD() > info.finalAired) return 'Ended · ' + seasonLabel + ' finished on ' + info.finalAired;
+    const lastText = info.lastAired ? ' · last episode ' + info.lastAired : ' · no episode out yet';
+    return 'Ongoing · ' + seasonLabel + ' · ' + info.released + '/' + info.total + ' episodes out' + lastText + ' · ends ' + info.finalAired;
+}
+
+function renderAdminOngoingList(filter) {
+    const container = document.getElementById('adminOngoingList');
+    const warn = document.getElementById('adminOngoingWarn');
+    if (!container) return;
+    const list = Array.isArray(allMovies) ? allMovies.filter(m => !m.deleted_at && m.tmdbType === 'tv') : [];
+    if (warn) {
+        if (list.length && (!ongoingColumnExists() || !linkUpdatedColumnExists())) {
+            warn.innerHTML = 'Run once in the Supabase SQL editor: <code>' + escapeHtml(ONGOING_SQL) + '</code>';
+            warn.style.display = 'block';
+        } else {
+            warn.style.display = 'none';
+        }
+    }
+    container.innerHTML = '';
+
+    const q = (filter || '').toLowerCase().trim();
+    const filtered = q ? list.filter(m => {
+        const t = (m.title || '').toLowerCase();
+        const sn = (m.searchName || '').toLowerCase();
+        return t.includes(q) || sn.includes(q);
+    }) : list;
+
+    if (filtered.length === 0) {
+        container.innerHTML = moviesDataLoaded
+            ? '<div class="admin-db-empty">No content found.</div>'
+            : '<div class="admin-db-empty">Loading content...</div>';
+        return;
+    }
+
+    filtered.forEach(movie => {
+        const isTv = movie.tmdbType === 'tv';
+        const card = document.createElement('div');
+        card.className = 'admin-db-card admin-ongoing-card';
+        card.innerHTML = `
+            <img class="admin-db-thumb" src="${movie.poster || ADMIN_POSTER_PLACEHOLDER}" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='${ADMIN_POSTER_PLACEHOLDER}';">
+            <div class="admin-db-info">
+                <div class="admin-db-title">${escapeHtml(stripYearSuffix(movie.title) || 'Untitled')}</div>
+                <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'} · <span class="admin-ongoing-status">${escapeHtml(getOngoingStatusText(movie))}</span></div>
+            </div>
+            <div class="admin-ongoing-actions">
+                <button type="button" class="admin-ongoing-toggle ${movie.ongoing ? 'on' : ''}">${movie.ongoing ? 'Ongoing: ON' : 'Ongoing: OFF'}</button>
+                <input type="number" min="1" class="admin-ongoing-season" placeholder="Season (latest)" value="${movie.ongoingSeason != null ? escapeAttr(movie.ongoingSeason) : ''}">
+                <span class="admin-server-save-status" aria-live="polite"></span>
+            </div>
+        `;
+        const toggle = card.querySelector('.admin-ongoing-toggle');
+        const seasonInput = card.querySelector('.admin-ongoing-season');
+        const statusEl = card.querySelector('.admin-server-save-status');
+        toggle.addEventListener('click', () => saveAdminOngoing(movie, { ongoing: !movie.ongoing }, statusEl));
+        let timer = null;
+        const saveSeason = () => {
+            clearTimeout(timer);
+            const raw = parseInt(seasonInput.value, 10);
+            const next = Number.isFinite(raw) && raw > 0 ? raw : null;
+            if ((movie.ongoingSeason || null) === next) return;
+            saveAdminOngoing(movie, { ongoingSeason: next }, statusEl);
+        };
+        seasonInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(saveSeason, 900); });
+        seasonInput.addEventListener('blur', saveSeason);
+        seasonInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSeason(); seasonInput.blur(); } });
+        container.appendChild(card);
+    });
+}
+
+async function saveAdminOngoing(movie, patch, statusEl) {
+    if (!movie || !movie.id) return false;
+    if (!ongoingColumnExists()) {
+        showToast('Ongoing column database-e nei - upore-r SQL ekbar run koro.', 'error');
+        return false;
+    }
+    if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Saving...'; }
+    try {
+        const { error } = await supabaseClient.from('movies').update(patch).eq('id', movie.id);
+        if (error) throw error;
+        Object.assign(movie, patch);
+        ongoingInfoMap.delete(movie.id);
+        ongoingPendingMap.delete(movie.id);
+        if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Saved'; }
+        showToast('Ongoing updated for "' + (movie.title || 'this item') + '"');
+        await refreshOngoingData(); // episode data abar load + order/homepage/admin list refresh
+        return true;
+    } catch (err) {
+        console.error('Save ongoing error:', err);
         if (statusEl) { statusEl.classList.add('err'); statusEl.textContent = 'Failed'; }
         showToast('Save failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
         return false;
