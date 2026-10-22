@@ -821,6 +821,56 @@ async function loadRecentEpisodeInfo() {
     }
 }
 
+// ==================== Refresh-er por scroll position dhore rakha ====================
+// Content async load hoy bole refresh-er shomoy browser page-ta chhoto thake, tai browser
+// nijer scroll restore korte pare na (top-e chole ashe). Tai nijeri position save kori
+// ar content load hole phire niye jai.
+const SCROLL_POS_KEY = 'bm_scroll_pos';
+let scrollSaveTimer = null;
+let scrollRestoreDone = false;
+let scrollRestoreCancelled = false;
+
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+function saveScrollPosition() {
+    try {
+        sessionStorage.setItem(SCROLL_POS_KEY, JSON.stringify({
+            key: location.pathname + location.search,
+            y: Math.round(window.scrollY || 0)
+        }));
+    } catch (e) { /* storage bondho thakle skip */ }
+}
+
+window.addEventListener('scroll', () => {
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = setTimeout(saveScrollPosition, 150);
+}, { passive: true });
+window.addEventListener('pagehide', saveScrollPosition);
+
+['wheel', 'touchstart', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, () => { scrollRestoreCancelled = true; }, { passive: true });
+});
+
+function restoreScrollPositionOnce() {
+    if (scrollRestoreDone) return;
+    scrollRestoreDone = true;
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(SCROLL_POS_KEY) || 'null'); } catch (e) { saved = null; }
+    if (!saved || saved.key !== (location.pathname + location.search) || !saved.y) return;
+    const target = saved.y;
+    const start = Date.now();
+    const attempt = () => {
+        if (scrollRestoreCancelled) return;
+        window.scrollTo(0, target);
+        const reached = Math.abs(window.scrollY - target) <= 2;
+        const maxHeightReached = (document.documentElement.scrollHeight - window.innerHeight) >= target;
+        if (reached || Date.now() - start > 6000) return;
+        if (!maxHeightReached) setTimeout(attempt, 120);
+        else setTimeout(attempt, 60);
+    };
+    attempt();
+}
+
 function ongoingBadgeHTML(movie) {
     return isOngoingActive(movie)
         ? '<span class="ongoing-badge"><span class="ongoing-dot"></span>Ongoing</span>'
@@ -1061,6 +1111,7 @@ async function fetchMoviesFromSupabase() {
                 safeSetUrl('replaceState', buildCategoryUrl(legacyRoute.category, legacyRoute.page));
             }
             switchCategory(initialCategory, initialPage);
+            restoreScrollPositionOnce(); // refresh-er por age-r scroll jaiga-te phire jai
             refreshOngoingData(); // ongoing content-er episode data load kore page-er 1 no jaigay bosay
             restoreMovieModalFromUrl(); // ?movie=<id> URL-e thakle (refresh) shei details page abar khule dao
 
