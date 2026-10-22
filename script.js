@@ -603,10 +603,26 @@ function getOngoingInfoField(movie, field) {
 
 // Ekhono ongoing ki na: flag on hole-o season-er shesh episode-er tarikh ekhono aseni thakle ongoing
 function isOngoingActive(movie) {
-    if (!movie || movie.ongoing !== true || movie.tmdbType !== 'tv') return false;
-    const info = ongoingInfoMap.get(movie.id);
-    if (!info) return true; // TMDB data ekhono aseni - manual flag-i dhore rakhi
-    return todayYMD() <= info.finalAired;
+    if (!movie || movie.tmdbType !== 'tv') return false;
+    // Admin-e ON button chaloo thakle sobsomoy ongoing (TMDB auto-check-er upore)
+    if (movie.ongoing === true) return true;
+    // ON na thakle TMDB theke automatic: season-er episode ekhono release holei ongoing
+    return isAutoOngoing(movie);
+}
+
+// TMDB tv status (per series) - movie.id -> { day, lastAir, lastSeason, nextAir, nextSeason }
+const tvStatusMap = new Map();
+
+// Series-er shesh episode-er season-er porer episode (next_episode_to_air) ekhono ache = season chole
+function isAutoOngoing(movie) {
+    if (!movie || movie.tmdbType !== 'tv') return false;
+    const st = tvStatusMap.get(movie.id);
+    if (!st) return false;
+    // (1) Latest season-er shesh episode ekhono ashe nai (ba aajke release hobe) -> ongoing
+    if (st.seasonReleased > 0 && st.seasonFinal && st.seasonFinal >= todayYMD()) return true;
+    // (2) TMDB-te porer episode dated (same season) -> ongoing
+    if (st.nextAir && (!st.lastSeason || !st.nextSeason || Number(st.lastSeason) === Number(st.nextSeason))) return true;
+    return false;
 }
 
 // TMDB tv id + season number theke episode air-date info (season na dile latest season)
@@ -698,7 +714,7 @@ async function refreshOngoingData() {
 
 // ---- Notun episode release (je kono series) -> 1 no position ----
 const NEW_EPISODE_WINDOW_DAYS = 7;   // ei kotodin por pinned soriye dewa hobe
-const RECENT_EP_CACHE_KEY = 'bm_recent_episode_v1';
+const RECENT_EP_CACHE_KEY = 'bm_tv_status_v3';
 const recentEpisodeMap = new Map();  // movie.id -> 'YYYY-MM-DD' (latest episode air date)
 let recentEpisodeRunning = false;
 
@@ -750,6 +766,11 @@ function writeRecentEpisodeCache(obj) {
     try { localStorage.setItem(RECENT_EP_CACHE_KEY, JSON.stringify(obj)); } catch (e) { /* storage na thakle skip */ }
 }
 
+function applyTvStatus(movieId, status) {
+    tvStatusMap.set(movieId, status);
+    recentEpisodeMap.set(movieId, status.lastAir || null);
+}
+
 // Sob series-er latest episode air-date TMDB theke ane (din-e ekbar cache). Ekta ekta kore, alpo alpo.
 async function loadRecentEpisodeInfo() {
     if (recentEpisodeRunning || !TMDB_API_KEY || !Array.isArray(allMovies)) return;
@@ -762,16 +783,34 @@ async function loadRecentEpisodeInfo() {
         for (const m of targets) {
             const cached = cache[m.id];
             if (cached && cached.day === today) {
-                recentEpisodeMap.set(m.id, cached.lastAir || null);
+                applyTvStatus(m.id, cached);
                 continue;
             }
             try {
                 const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${m.tmdbId}?api_key=${TMDB_API_KEY}`, {}, 6000);
                 if (!res.ok) continue;
                 const data = await res.json();
-                const lastAir = (data.last_episode_to_air && data.last_episode_to_air.air_date) || null;
-                cache[m.id] = { day: today, lastAir };
-                recentEpisodeMap.set(m.id, lastAir);
+                const last = data.last_episode_to_air || {};
+                const next = data.next_episode_to_air || {};
+                const status = {
+                    day: today,
+                    lastAir: last.air_date || null,
+                    lastSeason: last.season_number || null,
+                    nextAir: next.air_date || null,
+                    nextSeason: next.season_number || null,
+                    seasonFinal: null,
+                    seasonReleased: 0
+                };
+                // Latest season-er episode-er tarikh (shesh episode ekhono baki kina)
+                if (status.lastSeason) {
+                    const seasonInfo = await fetchSeasonAirInfo(m.tmdbId, status.lastSeason).catch(() => null);
+                    if (seasonInfo) {
+                        status.seasonFinal = seasonInfo.finalAired;
+                        status.seasonReleased = seasonInfo.released;
+                    }
+                }
+                cache[m.id] = status;
+                applyTvStatus(m.id, status);
                 changed = true;
             } catch (e) { /* ek-ta fail hole baaki gulo chalbe */ }
             await new Promise(r => setTimeout(r, 120)); // TMDB rate limit-er jonno choto gap
@@ -2492,6 +2531,7 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
+            ${isOngoingActive(movie) ? '<span class="ongoing-card-tag">Ongoing</span>' : ''}
             <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${escapeAttr(stripYearSuffix(movie.title))}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${escapeHtml(stripYearSuffix(movie.title) || 'Untitled')}${getCardYearLabel(movie) ? ` <span class="movie-card-year">(${escapeHtml(getCardYearLabel(movie))})</span>` : ''}</p></div>
@@ -2866,6 +2906,7 @@ fastServersList.forEach((fs, fIdx) => {
                     <span class="star-icon">★</span>
                     <span id="modalRatingVal">${finalRating}</span>/10
                 </div>
+                ${isOngoingActive(movie) ? '<span class="ongoing-card-tag">Ongoing</span>' : ''}
                 <img src="${upgradePosterQuality(poster)}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
             </div>
             <div class="card-header-info">
@@ -2873,8 +2914,8 @@ fastServersList.forEach((fs, fIdx) => {
                 ${buildOriginalTitleLineHTML(movie)}
                 <p class="card-tagline" id="modalTagline">${tagline}</p>
                 <p class="card-meta-subtitle">${genre} ${releaseDate !== "N/A" ? '| ' + releaseDate : ''}</p>
-                ${ongoingBadgeHTML(movie)}
                 <div class="card-stats-row">
+                ${ongoingBadgeHTML(movie)}
                     ${uploadedAtLabel ? `
                     <span class="stat-item">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7V12L15.5 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -10800,7 +10841,13 @@ async function saveAdminOriginalTitle(movie, value, statusEl) {
 
 // Ongoing tab - content-er ongoing on/off + season set kora, status dekhano
 function getOngoingStatusText(movie) {
-    if (!movie.ongoing) return 'Not ongoing';
+    if (!movie.ongoing) {
+        if (isAutoOngoing(movie)) {
+            const st = tvStatusMap.get(movie.id);
+            return 'Auto ongoing (TMDB) · Season ' + (st.nextSeason || st.lastSeason || '?') + ' · next episode ' + (st.nextAir || 'TBA');
+        }
+        return 'Not ongoing (auto)';
+    }
     if (!ongoingInfoMap.has(movie.id)) return 'Ongoing · checking episodes...';
     const info = ongoingInfoMap.get(movie.id);
     if (!info) return 'Ongoing · manual (TMDB episode data not found)';
@@ -10850,7 +10897,7 @@ function renderAdminOngoingList(filter) {
                 <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'} · <span class="admin-ongoing-status">${escapeHtml(getOngoingStatusText(movie))}</span></div>
             </div>
             <div class="admin-ongoing-actions">
-                <button type="button" class="admin-ongoing-toggle ${movie.ongoing ? 'on' : ''}">${movie.ongoing ? 'Ongoing: ON' : 'Ongoing: OFF'}</button>
+                <button type="button" class="admin-ongoing-toggle ${movie.ongoing ? 'on' : ''}" title="ON = force ongoing. OFF = automatic from TMDB">${movie.ongoing ? 'Ongoing: ON (manual)' : 'Auto (TMDB)'}</button>
                 <input type="number" min="1" class="admin-ongoing-season" placeholder="Season (latest)" value="${movie.ongoingSeason != null ? escapeAttr(movie.ongoingSeason) : ''}">
                 <span class="admin-server-save-status" aria-live="polite"></span>
             </div>

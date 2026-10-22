@@ -5495,12 +5495,11 @@ html.light-mode .card-original-title span { color: #6b7280; }
     .admin-original-input { flex: 1; width: auto; }
 }
 
-/* Ongoing badge (details page) */
+/* Ongoing badge (details page) - shudhu green dot + text, kono background/border nei; date-er age boshe */
 .ongoing-badge {
-    display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 8px;
-    padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 800;
-    letter-spacing: .6px; text-transform: uppercase; color: #bbf7d0;
-    background: rgba(34, 197, 94, 0.14); border: 1px solid rgba(34, 197, 94, 0.45);
+    display: inline-flex; align-items: center; gap: 6px; margin: 0 4px 0 0;
+    font-size: 12px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+    color: #22c55e;
 }
 .ongoing-dot {
     width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
@@ -5511,7 +5510,7 @@ html.light-mode .card-original-title span { color: #6b7280; }
     70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
     100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
-html.light-mode .ongoing-badge { color: #166534; background: rgba(34, 197, 94, 0.12); }
+html.light-mode .ongoing-badge { color: #16a34a; }
 
 /* Admin Ongoing tab */
 .admin-ongoing-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
@@ -5530,3 +5529,46 @@ html.light-mode .ongoing-badge { color: #166534; background: rgba(34, 197, 94, 0
     .admin-ongoing-actions { width: 100%; margin-left: 0; }
     .admin-ongoing-season { flex: 1; width: auto; }
 }
+
+/* Poster-er upor-er dane (heart-er paasher jaigay) ONGOING green dot - chhoto dot, boro pulse */
+.card-poster-side { position: relative; }
+.ongoing-poster-dot {
+    position: absolute; top: 16px; right: 52px; z-index: 3;
+    width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.75);
+    animation: ongoingPulseWide 1.6s ease-out infinite;
+}
+@keyframes ongoingPulseWide {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.75); }
+    100% { box-shadow: 0 0 0 16px rgba(34, 197, 94, 0); }
+}
+
+/* Card-er poster-er niche-dane ONGOING tag (border + background, dot nei) */
+.ongoing-card-tag {
+    position: absolute; right: 8px; bottom: 8px; z-index: 3;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+    color: #bbf7d0; background: rgba(10, 12, 18, 0.78);
+    border: 1px solid rgba(34, 197, 94, 0.7);
+    pointer-events: none;
+}
+html.light-mode .ongoing-card-tag { color: #166534; background: rgba(255, 255, 255, 0.9); border-color: #16a34a; }
+/* ONGOING text color animation (card tag + details badge) */
+@keyframes ongoingTextColor {
+    0%   { color: #bbf7d0; }
+    33%  { color: #4ade80; }
+    66%  { color: #22c55e; }
+    100% { color: #bbf7d0; }
+}
+.ongoing-card-tag { animation: ongoingTextColor 2.4s ease-in-out infinite; }
+.ongoing-badge { animation: ongoingTextColor 2.4s ease-in-out infinite; }
+html.light-mode .ongoing-card-tag,
+html.light-mode .ongoing-badge { animation-name: ongoingTextColorLight; }
+@keyframes ongoingTextColorLight {
+    0%   { color: #166534; }
+    50%  { color: #16a34a; }
+    100% { color: #166534; }
+}
+
+/* Details poster: niche-dane ONGOING tag */
+.card-poster-side .ongoing-card-tag { z-index: 5; }
