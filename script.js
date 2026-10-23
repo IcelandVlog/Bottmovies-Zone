@@ -12981,6 +12981,68 @@ function buildBrowseQuery(type, page) {
     return `${TMDB_BASE_URL}/discover/${type}?${params.toString()}`;
 }
 
+// ===== IMDb list (Most Popular / Top Rated) =====
+// build-imdb-lists.js diye banano imdb-lists.json theke list nei. File na thakle TMDB discover-e fallback.
+const IMDB_LISTS_URL = '/imdb-lists.json';
+const IMDB_PAGE_SIZE = 20;
+let imdbListsCache = undefined; // undefined = ekhono load hoy ni, null = file nei, object = loaded
+
+function getImdbLists() {
+    if (imdbListsCache !== undefined) return Promise.resolve(imdbListsCache);
+    return fetch(IMDB_LISTS_URL, { cache: 'no-cache' })
+        .then(r => { if (!r.ok) throw new Error('imdb-lists.json ' + r.status); return r.json(); })
+        .then(data => { imdbListsCache = data; return data; })
+        .catch(() => { imdbListsCache = null; return null; });
+}
+
+// Shudhu Sort by select thakle ar genre/OTT/Anime filter na thakle IMDb list byabohar hoy
+function browseUsesImdbList() {
+    return browseState.sortSel !== null
+        && browseState.genreSel.size === 0
+        && browseState.ottSel.size === 0
+        && !browseState.animeSel
+        && !!imdbListsCache;
+}
+
+function imdbItemToBrowseItem(x) {
+    const date = x.year ? String(x.year) + '-01-01' : '';
+    return {
+        id: x.tmdbId,
+        media_type: x.type === 'tv' ? 'tv' : 'movie',
+        title: x.title,
+        name: x.title,
+        release_date: x.type === 'movie' ? date : '',
+        first_air_date: x.type === 'tv' ? date : '',
+        poster_path: x.poster_path,
+        backdrop_path: x.backdrop_path || null,
+        vote_average: x.rating,
+        popularity: x.votes
+    };
+}
+
+function loadBrowseFromImdbList(reqId) {
+    const key = browseState.sortSel === 'top' ? 'topRated' : 'mostPopular';
+    const list = (imdbListsCache && imdbListsCache[key]) || [];
+    const filtered = list.filter(x => {
+        if (browseState.typeSel === 'movie') return x.type === 'movie';
+        if (browseState.typeSel === 'tv') return x.type === 'tv';
+        return true;
+    });
+    const start = (browseState.page - 1) * IMDB_PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + IMDB_PAGE_SIZE);
+    if (reqId !== browseState.requestId) return;
+    pageItems.map(imdbItemToBrowseItem).forEach(r => {
+        const k = r.media_type + ':' + r.id;
+        if (browseState.seen.has(k)) return;
+        browseState.seen.add(k);
+        browseState.items.push(r);
+    });
+    browseState.hasMore = start + IMDB_PAGE_SIZE < filtered.length;
+    browseState.page++;
+    browseState.loading = false;
+    renderBrowseResults();
+}
+
 async function loadBrowseResults(reset) {
     const hasFilter = browseHasFilter();
     if (reset) {
@@ -12995,9 +13057,21 @@ async function loadBrowseResults(reset) {
     }
     if (!hasFilter) return;
     if (browseState.loading || !browseState.hasMore && !reset) return;
+    // IMDb list ekhono load hoy ni: load kore abar load korbo
+    if (browseState.sortSel !== null && imdbListsCache === undefined
+        && browseState.genreSel.size === 0 && browseState.ottSel.size === 0 && !browseState.animeSel) {
+        getImdbLists().then(() => loadBrowseResults(true));
+        return;
+    }
     if (!TMDB_API_KEY) return;
 
     const reqId = browseState.requestId;
+    if (browseUsesImdbList()) {
+        browseState.loading = true;
+        renderBrowseResults();
+        loadBrowseFromImdbList(reqId);
+        return;
+    }
     const types = ['movie', 'tv'].map(t => ({ type: t, url: buildBrowseQuery(t, browseState.page) })).filter(x => x.url);
     if (!types.length) {
         browseState.hasMore = false;
