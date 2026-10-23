@@ -732,11 +732,7 @@ function getPinDate(movie) {
     const windowStart = daysAgoYMD(NEW_EPISODE_WINDOW_DAYS);
     const today = todayYMD();
     const candidates = [];
-    // 1) Ongoing series-er shesh release
-    if (isOngoingActive(movie)) {
-        const last = getOngoingInfoField(movie, 'lastAired');
-        candidates.push(last || '0000-00-00');
-    }
+    // Ongoing shudhu-i pin kore na - pin hoy shudhu EVENT-e: 1) notun episode release (window-er moddhe)
     // 2) Series-er notun episode (TMDB) - shudhu series
     if (movie.tmdbType === 'tv') {
         const recent = recentEpisodeMap.get(movie.id);
