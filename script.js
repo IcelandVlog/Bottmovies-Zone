@@ -12739,6 +12739,10 @@ const BROWSE_TYPE_OPTIONS = [
     { key: 'tv',    label: 'Series' }
 ];
 const BROWSE_ANIME_COLOR = '#fb923c';
+const BROWSE_SORT_OPTIONS = [
+    { key: 'popular', label: 'Most popular' },
+    { key: 'top',     label: 'Top rated' }
+];
 // Genre jeta TMDB-te ei type-e nei, tar bodole keyword ID (TMDB keyword: horror = 10292)
 const BROWSE_KEYWORD_FALLBACK = { 'Horror': 10292, 'Romance': 9799 };
 const BROWSE_CHIP_COLORS = ['#ef4444', '#a78bfa', '#f59e0b', '#22c55e', '#f472b6', '#38bdf8', '#fb7185', '#60a5fa', '#2dd4bf', '#c084fc', '#facc15', '#34d399', '#f97316', '#818cf8'];
@@ -12748,6 +12752,7 @@ const browseState = {
     genreSel: new Set(), // genre name-er set
     ottSel: new Set(),   // provider ID-er set
     typeSel: 'all',      // 'all' | 'movie' | 'tv'
+    sortSel: null,       // null | 'popular' | 'top' (Sort by chip; null = kono sort select kora nai)
     animeSel: false,     // Anime filter (Japanese-language Animation)
     page: 1,
     items: [],
@@ -12763,6 +12768,7 @@ function initBrowseTmdbSection() {
     if (!document.getElementById('browseTmdbSection')) return;
     renderBrowseTypeChips();
     renderBrowseOttChips();
+    renderBrowseSortChips();
     renderBrowseResults();
     loadBrowseGenres();
     setupBrowseInfiniteScroll();
@@ -12846,6 +12852,21 @@ function toggleBrowseType(key) {
     onBrowseFilterChanged();
 }
 
+function renderBrowseSortChips() {
+    const row = document.getElementById('browseSortChips');
+    if (!row) return;
+    row.innerHTML = BROWSE_SORT_OPTIONS.map((o, i) => {
+        const selected = browseState.sortSel === o.key;
+        return `<button type="button" class="browse-chip" style="--c:${browseChipColor(i + 16)}" aria-pressed="${selected}" onclick="toggleBrowseSort('${o.key}')">${escapeHtml(o.label)}</button>`;
+    }).join('');
+}
+
+function toggleBrowseSort(key) {
+    browseState.sortSel = browseState.sortSel === key ? null : key;
+    renderBrowseSortChips();
+    onBrowseFilterChanged();
+}
+
 function toggleBrowseAnime() {
     browseState.animeSel = !browseState.animeSel;
     renderGenreChips();
@@ -12854,7 +12875,7 @@ function toggleBrowseAnime() {
 
 function browseHasFilter() {
     return browseState.genreSel.size > 0 || browseState.ottSel.size > 0
-        || browseState.animeSel || browseState.typeSel !== 'all';
+        || browseState.animeSel || browseState.typeSel !== 'all' || browseState.sortSel !== null;
 }
 
 function renderBrowseOttChips() {
@@ -12890,6 +12911,8 @@ function clearBrowseFilters() {
     browseState.ottSel.clear();
     browseState.animeSel = false;
     browseState.typeSel = 'all';
+    browseState.sortSel = null;
+    renderBrowseSortChips();
     renderBrowseTypeChips();
     renderGenreChips();
     renderBrowseOttChips();
@@ -12904,6 +12927,7 @@ function onBrowseFilterChanged() {
         parts.push(BROWSE_TYPE_OPTIONS.find(t => t.key === browseState.typeSel).label);
     }
     if (browseState.animeSel) parts.push('Anime');
+    if (browseState.sortSel) parts.push(BROWSE_SORT_OPTIONS.find(o => o.key === browseState.sortSel).label);
     if (browseState.genreSel.size) parts.push([...browseState.genreSel].join(', '));
     if (browseState.ottSel.size) {
         parts.push(BROWSE_OTT_PROVIDERS.filter(p => browseState.ottSel.has(p.id)).map(p => p.name).join(', '));
@@ -12940,6 +12964,11 @@ function buildBrowseQuery(type, page) {
         else params.set('with_keywords', kws.join('|'));
     }
     // Anime = Japanese-language Animation (TMDB-te alada "anime" genre nei)
+    // Sort: Top rated hole vote_average diye, kom vote-er content bad diye (na hole ajob rating-er content aashe)
+    if (browseState.sortSel === 'top') {
+        params.set('sort_by', 'vote_average.desc');
+        params.set('vote_count.gte', '200');
+    }
     if (browseState.animeSel) {
         params.set('with_original_language', 'ja');
         if (!browseState.genreSel.size) params.set('with_genres', '16');
@@ -12990,7 +13019,8 @@ async function loadBrowseResults(reset) {
             (data.results || []).forEach(r => merged.push({ ...r, media_type: types[i].type }));
         });
         merged = merged.filter(r => r.poster_path);
-        merged.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        if (browseState.sortSel === 'top') merged.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+        else merged.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
         merged.forEach(r => {
             const key = r.media_type + ':' + r.id;
             if (browseState.seen.has(key)) return;

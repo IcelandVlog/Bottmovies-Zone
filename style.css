@@ -5380,7 +5380,7 @@ html.light-mode .browse-card:hover img { box-shadow: 0 8px 22px rgba(0, 0, 0, 0.
 html.light-mode .browse-block-title, html.light-mode .browse-card-title { color: #14161c; }
 html.light-mode .browse-chip { background: #ffffff; }
 html.light-mode .browse-selected-label, html.light-mode .browse-status, html.light-mode .browse-card-meta { color: #5b6472; }
-html.light-mode .browse-chip[aria-pressed="true"] { color: #0b0d12; }
+html.light-mode .browse-chip[aria-pressed="true"] { background: var(--c); color: #0b0d12; box-shadow: 0 0 14px -2px var(--c); }
 
 @media (max-width: 600px) {
     .browse-tmdb-section { padding: 0 16px; }
@@ -5591,3 +5591,26 @@ html.light-mode .ongoing-poster-dot { background: #ea580c; box-shadow: 0 0 0 0 r
     border: 1px solid #ea580c; background: rgba(234, 88, 12, 0.12); color: #fb923c;
 }
 .admin-ongoing-bump:hover { background: rgba(234, 88, 12, 0.22); }
+
+/* Light mode: poster-er niche-er dark fade (dark mode-er jonno) hover-e poster-ke kalo dekhachhilo - light mode-e soriye dewa holo */
+html.light-mode .poster-wrapper::after { display: none; }
+
+/* Light mode: Download ZIP + Copy Link button - dark navy-r bodole orange */
+html.light-mode .btn-zip-download,
+html.light-mode .btn-copy-link {
+    background: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+    border-color: #ea580c;
+    box-shadow: 0 2px 10px rgba(234, 88, 12, 0.28);
+    color: #ffffff;
+}
+html.light-mode .btn-zip-download:hover,
+html.light-mode .btn-copy-link:hover {
+    box-shadow: 0 4px 16px rgba(234, 88, 12, 0.42);
+}
+
+/* Light mode: details page-er poster-er chaaridike border */
+html.light-mode .card-poster-side img#modalPosterImg,
+html.light-mode .card-poster-side > img {
+    border: 2px solid #f97316;
+    box-shadow: 0 8px 22px rgba(249, 115, 22, 0.22);
+}
