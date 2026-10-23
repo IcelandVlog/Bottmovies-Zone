@@ -727,28 +727,30 @@ function daysAgoYMD(days) {
 
 // Ongoing series hole shesh episode-er tarikh; na hole notun episode gotoy window-er moddhe
 // release hole sheta. Na hole null (pin hobe na).
+// Pin-er sort key (ISO-like string, tulona-r jonno). Ongoing shudhu-i pin kore na - pin hoy shudhu
+// EVENT-e: notun content add (ongoing gulo-r 2 no), link update / Update button (1 no), ar series-er
+// notun episode release. Event-er pore sheta sheshe kono notun event na holeo kichu window porjonto thake.
 function getPinDate(movie) {
     if (!movie) return null;
     const windowStart = daysAgoYMD(NEW_EPISODE_WINDOW_DAYS);
     const today = todayYMD();
     const candidates = [];
-    // Ongoing shudhu-i pin kore na - pin hoy shudhu EVENT-e: 1) notun episode release (window-er moddhe)
-    // 2) Series-er notun episode (TMDB) - shudhu series
+    // 1) Series-er notun episode (TMDB)
     if (movie.tmdbType === 'tv') {
         const recent = recentEpisodeMap.get(movie.id);
-        if (recent && recent >= windowStart && recent <= today) candidates.push(recent);
+        if (recent && recent >= windowStart && recent <= today) candidates.push(recent + 'T00:00:00.000Z');
     }
-    // 3) Link change / notun link add (admin theke)
+    // 2) Link change / notun content add / manual Update (linkUpdatedAt)
     if (movie.linkUpdatedAt) {
         const d = new Date(movie.linkUpdatedAt);
         if (!isNaN(d.getTime())) {
             const pad = n => String(n).padStart(2, '0');
             const ymd = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-            if (ymd >= windowStart && ymd <= today) candidates.push(ymd);
+            if (ymd >= windowStart && ymd <= today) candidates.push(d.toISOString());
         }
     }
     if (!candidates.length) return null;
-    return candidates.sort().pop(); // sob-er notun tarikh
+    return candidates.sort().pop(); // sob-er notun event
 }
 
 function readRecentEpisodeCache() {
@@ -9036,6 +9038,9 @@ async function submitAdminContent() {
             submitBtn.textContent = 'Saving...';
         }
 
+        // Notun content add holey linkUpdatedAt stamp -> ei content 1 no-te thakbe
+        if (!editingId && linkUpdatedColumnExists()) payload.linkUpdatedAt = new Date().toISOString();
+
         let error;
         let insertedId = null;
         if (editingId) {
@@ -9051,6 +9056,19 @@ async function submitAdminContent() {
         // Notun series add korle TMDB-te episode ekhono release holei auto ongoing
         if (!editingId && insertedId) {
             await autoSetOngoingForNewSeries(insertedId, payload.tmdbId, payload.tmdbType);
+        }
+
+        // Notun content add holey ongoing series-gulo ekhon 2 no-te jabe (new content-er 1 second agey stamp)
+        if (!editingId && insertedId && linkUpdatedColumnExists()) {
+            const ongoingIds = (Array.isArray(allMovies) ? allMovies : [])
+                .filter(m => m.id !== insertedId && isOngoingActive(m))
+                .map(m => m.id);
+            if (ongoingIds.length) {
+                const { error: bumpErr } = await supabaseClient.from('movies')
+                    .update({ linkUpdatedAt: new Date(Date.now() - 1000).toISOString() })
+                    .in('id', ongoingIds);
+                if (bumpErr) console.error('Ongoing bump error:', bumpErr);
+            }
         }
 
         msgEl.textContent = editingId ? '✅ Content updated successfully!' : '✅ Content added successfully!';
@@ -10945,6 +10963,7 @@ function renderAdminOngoingList(filter) {
             </div>
             <div class="admin-ongoing-actions">
                 <button type="button" class="admin-ongoing-toggle ${movie.ongoing ? 'on' : ''}" title="ON = force ongoing. OFF = automatic from TMDB">${movie.ongoing ? 'Ongoing: ON (manual)' : 'Auto (TMDB)'}</button>
+                <button type="button" class="admin-ongoing-bump" title="Ekhon click korle 1 no position-e jabe">Update ↑</button>
                 <input type="number" min="1" class="admin-ongoing-season" placeholder="Season (latest)" value="${movie.ongoingSeason != null ? escapeAttr(movie.ongoingSeason) : ''}">
                 <span class="admin-server-save-status" aria-live="polite"></span>
             </div>
@@ -10953,6 +10972,7 @@ function renderAdminOngoingList(filter) {
         const seasonInput = card.querySelector('.admin-ongoing-season');
         const statusEl = card.querySelector('.admin-server-save-status');
         toggle.addEventListener('click', () => saveAdminOngoing(movie, { ongoing: !movie.ongoing }, statusEl));
+        card.querySelector('.admin-ongoing-bump').addEventListener('click', () => bumpMovieToTop(movie, statusEl));
         let timer = null;
         const saveSeason = () => {
             clearTimeout(timer);
@@ -10966,6 +10986,31 @@ function renderAdminOngoingList(filter) {
         seasonInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSeason(); seasonInput.blur(); } });
         container.appendChild(card);
     });
+}
+
+// Manual Update: ei content ekhon 1 no position-e chole jabe
+async function bumpMovieToTop(movie, statusEl) {
+    if (!movie || !movie.id) return false;
+    if (!linkUpdatedColumnExists()) {
+        showToast('linkUpdatedAt column database-e nei - SQL run koro.', 'error');
+        return false;
+    }
+    if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Updating...'; }
+    try {
+        const nowIso = new Date().toISOString();
+        const { error } = await supabaseClient.from('movies').update({ linkUpdatedAt: nowIso }).eq('id', movie.id);
+        if (error) throw error;
+        movie.linkUpdatedAt = nowIso;
+        if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Moved to #1'; }
+        showToast('"' + (movie.title || 'this item') + '" ekhon 1 no-te gechhe');
+        await refreshOngoingData();
+        return true;
+    } catch (err) {
+        console.error('Bump error:', err);
+        if (statusEl) { statusEl.classList.add('err'); statusEl.textContent = 'Failed'; }
+        showToast('Update failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        return false;
+    }
 }
 
 async function saveAdminOngoing(movie, patch, statusEl) {
