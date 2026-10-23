@@ -9039,7 +9039,8 @@ async function submitAdminContent() {
         }
 
         // Notun content add holey linkUpdatedAt stamp -> ei content 1 no-te thakbe
-        if (!editingId && linkUpdatedColumnExists()) payload.linkUpdatedAt = new Date().toISOString();
+        const newContentStamp = new Date().toISOString();
+        if (!editingId && linkUpdatedColumnExists()) payload.linkUpdatedAt = newContentStamp;
 
         let error;
         let insertedId = null;
@@ -9065,7 +9066,7 @@ async function submitAdminContent() {
                 .map(m => m.id);
             if (ongoingIds.length) {
                 const { error: bumpErr } = await supabaseClient.from('movies')
-                    .update({ linkUpdatedAt: new Date(Date.now() - 1000).toISOString() })
+                    .update({ linkUpdatedAt: new Date(new Date(newContentStamp).getTime() - 1000).toISOString() })
                     .in('id', ongoingIds);
                 if (bumpErr) console.error('Ongoing bump error:', bumpErr);
             }
