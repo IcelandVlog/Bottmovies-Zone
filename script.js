@@ -9059,19 +9059,6 @@ async function submitAdminContent() {
             await autoSetOngoingForNewSeries(insertedId, payload.tmdbId, payload.tmdbType);
         }
 
-        // Notun content add holey ongoing series-gulo ekhon 2 no-te jabe (new content-er 1 second agey stamp)
-        if (!editingId && insertedId && linkUpdatedColumnExists()) {
-            const ongoingIds = (Array.isArray(allMovies) ? allMovies : [])
-                .filter(m => m.id !== insertedId && isOngoingActive(m))
-                .map(m => m.id);
-            if (ongoingIds.length) {
-                const { error: bumpErr } = await supabaseClient.from('movies')
-                    .update({ linkUpdatedAt: new Date(new Date(newContentStamp).getTime() - 1000).toISOString() })
-                    .in('id', ongoingIds);
-                if (bumpErr) console.error('Ongoing bump error:', bumpErr);
-            }
-        }
-
         msgEl.textContent = editingId ? '✅ Content updated successfully!' : '✅ Content added successfully!';
         if (posterRefreshFailed) {
             msgEl.textContent += ' ⚠️ IMDb/TMDB ID was changed - no poster could be found automatically for the new ID, so the poster may be empty or still the old one. Please manually enter a valid poster link/file in the Poster Link field.';
