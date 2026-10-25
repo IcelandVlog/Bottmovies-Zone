@@ -565,21 +565,19 @@ function applyManualSerialPositions(list) {
         .sort((a, b) => (a.m.display_order - b.m.display_order) || (a.idx - b.idx))
         .map(entry => entry.m);
 
-    const result = autoItems.slice();
+    // Auto (serial chara) content-er moddhe pinned gulo age thake (notun content / notun episode / link update).
+    // Manual serial-wala content admin-er set kora position-e-i thake - pin tader position bodle dey na.
+    const autoPinned = autoItems.filter(m => getPinDate(m))
+        .sort((a, b) => String(getPinDate(b)).localeCompare(String(getPinDate(a))));
+    const autoPinnedIds = new Set(autoPinned.map(m => m.id));
+    const result = [...autoPinned, ...autoItems.filter(m => !autoPinnedIds.has(m.id))];
     manualItems.forEach(item => {
         let pos = Math.round(item.display_order) - 1;
         if (Number.isNaN(pos) || pos < 0) pos = 0;
         if (pos > result.length) pos = result.length;
         result.splice(pos, 0, item);
     });
-    // Ongoing (ekhono season shesh hoyni) content sob-er upore (1 no position) thake.
-    // Ekadhik ongoing hole sheta-r shesh release-er tarikh-er shomoy-er ulto krome (notun episode aage).
-    // Ar je kono series-er notun episode gotoy NEW_EPISODE_WINDOW_DAYS-er moddhe release hoyeche, tarao 1 no-te.
-    const pinned = result.filter(m => getPinDate(m))
-        .sort((a, b) => String(getPinDate(b)).localeCompare(String(getPinDate(a))));
-    if (!pinned.length) return result;
-    const pinnedIds = new Set(pinned.map(m => m.id));
-    return [...pinned, ...result.filter(m => !pinnedIds.has(m.id))];
+    return result;
 }
 
 // ==================== Ongoing (TV series) ====================
