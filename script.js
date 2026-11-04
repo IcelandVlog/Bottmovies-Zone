@@ -10993,7 +10993,13 @@ async function bumpMovieToTop(movie, statusEl) {
         movie.display_order = null;
         if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Moved to #1'; }
         showToast('"' + (movie.title || 'this item') + '" ekhon 1 no-te gechhe');
+        // Update-er pore sorasori 1 no page-e niye jai, jate ei content-ta sheshe chokhe pore
         await refreshOngoingData();
+        sortAllMoviesByDisplayOrder();
+        reorderFilteredMoviesToMatchAllMovies();
+        if (Array.isArray(currentFilteredMovies) && currentFilteredMovies.length) {
+            renderMoviesByPage(currentFilteredMovies, 1);
+        }
         return true;
     } catch (err) {
         console.error('Bump error:', err);
