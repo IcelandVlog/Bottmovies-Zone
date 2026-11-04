@@ -906,7 +906,7 @@ function parseDownloadBlocksValue(val) {
     try { return JSON.parse(val) || []; } catch (e) { return []; }
 }
 
-// Ager list-e je link chhilo na, emon link add/change hole TRUE
+// Ager list-e je link chhilo na, emon link add/change (address change) hole TRUE
 function hasNewLinks(oldBlocks, newBlocks) {
     const oldSet = new Set(collectAllLinkUrls(oldBlocks));
     return collectAllLinkUrls(newBlocks).some(u => !oldSet.has(u));
