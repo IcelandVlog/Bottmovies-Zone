@@ -8980,7 +8980,9 @@ async function submitAdminContent() {
         if (editingId && linkUpdatedColumnExists()) {
             const oldMovie = allMovies.find(m => String(m.id) === String(editingId));
             const oldBlocks = oldMovie ? parseDownloadBlocksValue(oldMovie.downloadBlocks) : [];
-            if (hasNewLinks(oldBlocks, downloadBlocks)) linkStampPatch = { linkUpdatedAt: new Date().toISOString() };
+            // Notun link ba notun season (link chhara-o) add hole-o 1 no-te jabe
+            const seasonAdded = Array.isArray(downloadBlocks) && Array.isArray(oldBlocks) && downloadBlocks.length > oldBlocks.length;
+            if (seasonAdded || hasNewLinks(oldBlocks, downloadBlocks)) linkStampPatch = { linkUpdatedAt: new Date().toISOString() };
         }
 
         const payload = {
@@ -10984,9 +10986,11 @@ async function bumpMovieToTop(movie, statusEl) {
     if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Updating...'; }
     try {
         const nowIso = new Date().toISOString();
-        const { error } = await supabaseClient.from('movies').update({ linkUpdatedAt: nowIso }).eq('id', movie.id);
+        // Update chaple manual Serial (display_order) khali kore dey, jate content sotti 1 no-te jay
+        const { error } = await supabaseClient.from('movies').update({ linkUpdatedAt: nowIso, display_order: null }).eq('id', movie.id);
         if (error) throw error;
         movie.linkUpdatedAt = nowIso;
+        movie.display_order = null;
         if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Moved to #1'; }
         showToast('"' + (movie.title || 'this item') + '" ekhon 1 no-te gechhe');
         await refreshOngoingData();
