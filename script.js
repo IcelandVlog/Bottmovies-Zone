@@ -8982,7 +8982,8 @@ async function submitAdminContent() {
             const oldBlocks = oldMovie ? parseDownloadBlocksValue(oldMovie.downloadBlocks) : [];
             // Notun link ba notun season (link chhara-o) add hole-o 1 no-te jabe
             const seasonAdded = Array.isArray(downloadBlocks) && Array.isArray(oldBlocks) && downloadBlocks.length > oldBlocks.length;
-            if (seasonAdded || hasNewLinks(oldBlocks, downloadBlocks)) linkStampPatch = { linkUpdatedAt: new Date().toISOString() };
+            // Link/season change hole manual Serial-o khali hoye jabe, jate automatically 1 no-te jay
+            if (seasonAdded || hasNewLinks(oldBlocks, downloadBlocks)) linkStampPatch = { linkUpdatedAt: new Date().toISOString(), display_order: null };
         }
 
         const payload = {
