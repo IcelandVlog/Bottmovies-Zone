@@ -7805,7 +7805,7 @@ function mediaScanParseStreamLogs(lines, mkvInfo) {
     // "Spain", "Brazil", "Simplified"...)। তাই দুই ধাপে চেষ্টা করা হচ্ছে:
     // ১) title-এ সরাসরি hyphenated locale code (es-LA) থাকলে সেটা, ২) না থাকলে
     // base language + title-এর qualifier শব্দ মিলিয়ে regional label বানানো।
-    function resolveTrack(t) {
+    function resolveTrackBase(t) {
         // t.ietf/t.code dutoi null hote pare jodi track-e kono "language:"
         // metadata line-i na thake (FFmpeg log-e "und" likhe-o na, kichu-i na) -
         // agey ei obosthay resolveTrack() null return korto, fole track-ta
@@ -7831,6 +7831,22 @@ function mediaScanParseStreamLogs(lines, mkvInfo) {
             if (regional) return regional;
         }
         return baseName;
+    }
+
+    // Track name (title) jeta ache, sheta-i dekhano hoy:
+    // - title shuru hoy ভাষার নাম দিয়ে (যেমন "English [SDH]") -> title-i হুবহু
+    // - title ভাষার নামের সমান বা regional label আগেই হয়েছে -> ভাষার নামই
+    // - onno title (যেমন "Commentary") -> "English (Commentary)"
+    function resolveTrack(t) {
+        const name = resolveTrackBase(t);
+        const title = t.title ? String(t.title).trim() : '';
+        if (!title || !name || name === 'Unknown') return name;
+        if (name.includes('(') || name.includes('[')) return name;
+        const lowerTitle = title.toLowerCase();
+        const lowerName = name.toLowerCase();
+        if (lowerTitle === lowerName) return name;
+        if (lowerTitle.startsWith(lowerName)) return title;
+        return name + ' (' + title + ')';
     }
 
     audioTracks.forEach(t => { const n = resolveTrack(t); if (n) audio.push(n); });
