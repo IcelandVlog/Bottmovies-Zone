@@ -7965,6 +7965,13 @@ function mediaScanMergeHistory(historyKey) {
     const totalScans = mediaScanHistory.length;
     if (totalScans === 0) return { labels: [], count: 0, commonCount: 0 };
 
+    // Movie hole: ekadhik video scan korle (ekta movie-r ekadhik file) sob audio/subtitle
+    // ek-i set-e mile jabe - kono "(S01 Only)" tag ba duplicate thakbe na
+    if (adminTmdbType === 'movie') {
+        const uniq = [...new Set(mediaScanHistory.flatMap(scan => scan[historyKey] || []))];
+        return { labels: uniq, count: uniq.length, commonCount: uniq.length };
+    }
+
     const order = []; // item naam-gulo prothom dekha jawar order-e
     const countsByItem = new Map(); // item -> [scan1-count, scan2-count, ...]
     mediaScanHistory.forEach((scan, idx) => {
