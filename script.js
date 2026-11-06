@@ -4325,7 +4325,8 @@ function fuzzyMatchScore(query, target) {
 // Search suggestion-e title-er moddhe user-er query-r shobdo gulo highlight kore dekhay
 function highlightSuggestionText(title, query) {
     const raw = String(title || '');
-    const words = String(query || '').trim().split(/\s+/).filter(Boolean);
+    // Punctuation (jemon "Daredevil:" er colon) bad diye shudhu shobdo gulo highlight hoy
+    const words = String(query || '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
     if (!words.length) return escapeHtml(raw);
     const pattern = words
         .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
