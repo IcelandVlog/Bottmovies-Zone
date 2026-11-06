@@ -7115,9 +7115,11 @@ function setupAdminPanel() {
 
     const mediaScanFileInput = document.getElementById('adminMediaScanFile');
     if (mediaScanFileInput) {
-        mediaScanFileInput.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                handleMediaScanFile(this.files[0]);
+        mediaScanFileInput.addEventListener('change', async function() {
+            // Ekadhik file select korle ekta-ekta kore sob file scan hoy, ফলাফল ek-i set-e merge hoy
+            const files = Array.from(this.files || []);
+            for (const file of files) {
+                await handleMediaScanFile(file);
             }
         });
     }
