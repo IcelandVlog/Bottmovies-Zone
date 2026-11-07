@@ -1016,13 +1016,28 @@ function handlePosterImgError(imgEl) {
     }, 800);
 }
 
-async function fetchMoviesFromSupabase() {
-    try {
-        const { data: movies, error } = await supabaseClient
+async function fetchAllMovieRows() {
+    const PAGE = 1000;
+    const all = [];
+    for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabaseClient
             .from('movies')
             .select('*')
             .order('display_order', { ascending: true, nullsFirst: false })
-            .order('id', { ascending: false });
+            .order('id', { ascending: false })
+            .range(from, from + PAGE - 1);
+        if (error) return { data: null, error };
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+    }
+    return { data: all, error: null };
+}
+
+async function fetchMoviesFromSupabase() {
+    try {
+        // Supabase ekbare sorbochcho 1000 row-i dey, tai pati kore sob row anhi (1000-er beshi content-o jeno baad na jay)
+        const { data: movies, error } = await fetchAllMovieRows();
 
         if (error) {
             console.error('Error fetching movies from Supabase:', error.message);
