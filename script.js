@@ -4310,7 +4310,8 @@ function normalizeSearchText(str) {
 function wordSimilarity(qWord, tWord) {
     if (!qWord || !tWord) return 0;
     if (tWord === qWord) return 1;
-    if (tWord.startsWith(qWord) || tWord.includes(qWord) || qWord.includes(tWord)) return 0.9;
+    const longEnough = Math.min(qWord.length, tWord.length) >= 3;
+    if (longEnough && (tWord.startsWith(qWord) || tWord.includes(qWord) || qWord.includes(tWord))) return 0.9;
     const dist = levenshteinDistance(qWord, tWord);
     const maxLen = Math.max(qWord.length, tWord.length);
     const threshold = Math.max(1, Math.ceil(maxLen * 0.4));
@@ -4357,6 +4358,15 @@ function highlightSuggestionText(title, query) {
     return out + escapeHtml(raw.slice(last));
 }
 
+// Query-r kotogulo shobder poora shobd (whole word) title/search name/original title-e ache
+function countQueryWordHits(query, movie) {
+    const qWords = [...new Set(normalizeSearchText(query).split(' ').filter(Boolean))];
+    if (!qWords.length) return 0;
+    const tWords = new Set([movie.title, movie.searchName, movie.originalTitle]
+        .map(x => normalizeSearchText(x || '')).join(' ').split(' ').filter(Boolean));
+    return qWords.filter(w => tWords.has(w)).length;
+}
+
 function getSmartMatches(query) {
     return moviesList
         .map(movie => {
@@ -4371,10 +4381,10 @@ function getSmartMatches(query) {
                 // (originalTitle column) rakha thake.
                 fuzzyMatchScore(query, movie.originalTitle)
             );
-            return { movie, score };
+            return { movie, score, hits: countQueryWordHits(query, movie) };
         })
         .filter(entry => entry.score >= 0.55)
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => (b.hits - a.hits) || (b.score - a.score))
         .map(entry => entry.movie);
 }
 
