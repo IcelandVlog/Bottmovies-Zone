@@ -4862,9 +4862,9 @@ function initApp() {
                 const fullLabel = stripYearSuffix(movie.title) + (suggestionYear ? ` (${suggestionYear})` : '');
                 item.innerHTML = highlightSuggestionText(fullLabel, query);
                 item.addEventListener('click', function() {
-                    searchInput.value = movie.title;
+                    // Suggestion-e click korle sorasori oi content-er details page khule jabe
                     searchSuggestions.style.display = 'none';
-                    searchMovies();
+                    openMovieModal(movie);
                 });
                 searchSuggestions.appendChild(item);
             });
