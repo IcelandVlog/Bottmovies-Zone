@@ -686,6 +686,10 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                         <label>Scan Video for Audio &amp; Subtitles <span class="admin-hint">(optional — auto-fills the fields above)</span></label>
                         <input type="file" id="adminMediaScanFile" multiple accept=".mkv,.mp4,video/x-matroska,video/mp4">
                         <div class="admin-media-scan-status" id="adminMediaScanStatus"></div>
+                        <div class="admin-scan-progress" id="adminMediaScanProgress" style="display:none;">
+                            <div class="admin-scan-progress-fill" id="adminMediaScanFill"></div>
+                            <span class="admin-scan-progress-text" id="adminMediaScanPct">0%</span>
+                        </div>
                         <div class="admin-media-scan-result" id="adminMediaScanResult" style="display:none;"></div>
                     </div>
 

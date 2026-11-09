@@ -7143,8 +7143,9 @@ function setupAdminPanel() {
         mediaScanFileInput.addEventListener('change', async function() {
             // Ekadhik file select korle ekta-ekta kore sob file scan hoy, ফলাফল ek-i set-e merge hoy
             const files = Array.from(this.files || []);
-            for (const file of files) {
-                await handleMediaScanFile(file);
+            for (let i = 0; i < files.length; i++) {
+                mediaScanBatch = { index: i, total: files.length };
+                await handleMediaScanFile(files[i]);
             }
         });
     }
@@ -8054,6 +8055,32 @@ function mediaScanFormatMergedList(historyKey) {
     return `(${count}/${commonCount})- ${labels.join(', ')}`;
 }
 
+// Ekadhik file scan-er progress: kotogulo file-er moddhe kotota shesh hoyeche
+let mediaScanBatch = { index: 0, total: 1 };
+
+// Scan-er stage onujayi (0-1) progress. Shob file mile overall % dekhay
+function setMediaScanPercent(stageFrac) {
+    const wrap = document.getElementById('adminMediaScanProgress');
+    const fill = document.getElementById('adminMediaScanFill');
+    const text = document.getElementById('adminMediaScanPct');
+    if (!wrap || !fill || !text) return;
+    const total = Math.max(1, mediaScanBatch.total || 1);
+    const overall = Math.min(100, Math.max(0, ((mediaScanBatch.index + stageFrac) / total) * 100));
+    wrap.style.display = 'block';
+    fill.style.width = overall.toFixed(1) + '%';
+    text.textContent = Math.round(overall) + '%';
+}
+
+function mediaScanStageFraction(msg) {
+    const m = String(msg || '');
+    if (/Loading scan engine/i.test(m)) return 0.05;
+    if (/Reading file header/i.test(m)) return 0.2;
+    if (/Header not found/i.test(m)) return 0.45;
+    if (/Detecting/i.test(m)) return 0.85;
+    if (/Starting scan/i.test(m)) return 0.02;
+    return 0.1;
+}
+
 async function handleMediaScanFile(file) {
     const statusEl = document.getElementById('adminMediaScanStatus');
     const resultEl = document.getElementById('adminMediaScanResult');
@@ -8078,8 +8105,12 @@ async function handleMediaScanFile(file) {
         setStatus('Starting scan...');
     }
 
+    setMediaScanPercent(0.02);
+    const progressStatus = (msg) => { setStatus(msg); setMediaScanPercent(mediaScanStageFraction(msg)); };
+
     try {
-        const result = await mediaScanProbeVideoFile(file, setStatus);
+        const result = await mediaScanProbeVideoFile(file, progressStatus);
+        setMediaScanPercent(1);
 
         if (result.audio.length === 0 && result.subtitle.length === 0) {
             setStatus('No audio or subtitle language tags were detected in this file.', 'error');
