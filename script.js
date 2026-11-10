@@ -7147,6 +7147,7 @@ function setupAdminPanel() {
                 mediaScanBatch = { index: i, total: files.length };
                 await handleMediaScanFile(files[i]);
             }
+            mediaScanHideProgress();
         });
     }
 
@@ -7981,8 +7982,19 @@ function mediaScanFormatList(list) {
 // এই হিস্ট্রি খালি হয়ে যায়, যাতে ভিন্ন ভিন্ন কনটেন্টের স্ক্যান একসাথে মিশে না যায়।
 let mediaScanHistory = [];
 
+// Progress bar shudhu scan-er shomoy dekhay; scan shesh hole ba form reset hole lukiye debe
+function mediaScanHideProgress() {
+    const wrap = document.getElementById('adminMediaScanProgress');
+    const fill = document.getElementById('adminMediaScanFill');
+    const text = document.getElementById('adminMediaScanPct');
+    if (wrap) wrap.style.display = 'none';
+    if (fill) fill.style.width = '0%';
+    if (text) text.textContent = '';
+}
+
 function mediaScanResetHistory() {
     mediaScanHistory = [];
+    mediaScanHideProgress();
 }
 
 // কতগুলো ফাইল স্ক্যান করা হবে তার কোনো লিমিট নেই (২টা সিজন না, ২০+ সিজন প্যাকও
@@ -8105,12 +8117,10 @@ async function handleMediaScanFile(file) {
         setStatus('Starting scan...');
     }
 
-    setMediaScanPercent(0.02);
     const progressStatus = (msg) => { setStatus(msg); setMediaScanPercent(mediaScanStageFraction(msg)); };
 
     try {
         const result = await mediaScanProbeVideoFile(file, progressStatus);
-        setMediaScanPercent(1);
 
         if (result.audio.length === 0 && result.subtitle.length === 0) {
             setStatus('No audio or subtitle language tags were detected in this file.', 'error');
@@ -8154,8 +8164,10 @@ async function handleMediaScanFile(file) {
 
         const mergeNote = mediaScanHistory.length > 1 ? ` (merged from ${mediaScanHistory.length} files scanned)` : '';
         setStatus(`Scan complete — Audio and Subtitles fields updated${mergeNote}.`, 'ok');
+        mediaScanHideProgress(); // scan shesh - % box lukiye dao
     } catch (err) {
         console.error('Media scan failed:', err);
+        mediaScanHideProgress();
         setStatus('Scan failed: ' + (err && err.message ? err.message : 'unknown error'), 'error');
     }
 }
