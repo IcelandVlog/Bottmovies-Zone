@@ -7031,8 +7031,44 @@ function switchAdminTab(tab) {
     }
 }
 
+// Admin-er dashboard khule TMDB ID-hin content gulor ID TMDB/IMDb theke auto bosiye database-e save kore.
+// Shudhu admin panel-e chole, tai shadharon visitor-er browser theke DB-te lekha hoy na.
+let tmdbAutoFillRunning = false;
+async function autoFillMissingTmdbIds() {
+    if (tmdbAutoFillRunning || !TMDB_API_KEY || !Array.isArray(allMovies)) return;
+    const missing = allMovies.filter(m => m && !m.deleted_at && !m.tmdbId && (m.imdbId || m.title));
+    if (!missing.length) return;
+    tmdbAutoFillRunning = true;
+    let filled = 0;
+    try {
+        for (const m of missing) {
+            try {
+                const r = await resolveTmdbMatch(m);
+                if (r && r.matchId) {
+                    const { error } = await supabaseClient.from('movies')
+                        .update({ tmdbId: r.matchId, tmdbType: r.mediaType })
+                        .eq('id', m.id);
+                    if (!error) {
+                        m.tmdbId = r.matchId;
+                        m.tmdbType = r.mediaType;
+                        filled++;
+                    }
+                }
+            } catch (e) { /* ek-ta fail hole baaki gulo chalbe */ }
+            await new Promise(res => setTimeout(res, 300));
+        }
+    } finally {
+        tmdbAutoFillRunning = false;
+    }
+    if (filled > 0) {
+        showToast('TMDB ID auto bosano holo: ' + filled + ' ta content');
+        loadRecentEpisodeInfo();
+    }
+}
+
 // ---------- Dashboard tab: real stats from the site's own database (no fake earning/premium numbers) ----------
 async function loadAdminDashboardStats() {
+    autoFillMissingTmdbIds();
     const movies = Array.isArray(allMovies) ? allMovies : [];
     const movieCount = movies.filter(m => m.tmdbType !== 'tv').length;
     const seriesCount = movies.filter(m => m.tmdbType === 'tv').length;
