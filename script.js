@@ -781,15 +781,16 @@ async function loadRecentEpisodeInfo() {
         const cache = readRecentEpisodeCache();
         const targets = allMovies.filter(m => m && m.tmdbType === 'tv' && m.tmdbId && !m.deleted_at);
         let changed = false;
-        for (const m of targets) {
+        // Ekbare 5-ta series ekshathe TMDB theke ana hoy (age ekta-ekta kore slow chilo)
+        const processOne = async (m) => {
             const cached = cache[m.id];
             if (cached && cached.day === today) {
                 applyTvStatus(m.id, cached);
-                continue;
+                return;
             }
             try {
                 const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${m.tmdbId}?api_key=${TMDB_API_KEY}`, {}, 6000);
-                if (!res.ok) continue;
+                if (!res.ok) return;
                 const data = await res.json();
                 const last = data.last_episode_to_air || {};
                 const next = data.next_episode_to_air || {};
@@ -815,7 +816,10 @@ async function loadRecentEpisodeInfo() {
                 applyTvStatus(m.id, status);
                 changed = true;
             } catch (e) { /* ek-ta fail hole baaki gulo chalbe */ }
-            await new Promise(r => setTimeout(r, 120)); // TMDB rate limit-er jonno choto gap
+        };
+        const CONCURRENCY = 5;
+        for (let i = 0; i < targets.length; i += CONCURRENCY) {
+            await Promise.all(targets.slice(i, i + CONCURRENCY).map(processOne));
         }
         if (changed) writeRecentEpisodeCache(cache);
     } finally {
