@@ -620,6 +620,11 @@ function isAutoOngoing(movie) {
     if (st.seasonReleased > 0 && st.seasonFinal && st.seasonFinal >= todayYMD()) return true;
     // (2) TMDB-te porer episode dated (same season) -> ongoing
     if (st.nextAir && (!st.lastSeason || !st.nextSeason || Number(st.lastSeason) === Number(st.nextSeason))) return true;
+    // (3) TMDB "Returning Series" ar shesh episode gotoy 60 din-er moddhe -> ongoing (porer episode-er date na thakleo)
+    if (st.tmdbStatus === 'Returning Series' && st.lastAir) {
+        const daysSince = (new Date(todayYMD()) - new Date(st.lastAir)) / 86400000;
+        if (daysSince >= -1 && daysSince <= 60) return true;
+    }
     return false;
 }
 
@@ -712,7 +717,7 @@ async function refreshOngoingData() {
 
 // ---- Notun episode release (je kono series) -> 1 no position ----
 const NEW_EPISODE_WINDOW_DAYS = 7;   // ei kotodin por pinned soriye dewa hobe
-const RECENT_EP_CACHE_KEY = 'bm_tv_status_v3';
+const RECENT_EP_CACHE_KEY = 'bm_tv_status_v4';
 const recentEpisodeMap = new Map();  // movie.id -> 'YYYY-MM-DD' (latest episode air date)
 let recentEpisodeRunning = false;
 
@@ -795,7 +800,8 @@ async function loadRecentEpisodeInfo() {
                     nextAir: next.air_date || null,
                     nextSeason: next.season_number || null,
                     seasonFinal: null,
-                    seasonReleased: 0
+                    seasonReleased: 0,
+                    tmdbStatus: data.status || null // "Returning Series" / "Ended" / "Canceled" ...
                 };
                 // Latest season-er episode-er tarikh (shesh episode ekhono baki kina)
                 if (status.lastSeason) {
