@@ -11099,21 +11099,27 @@ function renderAdminOngoingList(filter) {
                 <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'} · <span class="admin-ongoing-status">${escapeHtml(getOngoingStatusText(movie))}</span></div>
             </div>
             <div class="admin-ongoing-actions">
-                <button type="button" class="admin-ongoing-toggle ${state === 'on' ? 'on' : ''} ${state === 'off' ? 'off' : ''}" title="Auto → ON (forced ongoing) → OFF (forced not ongoing) → Auto">${stateLabel}</button>
+                <div class="admin-ongoing-modes">
+                    <button type="button" class="admin-ongoing-toggle ${state === 'auto' ? 'active' : ''}" data-mode="auto" title="TMDB automatic">Auto</button>
+                    <button type="button" class="admin-ongoing-toggle on ${state === 'on' ? 'active' : ''}" data-mode="on" title="Force ongoing">ON</button>
+                    <button type="button" class="admin-ongoing-toggle off ${state === 'off' ? 'active' : ''}" data-mode="off" title="Force NOT ongoing">OFF</button>
+                </div>
                 <button type="button" class="admin-ongoing-bump" title="Ekhon click korle 1 no position-e jabe">Update ↑</button>
                 <input type="number" min="1" class="admin-ongoing-season" placeholder="Season (latest)" value="${movie.ongoingSeason != null ? escapeAttr(movie.ongoingSeason) : ''}">
                 <span class="admin-server-save-status" aria-live="polite"></span>
             </div>
         `;
-        const toggle = card.querySelector('.admin-ongoing-toggle');
         const seasonInput = card.querySelector('.admin-ongoing-season');
         const statusEl = card.querySelector('.admin-server-save-status');
-        toggle.addEventListener('click', () => {
-            // Cycle: Auto -> ON -> OFF -> Auto
-            const next = state === 'auto' ? { ongoing: true, ongoingOff: false }
-                : state === 'on' ? { ongoing: false, ongoingOff: true }
-                : { ongoing: false, ongoingOff: false };
-            saveAdminOngoing(movie, next, statusEl);
+        card.querySelectorAll('.admin-ongoing-modes [data-mode]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mode = btn.getAttribute('data-mode');
+                if (mode === state) return;
+                const patch = mode === 'on' ? { ongoing: true, ongoingOff: false }
+                    : mode === 'off' ? { ongoing: false, ongoingOff: true }
+                    : { ongoing: false, ongoingOff: false };
+                saveAdminOngoing(movie, patch, statusEl);
+            });
         });
         card.querySelector('.admin-ongoing-bump').addEventListener('click', () => bumpMovieToTop(movie, statusEl));
         let timer = null;
