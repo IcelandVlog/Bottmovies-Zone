@@ -584,7 +584,7 @@ function applyManualSerialPositions(list) {
 // Admin Ongoing tab theke movie.ongoing = true + (optional) ongoingSeason set kora thakle,
 // TMDB-theke season-er episode air_date neya hoy. Shesh episode release hole ongoing shesh.
 // DB column: ongoing (boolean), ongoingSeason (smallint) - Supabase SQL editor-e ONGOING_SQL run korte hobe.
-const ONGOING_SQL = 'alter table public.movies add column if not exists "ongoing" boolean default false; alter table public.movies add column if not exists "ongoingSeason" smallint; alter table public.movies add column if not exists "linkUpdatedAt" timestamptz;';
+const ONGOING_SQL = 'alter table public.movies add column if not exists "ongoing" boolean default false; alter table public.movies add column if not exists "ongoingSeason" smallint; alter table public.movies add column if not exists "linkUpdatedAt" timestamptz; alter table public.movies add column if not exists "ongoingOff" boolean default false;';
 const ongoingInfoMap = new Map();   // movie.id -> { season, total, released, lastAired, finalAired } | null
 const ongoingPendingMap = new Map(); // movie.id -> in-flight promise
 
@@ -602,6 +602,8 @@ function getOngoingInfoField(movie, field) {
 // Ekhono ongoing ki na: flag on hole-o season-er shesh episode-er tarikh ekhono aseni thakle ongoing
 function isOngoingActive(movie) {
     if (!movie || movie.tmdbType !== 'tv') return false;
+    // Admin-e manual OFF chaloo thakle TMDB-er auto-check-o ongoing dekhabe na
+    if (movie.ongoingOff === true) return false;
     // Admin-e ON button chaloo thakle sobsomoy ongoing (TMDB auto-check-er upore)
     if (movie.ongoing === true) return true;
     // ON na thakle TMDB theke automatic: season-er episode ekhono release holei ongoing
@@ -11035,6 +11037,7 @@ async function saveAdminOriginalTitle(movie, value, statusEl) {
 
 // Ongoing tab - content-er ongoing on/off + season set kora, status dekhano
 function getOngoingStatusText(movie) {
+    if (movie.ongoingOff === true) return 'Forced OFF (manual) - not ongoing';
     if (!movie.ongoing) {
         if (isAutoOngoing(movie)) {
             const st = tvStatusMap.get(movie.id);
@@ -11080,8 +11083,13 @@ function renderAdminOngoingList(filter) {
         return;
     }
 
-    filtered.forEach(movie => {
+    const rank = m => (isOngoingActive(m) ? 0 : (m.ongoing === true ? 1 : 2));
+    const sortedFiltered = [...filtered].sort((a, b) => rank(a) - rank(b));
+
+    sortedFiltered.forEach(movie => {
         const isTv = movie.tmdbType === 'tv';
+        const state = movie.ongoingOff === true ? 'off' : (movie.ongoing === true ? 'on' : 'auto');
+        const stateLabel = state === 'off' ? 'Ongoing: OFF (manual)' : (state === 'on' ? 'Ongoing: ON (manual)' : 'Auto (TMDB)');
         const card = document.createElement('div');
         card.className = 'admin-db-card admin-ongoing-card';
         card.innerHTML = `
@@ -11091,7 +11099,7 @@ function renderAdminOngoingList(filter) {
                 <div class="admin-db-meta">${isTv ? 'TV Series' : 'Movie'} · <span class="admin-ongoing-status">${escapeHtml(getOngoingStatusText(movie))}</span></div>
             </div>
             <div class="admin-ongoing-actions">
-                <button type="button" class="admin-ongoing-toggle ${movie.ongoing ? 'on' : ''}" title="ON = force ongoing. OFF = automatic from TMDB">${movie.ongoing ? 'Ongoing: ON (manual)' : 'Auto (TMDB)'}</button>
+                <button type="button" class="admin-ongoing-toggle ${state === 'on' ? 'on' : ''} ${state === 'off' ? 'off' : ''}" title="Auto → ON (forced ongoing) → OFF (forced not ongoing) → Auto">${stateLabel}</button>
                 <button type="button" class="admin-ongoing-bump" title="Ekhon click korle 1 no position-e jabe">Update ↑</button>
                 <input type="number" min="1" class="admin-ongoing-season" placeholder="Season (latest)" value="${movie.ongoingSeason != null ? escapeAttr(movie.ongoingSeason) : ''}">
                 <span class="admin-server-save-status" aria-live="polite"></span>
@@ -11100,7 +11108,13 @@ function renderAdminOngoingList(filter) {
         const toggle = card.querySelector('.admin-ongoing-toggle');
         const seasonInput = card.querySelector('.admin-ongoing-season');
         const statusEl = card.querySelector('.admin-server-save-status');
-        toggle.addEventListener('click', () => saveAdminOngoing(movie, { ongoing: !movie.ongoing }, statusEl));
+        toggle.addEventListener('click', () => {
+            // Cycle: Auto -> ON -> OFF -> Auto
+            const next = state === 'auto' ? { ongoing: true, ongoingOff: false }
+                : state === 'on' ? { ongoing: false, ongoingOff: true }
+                : { ongoing: false, ongoingOff: false };
+            saveAdminOngoing(movie, next, statusEl);
+        });
         card.querySelector('.admin-ongoing-bump').addEventListener('click', () => bumpMovieToTop(movie, statusEl));
         let timer = null;
         const saveSeason = () => {
