@@ -5672,20 +5672,144 @@ html.light-mode .admin-scan-progress-text {
 .admin-ongoing-modes .admin-ongoing-toggle.on.active { background: rgba(74, 222, 128, 0.18); border-color: #4ade80; color: #4ade80; }
 .admin-ongoing-modes .admin-ongoing-toggle.off.active { background: rgba(248, 113, 113, 0.18); border-color: #f87171; color: #f87171; }
 
-/* Image link field-er pashe Upload image button */
+/* Image/thumbnail link field-er pashe Upload button - input-er height-er sathe mile, theme-er sathe */
 .admin-img-upload-btn {
     display: inline-flex;
     align-items: center;
-    margin: 6px 0 4px;
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(96, 165, 250, 0.45);
-    background: rgba(59, 130, 246, 0.12);
-    color: #93c5fd;
+    justify-content: center;
+    gap: 6px;
+    height: 40px;
+    margin: 0 0 0 8px;
+    padding: 0 14px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
-.admin-img-upload-btn:hover { background: rgba(59, 130, 246, 0.22); }
+.admin-img-upload-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+}
 .admin-img-upload-btn:disabled { opacity: 0.6; cursor: wait; }
-html.light-mode .admin-img-upload-btn { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+html.light-mode .admin-img-upload-btn {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #374151;
+}
+html.light-mode .admin-img-upload-btn:hover { background: #f3f4f6; color: #111827; }
+
+/* ---- One-line compact trailer / season rows (inputs + upload button ek line-e) ---- */
+.admin-trailer-movie-row {
+    display: flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+}
+.admin-trailer-movie-row input {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+}
+.admin-trailer-movie-row .admin-img-upload-btn {
+    height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    font-size: 11px;
+}
+.admin-season-trailer-row {
+    grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) auto 28px !important;
+    gap: 6px;
+    align-items: center;
+}
+.admin-season-trailer-row input {
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    min-width: 0;
+}
+.admin-season-trailer-row input.admin-season-trailer-num {
+    padding: 4px 2px;
+}
+.admin-season-trailer-row .admin-img-upload-btn {
+    height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    font-size: 11px;
+}
+.admin-season-trailer-row .admin-row-remove-btn {
+    height: 32px;
+    min-height: 32px;
+    width: 28px;
+    padding: 0;
+}
+
+/* Watch thumbnail / banner image: input + Upload button ek line-e */
+.admin-img-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+.admin-img-row input {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.admin-img-row .admin-img-upload-btn {
+    margin: 0;
+}
+
+/* Watch series episode row: preview, Ep, link, thumbnail, Upload thumbnail, remove - sob ek line-e */
+.admin-season-watch-row {
+    grid-template-columns: 56px 56px minmax(0, 1fr) minmax(0, 1fr) auto 28px !important;
+    gap: 6px !important;
+    align-items: center;
+}
+.admin-season-watch-row input {
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    min-width: 0;
+}
+.admin-season-watch-row .admin-img-upload-btn {
+    height: 32px;
+    margin: 0;
+    padding: 0 10px;
+    font-size: 11px;
+}
+.admin-season-watch-row .admin-row-remove-btn {
+    height: 32px;
+    min-height: 32px;
+    width: 28px;
+    padding: 0;
+}
+
+/* Custom watch thumbnail / banner image: Upload button-er height input-er sathe same */
+.admin-img-row { align-items: stretch !important; }
+.admin-img-row .admin-img-upload-btn {
+    height: auto !important;
+    align-self: stretch;
+    margin: 0 !important;
+}
+
+/* Custom watch thumbnail input + Upload image button - dui-tai ek-i height (36px) */
+.admin-img-row input {
+    height: 36px !important;
+    box-sizing: border-box;
+}
+.admin-img-row .admin-img-upload-btn {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 14px;
+    box-sizing: border-box;
+    align-self: center;
+}

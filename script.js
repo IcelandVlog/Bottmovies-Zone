@@ -558,22 +558,23 @@ let currentPage = 1;
 // একাধিক item-এ একই serial দিলে, ছোট id / আগে processed হওয়া item আগে বসবে।
 function applyManualSerialPositions(list) {
     if (!Array.isArray(list)) return list;
-    const autoItems = list.filter(m => m.display_order == null);
+    // Pinned (notun content / link change / Update / notun episode, NEW_EPISODE_WINDOW_DAYS-er moddhe)
+    // sob-sheye upore thakbe - manual Serial thakleo. Sheta-r nicher serial-wala content niche sorbe.
+    const pinnedAll = list.filter(m => getPinDate(m))
+        .sort((a, b) => String(getPinDate(b)).localeCompare(String(getPinDate(a))));
+    const pinnedIds = new Set(pinnedAll.map(m => m.id));
+    const autoItems = list.filter(m => m.display_order == null && !pinnedIds.has(m.id));
     const manualItems = list
-        .filter(m => m.display_order != null)
+        .filter(m => m.display_order != null && !pinnedIds.has(m.id))
         .map((m, idx) => ({ m, idx })) // stable tie-break এর জন্য আগের index মনে রাখা
         .sort((a, b) => (a.m.display_order - b.m.display_order) || (a.idx - b.idx))
         .map(entry => entry.m);
 
-    // Auto (serial chara) content-er moddhe pinned gulo age thake (notun content / notun episode / link update).
-    // Manual serial-wala content admin-er set kora position-e-i thake - pin tader position bodle dey na.
-    const autoPinned = autoItems.filter(m => getPinDate(m))
-        .sort((a, b) => String(getPinDate(b)).localeCompare(String(getPinDate(a))));
-    const autoPinnedIds = new Set(autoPinned.map(m => m.id));
-    const result = [...autoPinned, ...autoItems.filter(m => !autoPinnedIds.has(m.id))];
+    const result = [...pinnedAll, ...autoItems];
     manualItems.forEach(item => {
         let pos = Math.round(item.display_order) - 1;
         if (Number.isNaN(pos) || pos < 0) pos = 0;
+        if (pos < pinnedAll.length) pos = pinnedAll.length; // pinned-er upore kakhono jabe na
         if (pos > result.length) pos = result.length;
         result.splice(pos, 0, item);
     });
@@ -8704,7 +8705,7 @@ function addSeasonTrailerRow(data) {
     row.innerHTML = `
         <input type="number" min="1" class="admin-season-trailer-num" placeholder="Season" value="${escapeAttr(nextSeasonGuess)}">
         <input type="text" class="admin-season-trailer-link" placeholder="YouTube link or video ID" value="${escapeAttr(data.link)}">
-        <input type="text" class="admin-season-trailer-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}">
+        <input type="text" class="admin-season-trailer-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}"><button type="button" class="admin-img-upload-btn">📁 Upload thumbnail</button>
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-season-trailer-row').remove()">✕</button>
     `;
     list.appendChild(row);
@@ -9803,7 +9804,7 @@ function renderAdminTrailerList(filter) {
                 ` : `
                 <div class="admin-trailer-movie-row">
                     <input type="text" class="admin-trailer-movie-link" placeholder="YouTube Trailer/Teaser link or video ID" value="${escapeAttr(movie.trailerLink || '')}">
-                    <input type="text" class="admin-trailer-movie-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(movie.trailerThumb || '')}">
+                    <input type="text" class="admin-trailer-movie-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(movie.trailerThumb || '')}"><button type="button" class="admin-img-upload-btn">📁 Upload thumbnail</button>
                 </div>
                 `}
             </div>
@@ -9901,7 +9902,7 @@ function addAdminTrailerSeasonRow(container, data) {
     row.innerHTML = `
         <input type="number" min="1" class="admin-season-trailer-num" placeholder="Season" value="${escapeAttr(nextSeasonGuess)}">
         <input type="text" class="admin-season-trailer-link" placeholder="YouTube link or video ID" value="${escapeAttr(data.link)}">
-        <input type="text" class="admin-season-trailer-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}">
+        <input type="text" class="admin-season-trailer-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}"><button type="button" class="admin-img-upload-btn">📁 Upload thumbnail</button>
         <button type="button" class="admin-row-remove-btn">✕</button>
     `;
     row.querySelector('.admin-row-remove-btn').addEventListener('click', () => row.remove());
@@ -10089,7 +10090,7 @@ function addAdminWatchSeasonRow(container, data, forcedSeason, fallbackPoster) {
         <input type="number" min="1" class="admin-season-watch-num admin-watch-hidden-field" value="${escapeAttr(seasonVal)}" tabindex="-1" aria-hidden="true">
         <input type="text" class="admin-episode-watch-num" placeholder="Ep (number ba text)" value="${escapeAttr(episodeGuess)}">
         <input type="text" class="admin-season-watch-link" placeholder="Custom watch/embed link" value="${escapeAttr(data.link)}">
-        <input type="text" class="admin-season-watch-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}">
+        <input type="text" class="admin-season-watch-thumb" placeholder="Thumbnail link (optional)" value="${escapeAttr(data.thumb)}"><button type="button" class="admin-img-upload-btn">📁 Upload thumbnail</button>
         <button type="button" class="admin-row-remove-btn">✕</button>
     `;
     row.querySelector('.admin-row-remove-btn').addEventListener('click', () => {
@@ -10459,7 +10460,7 @@ function renderAdminWatchList(filter) {
                 <button type="button" class="admin-add-row-btn admin-watch-add-season-btn">+ Add Episode</button>
                 ` : ''}
                 <input type="text" class="admin-watch-link-input" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed)" value="${escapeAttr(movie.watchLink || '')}">
-                <input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}"><button type="button" class="admin-img-upload-btn">📁 Upload image</button>
+                <div class="admin-img-row"><input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}"><button type="button" class="admin-img-upload-btn">📁 Upload image</button></div>
                 </div>
             </div>
             <div class="admin-db-actions">
@@ -11250,7 +11251,7 @@ function renderAdminBannerList(filter) {
                         ${bannerCatOptions.map(cat => `<option value="${escapeAttr(cat)}" ${movie.featured_category === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
                     </select>
                     <input type="text" class="admin-banner-label-input" placeholder="Custom badge text (optional, e.g. Marvel)" value="${escapeAttr(movie.featured_category_label || '')}">
-                    <input type="text" class="admin-banner-image-input" placeholder="Custom banner image URL (optional — overrides TMDB backdrop)" value="${movie.featured_image || ''}"><button type="button" class="admin-img-upload-btn">📁 Upload image</button>
+                    <div class="admin-img-row"><input type="text" class="admin-banner-image-input" placeholder="Custom banner image URL (optional — overrides TMDB backdrop)" value="${movie.featured_image || ''}"><button type="button" class="admin-img-upload-btn">📁 Upload image</button></div>
                 </div>
             </div>
             <div class="admin-db-actions">
