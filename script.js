@@ -8808,6 +8808,48 @@ function extractYoutubeVideoId(input) {
 // Same "posters" bucket reused for trailer thumbnails too, just with a different
 // filename prefix - so no extra Supabase bucket setup is needed for this feature.
 
+// Jekono image link field-er pashe "Upload image" button: file select kore upload hoye URL field-e boshe
+let imgUploadTarget = null;
+let imgUploadFileInput = null;
+function ensureImgUploadFileInput() {
+    if (imgUploadFileInput) return imgUploadFileInput;
+    imgUploadFileInput = document.createElement('input');
+    imgUploadFileInput.type = 'file';
+    imgUploadFileInput.accept = 'image/*';
+    imgUploadFileInput.style.display = 'none';
+    document.body.appendChild(imgUploadFileInput);
+    imgUploadFileInput.addEventListener('change', async function() {
+        const file = this.files && this.files[0];
+        const target = imgUploadTarget;
+        this.value = '';
+        if (!file || !target) return;
+        const btn = target.nextElementSibling;
+        const oldLabel = btn && btn.classList.contains('admin-img-upload-btn') ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
+        try {
+            const url = await uploadPosterFile(file, 'image');
+            target.value = url;
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+            showToast('Image uploaded');
+        } catch (err) {
+            showToast('Upload failed: ' + (err && err.message ? err.message : 'unknown error'), 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = oldLabel || '📁 Upload image'; }
+        }
+    });
+    return imgUploadFileInput;
+}
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest && e.target.closest('.admin-img-upload-btn');
+    if (!btn) return;
+    const input = btn.previousElementSibling;
+    if (!input || input.tagName !== 'INPUT') return;
+    imgUploadTarget = input;
+    ensureImgUploadFileInput().click();
+});
+
 async function uploadPosterFile(file, prefix = 'poster') {
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const fileName = `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
@@ -10417,7 +10459,7 @@ function renderAdminWatchList(filter) {
                 <button type="button" class="admin-add-row-btn admin-watch-add-season-btn">+ Add Episode</button>
                 ` : ''}
                 <input type="text" class="admin-watch-link-input" placeholder="Custom watch/embed link (optional — overrides the automatic TMDB embed)" value="${escapeAttr(movie.watchLink || '')}">
-                <input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}">
+                <input type="text" class="admin-watch-thumb-input" placeholder="Custom watch thumbnail (optional — otherwise the poster is shown automatically)" value="${escapeAttr(movie.watchThumb || '')}"><button type="button" class="admin-img-upload-btn">📁 Upload image</button>
                 </div>
             </div>
             <div class="admin-db-actions">
@@ -11208,7 +11250,7 @@ function renderAdminBannerList(filter) {
                         ${bannerCatOptions.map(cat => `<option value="${escapeAttr(cat)}" ${movie.featured_category === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
                     </select>
                     <input type="text" class="admin-banner-label-input" placeholder="Custom badge text (optional, e.g. Marvel)" value="${escapeAttr(movie.featured_category_label || '')}">
-                    <input type="text" class="admin-banner-image-input" placeholder="Custom banner image URL (optional — overrides TMDB backdrop)" value="${movie.featured_image || ''}">
+                    <input type="text" class="admin-banner-image-input" placeholder="Custom banner image URL (optional — overrides TMDB backdrop)" value="${movie.featured_image || ''}"><button type="button" class="admin-img-upload-btn">📁 Upload image</button>
                 </div>
             </div>
             <div class="admin-db-actions">
