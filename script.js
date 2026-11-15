@@ -584,7 +584,7 @@ function applyManualSerialPositions(list) {
 // Admin Ongoing tab theke movie.ongoing = true + (optional) ongoingSeason set kora thakle,
 // TMDB-theke season-er episode air_date neya hoy. Shesh episode release hole ongoing shesh.
 // DB column: ongoing (boolean), ongoingSeason (smallint) - Supabase SQL editor-e ONGOING_SQL run korte hobe.
-const ONGOING_SQL = 'alter table public.movies add column if not exists "ongoing" boolean default false; alter table public.movies add column if not exists "ongoingSeason" smallint; alter table public.movies add column if not exists "linkUpdatedAt" timestamptz; alter table public.movies add column if not exists "ongoingOff" boolean default false;';
+const ONGOING_SQL = 'alter table public.movies add column if not exists "ongoing" boolean default false; alter table public.movies add column if not exists "ongoingSeason" smallint; alter table public.movies add column if not exists "linkUpdatedAt" timestamptz; alter table public.movies add column if not exists "ongoingOff" boolean default false; alter table public.movies add column if not exists "tvStatus" jsonb;';
 const ongoingInfoMap = new Map();   // movie.id -> { season, total, released, lastAired, finalAired } | null
 const ongoingPendingMap = new Map(); // movie.id -> in-flight promise
 
@@ -621,12 +621,8 @@ function isAutoOngoing(movie) {
     // (1) Latest season-er shesh episode ekhono ashe nai (ba aajke release hobe) -> ongoing
     if (st.seasonReleased > 0 && st.seasonFinal && st.seasonFinal >= todayYMD()) return true;
     // (2) TMDB-te porer episode dated (same season) -> ongoing
-    if (st.nextAir && (!st.lastSeason || !st.nextSeason || Number(st.lastSeason) === Number(st.nextSeason))) return true;
-    // (3) TMDB "Returning Series" ar shesh episode gotoy 60 din-er moddhe -> ongoing (porer episode-er date na thakleo)
-    if (st.tmdbStatus === 'Returning Series' && st.lastAir) {
-        const daysSince = (new Date(todayYMD()) - new Date(st.lastAir)) / 86400000;
-        if (daysSince >= -1 && daysSince <= 60) return true;
-    }
+    // (2) Porer episode-er tarikh ekhono baki ache (aaj ba pore) -> ongoing
+    if (st.nextAir && st.nextAir >= todayYMD() && (!st.lastSeason || !st.nextSeason || Number(st.lastSeason) === Number(st.nextSeason))) return true;
     return false;
 }
 
@@ -775,58 +771,16 @@ function applyTvStatus(movieId, status) {
 }
 
 // Sob series-er latest episode air-date TMDB theke ane (din-e ekbar cache). Ekta ekta kore, alpo alpo.
+// TMDB-te proti din check kore DB-r "tvStatus" column-e save kora hoy (scripts/sync-tv-status.js).
+// Device-e ar TMDB-te jaoya lage na - DB theke-i sathe sathe ongoing tathya bosano hoy.
 async function loadRecentEpisodeInfo() {
-    if (recentEpisodeRunning || !TMDB_API_KEY || !Array.isArray(allMovies)) return;
-    recentEpisodeRunning = true;
-    try {
-        const today = todayYMD();
-        const cache = readRecentEpisodeCache();
-        const targets = allMovies.filter(m => m && m.tmdbType === 'tv' && m.tmdbId && !m.deleted_at);
-        let changed = false;
-        // Ekbare 5-ta series ekshathe TMDB theke ana hoy (age ekta-ekta kore slow chilo)
-        const processOne = async (m) => {
-            const cached = cache[m.id];
-            if (cached && cached.day === today) {
-                applyTvStatus(m.id, cached);
-                return;
-            }
-            try {
-                const res = await fetchWithTimeout(`${TMDB_BASE_URL}/tv/${m.tmdbId}?api_key=${TMDB_API_KEY}`, {}, 6000);
-                if (!res.ok) return;
-                const data = await res.json();
-                const last = data.last_episode_to_air || {};
-                const next = data.next_episode_to_air || {};
-                const status = {
-                    day: today,
-                    lastAir: last.air_date || null,
-                    lastSeason: last.season_number || null,
-                    nextAir: next.air_date || null,
-                    nextSeason: next.season_number || null,
-                    seasonFinal: null,
-                    seasonReleased: 0,
-                    tmdbStatus: data.status || null // "Returning Series" / "Ended" / "Canceled" ...
-                };
-                // Latest season-er episode-er tarikh (shesh episode ekhono baki kina)
-                if (status.lastSeason) {
-                    const seasonInfo = await fetchSeasonAirInfo(m.tmdbId, status.lastSeason).catch(() => null);
-                    if (seasonInfo) {
-                        status.seasonFinal = seasonInfo.finalAired;
-                        status.seasonReleased = seasonInfo.released;
-                    }
-                }
-                cache[m.id] = status;
-                applyTvStatus(m.id, status);
-                changed = true;
-            } catch (e) { /* ek-ta fail hole baaki gulo chalbe */ }
-        };
-        const CONCURRENCY = 5;
-        for (let i = 0; i < targets.length; i += CONCURRENCY) {
-            await Promise.all(targets.slice(i, i + CONCURRENCY).map(processOne));
-        }
-        if (changed) writeRecentEpisodeCache(cache);
-    } finally {
-        recentEpisodeRunning = false;
-    }
+    if (!Array.isArray(allMovies)) return;
+    allMovies.forEach(m => {
+        if (!m || m.tmdbType !== 'tv' || !m.tvStatus) return;
+        let st = m.tvStatus;
+        if (typeof st === 'string') { try { st = JSON.parse(st); } catch (e) { return; } }
+        if (st && typeof st === 'object') applyTvStatus(m.id, st);
+    });
 }
 
 // ==================== Refresh-er por scroll position dhore rakha ====================
