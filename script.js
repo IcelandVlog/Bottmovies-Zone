@@ -7022,7 +7022,7 @@ async function autoFillMissingTmdbIds() {
         tmdbAutoFillRunning = false;
     }
     if (filled > 0) {
-        showToast('TMDB ID auto bosano holo: ' + filled + ' ta content');
+        showToast('TMDB ID auto-filled for ' + filled + ' content');
         loadRecentEpisodeInfo();
     }
 }
