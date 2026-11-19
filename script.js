@@ -8875,8 +8875,8 @@ function zipFieldsForRow(row) {
 // parsedList = [{ file, entries }, ...] - ekadhik ZIP ekshathe select korle sob file-i ekhane jay.
 // Prottek file-er sathe "zip" (kon ZIP-er) field thake. ZIP-gulo naam onujayi (serial) sajano hoy.
 function buildZipListing(parsedList) {
-    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-    const sorted = [...parsedList].sort((a, b) => collator.compare(a.file.name, b.file.name));
+    // Scan korar order-i thakbe (age scan kora ZIP age)
+    const sorted = [...parsedList];
     const files = [];
     const zipSizes = {};
     sorted.forEach(({ file, entries }) => {
@@ -9071,10 +9071,8 @@ function showZipListingModal(listing, row) {
     if (!listing.files.length) {
         body.innerHTML = '<div class="zip-contents-empty">No files found in this ZIP.</div>';
     } else {
-        // Serial onujayi sajano: ZIP-er naam (natural order), tarpor folder, tarpor file-er naam
-        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-        const sorted = [...listing.files].sort((a, b) =>
-            collator.compare(a.zip || '', b.zip || '') || collator.compare(a.name, b.name));
+        // Scan korar order-i dekhabe (ZIP 1, 2, 3...); file-er order-o ZIP-er bhetorer order-i
+        const sorted = listing.files;
         const sections = [];
         const sectionMap = new Map();
         sorted.forEach(entry => {
@@ -9092,22 +9090,25 @@ function showZipListingModal(listing, row) {
         });
         const multiZip = new Set(sections.map(sec => sec.zip)).size > 1;
         let html = '';
-        let lastZip = null;
         const removable = !!row;
-        sections.forEach(({ zip, folder, items }, secIdx) => {
-            if (multiZip && zip !== lastZip) {
-                html += `<div class="zip-sub-head"><span class="zip-sub-name">${escapeHtml(zip)}</span>${removable ? zipRemoveButtonHTML(zip) : ''}</div>`;
-            }
-            lastZip = zip;
+        // ZIP-gulo 1, 2, 3... serial pabe (scan-er order-e)
+        const zipNumber = new Map();
+        sections.forEach(sec => { if (!zipNumber.has(sec.zip)) zipNumber.set(sec.zip, zipNumber.size + 1); });
+        const firstSectionOf = new Set();
+        sections.forEach(({ zip, folder, items }) => {
+            const zipNo = zipNumber.get(zip);
+            const isFirstOfZip = !firstSectionOf.has(zip);
+            firstSectionOf.add(zip);
             // Folder na thakle (zip-er root-e file) ZIP-er nam-i folder-er jaigay dekhay.
             // Folder header-e click korle ei folder-er file gulo hide/show hoy.
             html += `
                 <div class="zip-folder-head" role="button" tabindex="0" aria-expanded="true">
+                    ${multiZip ? `<span class="zip-serial">${zipNo}</span>` : ''}
                     <span class="zip-folder-chevron">${CHEVRON_SVG}</span>
                     <span class="zip-folder-icon">${FOLDER_ICON_SVG}</span>
                     <span class="zip-folder-name">${escapeHtml(folder || zip)}</span>
                     <span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span>
-                    ${removable && !multiZip && secIdx === 0 ? zipRemoveButtonHTML('') : ''}
+                    ${removable && isFirstOfZip ? zipRemoveButtonHTML(multiZip ? zip : '') : ''}
                 </div>`;
             html += '<div class="zip-folder-items">';
             items.forEach(it => {
