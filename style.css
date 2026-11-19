@@ -6193,3 +6193,26 @@ html.light-mode .zip-folder-head { border-color: #e5e7eb; }
 }
 .zip-sub-head:first-child { border-top: none; }
 html.light-mode .zip-sub-head { color: #6b7280; border-color: #e5e7eb; }
+
+/* Admin: scanned ZIP clear/remove button (folder row / ZIP sub-heading) */
+.zip-remove-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 8px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #fca5a5;
+    background-color: rgba(127, 29, 29, .25);
+    border: 1px solid #7f1d1d;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.zip-remove-btn:hover { background-color: rgba(127, 29, 29, .5); color: #fecaca; }
+html.light-mode .zip-remove-btn { color: #b91c1c; background-color: #fef2f2; border-color: #fca5a5; }
+html.light-mode .zip-remove-btn:hover { background-color: #fee2e2; }
+.zip-sub-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.zip-sub-name { min-width: 0; word-break: break-all; }
+.zip-folder-head .zip-remove-btn { margin-left: 4px; }

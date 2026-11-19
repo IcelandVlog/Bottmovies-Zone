@@ -8878,7 +8878,9 @@ function buildZipListing(parsedList) {
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     const sorted = [...parsedList].sort((a, b) => collator.compare(a.file.name, b.file.name));
     const files = [];
+    const zipSizes = {};
     sorted.forEach(({ file, entries }) => {
+        zipSizes[file.name] = file.size || 0;
         // Mac-er hidden metadata (__MACOSX, ._file) ar folder entry badd
         entries.forEach(e => {
             if (e.isDir || e.name.startsWith('__MACOSX/') || e.name.split('/').pop().startsWith('._')) return;
@@ -8888,7 +8890,47 @@ function buildZipListing(parsedList) {
     const totalSize = files.reduce((sum, f) => sum + f.size, 0);
     const zipSize = sorted.reduce((sum, p) => sum + (p.file.size || 0), 0);
     const zipName = sorted.length === 1 ? sorted[0].file.name : `${sorted.length} ZIP files`;
-    return { zipName, zipSize, files, count: files.length, totalSize };
+    return { zipName, zipSize, files, count: files.length, totalSize, zipSizes };
+}
+
+// Scan kora ZIP remove: zipName diye ekta ZIP, khali thakle sob ZIP clear
+function removeScannedZip(row, zipName) {
+    const listing = row && row._zipListing;
+    if (!listing) return;
+    if (!zipName) {
+        row._zipListing = null;
+    } else {
+        const zipOf = f => f.zip || listing.zipName;
+        const files = listing.files.filter(f => zipOf(f) !== zipName);
+        if (!files.length) {
+            row._zipListing = null;
+        } else {
+            const zipNames = [...new Set(files.map(zipOf))];
+            const sizes = {};
+            zipNames.forEach(n => { if (listing.zipSizes && listing.zipSizes[n] != null) sizes[n] = listing.zipSizes[n]; });
+            const knownTotal = zipNames.reduce((sum, n) => sum + (sizes[n] || 0), 0);
+            row._zipListing = {
+                zipName: zipNames.length === 1 ? zipNames[0] : `${zipNames.length} ZIP files`,
+                zipSize: knownTotal || listing.zipSize,
+                files,
+                count: files.length,
+                totalSize: files.reduce((sum, f) => sum + (f.size || 0), 0),
+                zipSizes: sizes
+            };
+        }
+    }
+    updateZipButtonText(row);
+    if (row._zipListing) {
+        showZipListingModal(row._zipListing, row);
+    } else {
+        closeZipContentsModal();
+    }
+}
+
+const ZIP_TRASH_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>';
+function zipRemoveButtonHTML(zipName) {
+    const title = zipName ? 'Remove this ZIP' : 'Clear scanned ZIP';
+    return `<button type="button" class="zip-remove-btn" data-zip="${escapeAttr(zipName)}" title="${escapeAttr(title)}">${ZIP_TRASH_SVG}<span>Clear</span></button>`;
 }
 
 function updateZipButtonText(row) {
@@ -8989,6 +9031,12 @@ function ensureZipContentsModal() {
     };
     const body = overlay.querySelector('.zip-contents-body');
     body.addEventListener('click', (e) => {
+        const removeBtn = e.target.closest('.zip-remove-btn');
+        if (removeBtn) {
+            e.stopPropagation();
+            if (overlay._row) removeScannedZip(overlay._row, removeBtn.getAttribute('data-zip') || '');
+            return;
+        }
         const head = e.target.closest('.zip-folder-head');
         if (head) toggleFolder(head);
     });
@@ -9045,9 +9093,10 @@ function showZipListingModal(listing, row) {
         const multiZip = new Set(sections.map(sec => sec.zip)).size > 1;
         let html = '';
         let lastZip = null;
-        sections.forEach(({ zip, folder, items }) => {
+        const removable = !!row;
+        sections.forEach(({ zip, folder, items }, secIdx) => {
             if (multiZip && zip !== lastZip) {
-                html += `<div class="zip-sub-head">${escapeHtml(zip)}</div>`;
+                html += `<div class="zip-sub-head"><span class="zip-sub-name">${escapeHtml(zip)}</span>${removable ? zipRemoveButtonHTML(zip) : ''}</div>`;
             }
             lastZip = zip;
             // Folder na thakle (zip-er root-e file) ZIP-er nam-i folder-er jaigay dekhay.
@@ -9058,6 +9107,7 @@ function showZipListingModal(listing, row) {
                     <span class="zip-folder-icon">${FOLDER_ICON_SVG}</span>
                     <span class="zip-folder-name">${escapeHtml(folder || zip)}</span>
                     <span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span>
+                    ${removable && !multiZip && secIdx === 0 ? zipRemoveButtonHTML('') : ''}
                 </div>`;
             html += '<div class="zip-folder-items">';
             items.forEach(it => {
