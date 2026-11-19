@@ -8930,7 +8930,7 @@ function removeScannedZip(row, zipName) {
 const ZIP_TRASH_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>';
 function zipRemoveButtonHTML(zipName) {
     const title = zipName ? 'Remove this ZIP' : 'Clear scanned ZIP';
-    return `<button type="button" class="zip-remove-btn" data-zip="${escapeAttr(zipName)}" title="${escapeAttr(title)}">${ZIP_TRASH_SVG}<span>Clear</span></button>`;
+    return `<button type="button" class="zip-remove-btn" data-zip="${escapeAttr(zipName)}" title="${escapeAttr(title)}">${ZIP_TRASH_SVG}</button>`;
 }
 
 function updateZipButtonText(row) {
