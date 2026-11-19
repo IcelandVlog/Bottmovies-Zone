@@ -990,8 +990,9 @@ function buildPublicZipButtonsHTML(movie) {
     });
     publicZipListings = listings;
     if (!listings.length) return '';
+    // Button-e shudhu "ZIP contents" lekha thake; quality/season tooltip-e (hover korle) dekha jay
     return listings.map((l, i) =>
-        `<button type="button" class="zip-public-btn" onclick="openPublicZipContents(${i})">📦 ZIP contents${l.label ? ' · ' + escapeHtml(l.label) : ''}</button>`
+        `<button type="button" class="zip-public-btn" title="${escapeAttr(l.label)}" onclick="openPublicZipContents(${i})"><svg class="zip-public-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 12h2v2h-2z"/><path d="M10 16h2v2h-2z"/></svg><span>ZIP contents</span></button>`
     ).join(' ');
 }
 
