@@ -6235,3 +6235,16 @@ html.light-mode .zip-remove-btn:hover { background-color: #fee2e2; }
     border-radius: 6px;
 }
 html.light-mode .zip-serial { background-color: #f3f4f6; border-color: #e5e7eb; color: #111827; }
+
+/* Single line: folder/file name line-er bairer ongsho ellipsis (...) hoye hide */
+.zip-folder-name,
+.zip-file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    word-break: normal;
+}
+.zip-folder-head > * { flex-shrink: 0; }
+.zip-folder-head > .zip-folder-name { flex: 1 1 auto; flex-shrink: 1; }
+.zip-file-row { grid-template-columns: 22px minmax(0, 1fr) auto auto; }

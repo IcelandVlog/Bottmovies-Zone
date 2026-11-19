@@ -8894,6 +8894,35 @@ function buildZipListing(parsedList) {
 }
 
 // Scan kora ZIP remove: zipName diye ekta ZIP, khali thakle sob ZIP clear
+// Age scan kora ZIP-er sathe notun ZIP jog kora. Ekoi naam-er ZIP abar bachle sheta-i jaigay
+// notun data diye bodle jay (serial thake), notun ZIP shesh-e jay.
+function mergeZipListings(existing, incoming) {
+    const order = [];
+    const byZip = new Map();
+    const sizes = { ...(existing.zipSizes || {}) };
+    existing.files.forEach(f => {
+        const z = f.zip || existing.zipName;
+        if (!byZip.has(z)) { byZip.set(z, []); order.push(z); }
+        byZip.get(z).push(f);
+    });
+    const incomingNames = [...new Set(incoming.files.map(f => f.zip))];
+    incomingNames.forEach(z => {
+        if (!byZip.has(z)) order.push(z);
+        byZip.set(z, incoming.files.filter(f => f.zip === z));
+        if (incoming.zipSizes && incoming.zipSizes[z] != null) sizes[z] = incoming.zipSizes[z];
+    });
+    const files = order.flatMap(z => byZip.get(z));
+    const zipSize = order.reduce((sum, z) => sum + (sizes[z] || 0), 0);
+    return {
+        zipName: order.length === 1 ? order[0] : `${order.length} ZIP files`,
+        zipSize: zipSize || (existing.zipSize || 0) + (incoming.zipSize || 0),
+        files,
+        count: files.length,
+        totalSize: files.reduce((sum, f) => sum + (f.size || 0), 0),
+        zipSizes: sizes
+    };
+}
+
 function removeScannedZip(row, zipName) {
     const listing = row && row._zipListing;
     if (!listing) return;
@@ -8964,7 +8993,9 @@ function pickZipForRow(row) {
             for (const file of picked) {
                 parsed.push({ file, entries: await readZipCentralDirectory(file) });
             }
-            row._zipListing = buildZipListing(parsed);
+            const incoming = buildZipListing(parsed);
+            // Age theke scan kora ZIP thakle notun-gulo jog hoy (serial-o thake)
+            row._zipListing = row._zipListing ? mergeZipListings(row._zipListing, incoming) : incoming;
             // Size field khali thakle ZIP-er size (ekadhik hole total) auto boshe
             const sizeInput = row.querySelector('.admin-link-size');
             if (sizeInput && !sizeInput.value.trim()) sizeInput.value = formatZipBytes(row._zipListing.zipSize);
@@ -9010,7 +9041,7 @@ function ensureZipContentsModal() {
             <div class="zip-contents-body"></div>
             <div class="zip-contents-foot">
                 <span class="zip-contents-legend"></span>
-                <button type="button" class="admin-mini-btn zip-contents-rechoose">Choose another ZIP</button>
+                <button type="button" class="admin-mini-btn zip-contents-rechoose">Add another ZIP</button>
             </div>
         </div>`;
     document.body.appendChild(overlay);
@@ -9106,7 +9137,7 @@ function showZipListingModal(listing, row) {
                     ${multiZip ? `<span class="zip-serial">${zipNo}</span>` : ''}
                     <span class="zip-folder-chevron">${CHEVRON_SVG}</span>
                     <span class="zip-folder-icon">${FOLDER_ICON_SVG}</span>
-                    <span class="zip-folder-name">${escapeHtml(folder || zip)}</span>
+                    <span class="zip-folder-name" title="${escapeAttr(folder || zip)}">${escapeHtml(folder || zip)}</span>
                     <span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span>
                     ${removable && isFirstOfZip ? zipRemoveButtonHTML(multiZip ? zip : '') : ''}
                 </div>`;
@@ -9116,7 +9147,7 @@ function showZipListingModal(listing, row) {
                 html += `
                     <div class="zip-file-row kind-${it.kind}">
                         <span class="zip-file-icon">${FILE_ICON_SVG}</span>
-                        <span class="zip-file-name">${escapeHtml(it.base)}</span>
+                        <span class="zip-file-name" title="${escapeAttr(it.base)}">${escapeHtml(it.base)}</span>
                         <span class="zip-file-size">${formatZipBytes(it.size)}</span>
                         <span class="zip-ext-badge kind-${it.kind}">${escapeHtml(ext)}</span>
                     </div>`;
