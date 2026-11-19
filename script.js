@@ -9144,7 +9144,7 @@ function showZipListingModal(listing, row) {
             // Folder na thakle (zip-er root-e file) ZIP-er nam-i folder-er jaigay dekhay.
             // Folder header-e click korle ei folder-er file gulo hide/show hoy.
             html += `
-                <div class="zip-folder-head" role="button" tabindex="0" aria-expanded="true">
+                <div class="zip-folder-head is-collapsed" role="button" tabindex="0" aria-expanded="false">
                     ${multiZip ? `<span class="zip-serial">${zipNo}</span>` : ''}
                     <span class="zip-folder-chevron">${CHEVRON_SVG}</span>
                     <span class="zip-folder-icon">${FOLDER_ICON_SVG}</span>
@@ -9152,7 +9152,8 @@ function showZipListingModal(listing, row) {
                     <span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span>
                     ${removable && isFirstOfZip ? zipRemoveButtonHTML(multiZip ? zip : '') : ''}
                 </div>`;
-            html += '<div class="zip-folder-items">';
+            // Default-e hide thake; folder header-e click korle file gulo dekha jay
+            html += '<div class="zip-folder-items collapsed">';
             items.forEach(it => {
                 const ext = (it.base.split('.').pop() || '').toUpperCase();
                 html += `
