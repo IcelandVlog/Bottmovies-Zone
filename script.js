@@ -964,6 +964,43 @@ function getMovieQualityBadge(movie) {
     return sorted.map(q => q.replace('P', 'p')).join(' / ');
 }
 
+// Details page-er ZIP contents: database-e save kora zipFiles theke button banay
+let publicZipListings = [];
+
+function buildPublicZipButtonsHTML(movie) {
+    const blocks = Array.isArray(movie && movie.downloadBlocks) ? movie.downloadBlocks : [];
+    const listings = [];
+    blocks.forEach(sec => {
+        const isSeries = Array.isArray(sec.items);
+        const sources = isSeries ? sec.items : [sec];
+        sources.forEach(it => {
+            if (!Array.isArray(it.zipFiles) || !it.zipFiles.length) return;
+            const files = it.zipFiles.map(f => ({ name: f.name, size: Number(f.size) || 0 }));
+            const context = isSeries ? String(sec.label || '').trim().slice(0, 30) : '';
+            const label = [context, String(it.quality || '').toUpperCase()].filter(Boolean).join(' · ');
+            listings.push({
+                zipName: it.zipName || 'ZIP',
+                zipSize: Number(it.zipSize) || 0,
+                files,
+                count: files.length,
+                totalSize: files.reduce((sum, f) => sum + f.size, 0),
+                label
+            });
+        });
+    });
+    publicZipListings = listings;
+    if (!listings.length) return '';
+    return listings.map((l, i) =>
+        `<button type="button" class="zip-public-btn" onclick="openPublicZipContents(${i})">📦 ZIP contents${l.label ? ' · ' + escapeHtml(l.label) : ''}</button>`
+    ).join(' ');
+}
+
+function openPublicZipContents(index) {
+    const listing = publicZipListings[index];
+    if (!listing) return;
+    showZipListingModal(listing, null);
+}
+
 // A poster <img> can fail to load once on a "cold" first visit (DNS/TLS not
 // warmed up yet, slow first connection to image.tmdb.org / OMDb's poster
 // host) even though the URL is perfectly valid - a plain reload fixes it
@@ -3000,7 +3037,7 @@ fastServersList.forEach((fs, fIdx) => {
                     <div class="clamped-text-box" id="subsLangText">• <strong>Subtitles:</strong> ${movie.Subtitles || movie.subtitles || 'N/A'}</div>
                     <button type="button" class="toggle-more-btn" id="subsLangToggleBtn" onclick="toggleMoreLess('subsLangText','subsLangToggleBtn')">More</button>
                 </li>
-                <li>• <strong>Quality:</strong> <span class="badge-quality">${getMovieQualityBadge(movie)}</span></li>
+                <li>• <strong>Quality:</strong> <span class="badge-quality">${getMovieQualityBadge(movie)}</span> ${buildPublicZipButtonsHTML(movie)}</li>
             </ul>
         </div>
         ${trailerHTML}
@@ -8945,8 +8982,15 @@ function ensureZipContentsModal() {
 function openZipContentsModal(row) {
     const listing = row && row._zipListing;
     if (!listing) return;
+    showZipListingModal(listing, row);
+}
+
+// Shared view: admin (row diye, "Choose another ZIP" dekhay) ar public details page
+// (row chara, shudhu dekhay) - duitai eki popup use kore.
+function showZipListingModal(listing, row) {
     const overlay = ensureZipContentsModal();
-    overlay._row = row;
+    overlay._row = row || null;
+    overlay.querySelector('.zip-contents-rechoose').style.display = row ? '' : 'none';
     overlay.querySelector('.zip-contents-title').textContent = listing.zipName;
     overlay.querySelector('.zip-contents-sub').textContent =
         `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.totalSize)} inside · ZIP ${formatZipBytes(listing.zipSize)}`;
