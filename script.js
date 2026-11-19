@@ -8928,6 +8928,11 @@ function closeZipContentsModal() {
     if (overlay) overlay.style.display = 'none';
 }
 
+const ZIP_ICON_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 12h2v2h-2z"/><path d="M10 16h2v2h-2z"/></svg>';
+const FOLDER_ICON_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+const FILE_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>';
+const CHEVRON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
 function ensureZipContentsModal() {
     let overlay = document.getElementById('zipContentsOverlay');
     if (overlay) return overlay;
@@ -8938,12 +8943,14 @@ function ensureZipContentsModal() {
     overlay.innerHTML = `
         <div class="zip-contents-box" role="dialog" aria-modal="true" aria-labelledby="zipContentsTitle">
             <div class="zip-contents-head">
-                <div class="zip-contents-head-text">
-                    <div class="zip-contents-title" id="zipContentsTitle"></div>
-                    <div class="zip-contents-sub"></div>
+                <div class="zip-contents-head-left">
+                    <span class="zip-contents-head-icon">${ZIP_ICON_SVG}</span>
+                    <span class="zip-contents-title" id="zipContentsTitle">ZIP Archive</span>
+                    <span class="zip-contents-pill"></span>
                 </div>
                 <button type="button" class="zip-contents-close" aria-label="Close">✕</button>
             </div>
+            <div class="zip-contents-zipname"></div>
             <div class="zip-contents-body"></div>
             <div class="zip-contents-foot">
                 <span class="zip-contents-legend"></span>
@@ -8953,26 +8960,27 @@ function ensureZipContentsModal() {
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeZipContentsModal(); });
     overlay.querySelector('.zip-contents-close').addEventListener('click', closeZipContentsModal);
+    overlay.querySelector('.zip-contents-rechoose').addEventListener('click', () => {
+        const row = overlay._row;
+        closeZipContentsModal();
+        if (row) pickZipForRow(row);
+    });
     // Folder header toggle (click ba Enter/Space)
     const toggleFolder = (head) => {
         const items = head.nextElementSibling;
         if (!items || !items.classList.contains('zip-folder-items')) return;
         const collapsed = items.classList.toggle('collapsed');
         head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-        head.querySelector('.zip-folder-toggle').textContent = collapsed ? '▸' : '▾';
+        head.classList.toggle('is-collapsed', collapsed);
     };
-    overlay.querySelector('.zip-contents-body').addEventListener('click', (e) => {
+    const body = overlay.querySelector('.zip-contents-body');
+    body.addEventListener('click', (e) => {
         const head = e.target.closest('.zip-folder-head');
         if (head) toggleFolder(head);
     });
-    overlay.querySelector('.zip-contents-body').addEventListener('keydown', (e) => {
+    body.addEventListener('keydown', (e) => {
         const head = e.target.closest && e.target.closest('.zip-folder-head');
         if (head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleFolder(head); }
-    });
-    overlay.querySelector('.zip-contents-rechoose').addEventListener('click', () => {
-        const row = overlay._row;
-        closeZipContentsModal();
-        if (row) pickZipForRow(row);
     });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay.style.display !== 'none') closeZipContentsModal();
@@ -8992,15 +9000,15 @@ function showZipListingModal(listing, row) {
     const overlay = ensureZipContentsModal();
     overlay._row = row || null;
     overlay.querySelector('.zip-contents-rechoose').style.display = row ? '' : 'none';
-    overlay.querySelector('.zip-contents-title').textContent = listing.zipName;
-    overlay.querySelector('.zip-contents-sub').textContent =
-        `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.totalSize)} inside · ZIP ${formatZipBytes(listing.zipSize)}`;
+
+    overlay.querySelector('.zip-contents-pill').textContent =
+        `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.totalSize)}`;
+    overlay.querySelector('.zip-contents-zipname').textContent = listing.zipName;
 
     const body = overlay.querySelector('.zip-contents-body');
     if (!listing.files.length) {
         body.innerHTML = '<div class="zip-contents-empty">No files found in this ZIP.</div>';
     } else {
-        // Folder onujayi group kora (folder na thakle ZIP-er nam)
         const groups = new Map();
         listing.files.forEach(entry => {
             const slash = entry.name.lastIndexOf('/');
@@ -9013,16 +9021,22 @@ function showZipListingModal(listing, row) {
         groups.forEach((items, folder) => {
             // Folder na thakle (zip-er root-e file) ZIP-er nam-i folder-er jaigay dekhay.
             // Folder header-e click korle ei folder-er file gulo hide/show hoy.
-            html += `<div class="zip-folder-head" role="button" tabindex="0" aria-expanded="true"><span class="zip-folder-toggle">▾</span><span class="zip-folder-name">📁 ${escapeHtml(folder || listing.zipName)}</span><span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span></div>`;
+            html += `
+                <div class="zip-folder-head" role="button" tabindex="0" aria-expanded="true">
+                    <span class="zip-folder-chevron">${CHEVRON_SVG}</span>
+                    <span class="zip-folder-icon">${FOLDER_ICON_SVG}</span>
+                    <span class="zip-folder-name">${escapeHtml(folder || listing.zipName)}</span>
+                    <span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span>
+                </div>`;
             html += '<div class="zip-folder-items">';
             items.forEach(it => {
                 const ext = (it.base.split('.').pop() || '').toUpperCase();
                 html += `
-                    <div class="zip-file-row">
-                        <span class="zip-kind-dot ${it.kind}"></span>
+                    <div class="zip-file-row kind-${it.kind}">
+                        <span class="zip-file-icon">${FILE_ICON_SVG}</span>
                         <span class="zip-file-name">${escapeHtml(it.base)}</span>
                         <span class="zip-file-size">${formatZipBytes(it.size)}</span>
-                        <span class="zip-ext-badge">${escapeHtml(ext)}</span>
+                        <span class="zip-ext-badge kind-${it.kind}">${escapeHtml(ext)}</span>
                     </div>`;
             });
             html += '</div>';
@@ -9032,7 +9046,7 @@ function showZipListingModal(listing, row) {
         // Shudhu je kind-gulo ZIP-e ache, legend-e sheta-i dekhabe
         const presentKinds = ['video', 'image', 'text', 'other'].filter(k => listing.files.some(f => zipEntryKind(f.name.split('/').pop()) === k));
         overlay.querySelector('.zip-contents-legend').innerHTML = presentKinds
-            .map(k => `<span class="zip-kind-dot ${k}"></span>${ZIP_KIND_LABELS[k]}`)
+            .map(k => `<span class="zip-legend-item"><span class="zip-kind-dot ${k}"></span>${ZIP_KIND_LABELS[k]}</span>`)
             .join('');
     }
     overlay.style.display = 'flex';
