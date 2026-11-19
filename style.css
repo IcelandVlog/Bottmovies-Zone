@@ -6182,3 +6182,14 @@ html.light-mode .zip-folder-head { border-color: #e5e7eb; }
     .zip-folder-head { padding: 14px 14px; }
     .zip-file-row { padding: 10px 14px 10px 40px; }
 }
+
+/* Multi-ZIP: ZIP-er naam sub-heading (serial onujayi) */
+.zip-sub-head {
+    padding: 14px 18px 4px;
+    font-size: 12px;
+    color: #8b8b96;
+    word-break: break-all;
+    border-top: 1px solid #2c2c33;
+}
+.zip-sub-head:first-child { border-top: none; }
+html.light-mode .zip-sub-head { color: #6b7280; border-color: #e5e7eb; }

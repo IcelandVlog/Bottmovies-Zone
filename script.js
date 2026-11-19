@@ -975,7 +975,7 @@ function buildPublicZipButtonsHTML(movie) {
         const sources = isSeries ? sec.items : [sec];
         sources.forEach(it => {
             if (!Array.isArray(it.zipFiles) || !it.zipFiles.length) return;
-            const files = it.zipFiles.map(f => ({ name: f.name, size: Number(f.size) || 0 }));
+            const files = it.zipFiles.map(f => ({ zip: f.zip || it.zipName || 'ZIP', name: f.name, size: Number(f.size) || 0 }));
             const context = isSeries ? String(sec.label || '').trim().slice(0, 30) : '';
             const label = [context, String(it.quality || '').toUpperCase()].filter(Boolean).join(' · ');
             listings.push({
@@ -8664,7 +8664,7 @@ function buildLinkRowElement(data, options) {
     zipBtn.addEventListener('click', () => onZipContentsClick(row));
     // Database-e age save kora ZIP file list thakle sheta load kore (abar zip bachhar lagbe na)
     if (Array.isArray(data.zipFiles) && data.zipFiles.length) {
-        const files = data.zipFiles.map(f => ({ name: f.name, size: Number(f.size) || 0 }));
+        const files = data.zipFiles.map(f => ({ zip: f.zip || data.zipName || 'ZIP', name: f.name, size: Number(f.size) || 0 }));
         row._zipListing = {
             zipName: data.zipName || 'ZIP',
             zipSize: Number(data.zipSize) || 0,
@@ -8868,17 +8868,27 @@ function zipFieldsForRow(row) {
     return {
         zipName: listing.zipName,
         zipSize: listing.zipSize,
-        zipFiles: listing.files.map(f => ({ name: f.name, size: f.size }))
+        zipFiles: listing.files.map(f => ({ zip: f.zip || listing.zipName, name: f.name, size: f.size }))
     };
 }
 
-function buildZipListing(file, entries) {
-    // Mac-er hidden metadata (__MACOSX, ._file) ar folder entry badd
-    const files = entries.filter(e => !e.isDir
-        && !e.name.startsWith('__MACOSX/')
-        && !e.name.split('/').pop().startsWith('._'));
-    const totalSize = files.reduce((sum, e) => sum + (e.size || 0), 0);
-    return { zipName: file.name, zipSize: file.size, files, count: files.length, totalSize };
+// parsedList = [{ file, entries }, ...] - ekadhik ZIP ekshathe select korle sob file-i ekhane jay.
+// Prottek file-er sathe "zip" (kon ZIP-er) field thake. ZIP-gulo naam onujayi (serial) sajano hoy.
+function buildZipListing(parsedList) {
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    const sorted = [...parsedList].sort((a, b) => collator.compare(a.file.name, b.file.name));
+    const files = [];
+    sorted.forEach(({ file, entries }) => {
+        // Mac-er hidden metadata (__MACOSX, ._file) ar folder entry badd
+        entries.forEach(e => {
+            if (e.isDir || e.name.startsWith('__MACOSX/') || e.name.split('/').pop().startsWith('._')) return;
+            files.push({ zip: file.name, name: e.name, size: e.size || 0 });
+        });
+    });
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    const zipSize = sorted.reduce((sum, p) => sum + (p.file.size || 0), 0);
+    const zipName = sorted.length === 1 ? sorted[0].file.name : `${sorted.length} ZIP files`;
+    return { zipName, zipSize, files, count: files.length, totalSize };
 }
 
 function updateZipButtonText(row) {
@@ -8901,17 +8911,21 @@ function pickZipForRow(row) {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.zip,application/zip,application/x-zip-compressed';
+    input.multiple = true;
     input.onchange = async () => {
-        const file = input.files && input.files[0];
-        if (!file) return;
+        const picked = Array.from(input.files || []);
+        if (!picked.length) return;
         const btn = row.querySelector('.admin-zip-contents-btn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Reading ZIP...'; }
+        if (btn) { btn.disabled = true; btn.textContent = picked.length > 1 ? `Reading ${picked.length} ZIPs...` : 'Reading ZIP...'; }
         try {
-            const entries = await readZipCentralDirectory(file);
-            row._zipListing = buildZipListing(file, entries);
-            // Size field khali thakle ZIP-er size auto boshe
+            const parsed = [];
+            for (const file of picked) {
+                parsed.push({ file, entries: await readZipCentralDirectory(file) });
+            }
+            row._zipListing = buildZipListing(parsed);
+            // Size field khali thakle ZIP-er size (ekadhik hole total) auto boshe
             const sizeInput = row.querySelector('.admin-link-size');
-            if (sizeInput && !sizeInput.value.trim()) sizeInput.value = formatZipBytes(file.size);
+            if (sizeInput && !sizeInput.value.trim()) sizeInput.value = formatZipBytes(row._zipListing.zipSize);
             openZipContentsModal(row);
         } catch (err) {
             showToast('❌ ZIP read failed: ' + (err && err.message ? err.message : err), 'error');
@@ -9009,23 +9023,40 @@ function showZipListingModal(listing, row) {
     if (!listing.files.length) {
         body.innerHTML = '<div class="zip-contents-empty">No files found in this ZIP.</div>';
     } else {
-        const groups = new Map();
-        listing.files.forEach(entry => {
+        // Serial onujayi sajano: ZIP-er naam (natural order), tarpor folder, tarpor file-er naam
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+        const sorted = [...listing.files].sort((a, b) =>
+            collator.compare(a.zip || '', b.zip || '') || collator.compare(a.name, b.name));
+        const sections = [];
+        const sectionMap = new Map();
+        sorted.forEach(entry => {
+            const zip = entry.zip || listing.zipName;
             const slash = entry.name.lastIndexOf('/');
             const folder = slash >= 0 ? entry.name.slice(0, slash) : '';
             const base = slash >= 0 ? entry.name.slice(slash + 1) : entry.name;
-            if (!groups.has(folder)) groups.set(folder, []);
-            groups.get(folder).push({ base, size: entry.size, kind: zipEntryKind(base) });
+            const key = zip + '\u0000' + folder;
+            if (!sectionMap.has(key)) {
+                const sec = { zip, folder, items: [] };
+                sectionMap.set(key, sec);
+                sections.push(sec);
+            }
+            sectionMap.get(key).items.push({ base, size: entry.size, kind: zipEntryKind(base) });
         });
+        const multiZip = new Set(sections.map(sec => sec.zip)).size > 1;
         let html = '';
-        groups.forEach((items, folder) => {
+        let lastZip = null;
+        sections.forEach(({ zip, folder, items }) => {
+            if (multiZip && zip !== lastZip) {
+                html += `<div class="zip-sub-head">${escapeHtml(zip)}</div>`;
+            }
+            lastZip = zip;
             // Folder na thakle (zip-er root-e file) ZIP-er nam-i folder-er jaigay dekhay.
             // Folder header-e click korle ei folder-er file gulo hide/show hoy.
             html += `
                 <div class="zip-folder-head" role="button" tabindex="0" aria-expanded="true">
                     <span class="zip-folder-chevron">${CHEVRON_SVG}</span>
                     <span class="zip-folder-icon">${FOLDER_ICON_SVG}</span>
-                    <span class="zip-folder-name">${escapeHtml(folder || listing.zipName)}</span>
+                    <span class="zip-folder-name">${escapeHtml(folder || zip)}</span>
                     <span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span>
                 </div>`;
             html += '<div class="zip-folder-items">';
