@@ -6263,3 +6263,22 @@ html.light-mode .zip-serial { background-color: #f3f4f6; border-color: #e5e7eb; 
     cursor: pointer;
 }
 .zip-contents-save:hover { background-color: #1d4ed8; }
+
+/* Admin link row: saved ZIP list clear button (ZIP contents-er paashe) */
+.admin-link-zip-cell { gap: 4px; }
+.admin-zip-row-clear {
+    width: 30px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: #fca5a5;
+    background-color: rgba(127, 29, 29, .25);
+    border: 1px solid #7f1d1d;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.admin-zip-row-clear:hover { background-color: rgba(127, 29, 29, .5); color: #fecaca; }
+html.light-mode .admin-zip-row-clear { color: #b91c1c; background-color: #fef2f2; border-color: #fca5a5; }

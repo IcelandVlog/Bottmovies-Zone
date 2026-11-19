@@ -8647,6 +8647,7 @@ function buildLinkRowElement(data, options) {
         <input type="text" class="admin-link-size" placeholder="${escapeAttr(options.sizePlaceholder || 'Size (e.g. 1.2GB)')}" value="${escapeAttr(data.size)}">
         <div class="admin-link-zip-cell">
             <button type="button" class="admin-zip-contents-btn" title="Choose a ZIP file to see what is inside">📦 Choose ZIP</button>
+            <button type="button" class="admin-zip-row-clear" title="Clear saved ZIP list for this row" style="display:none;">${ZIP_TRASH_SVG}</button>
         </div>
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
@@ -8662,6 +8663,10 @@ function buildLinkRowElement(data, options) {
     };
     typeSel.addEventListener('change', syncZipUi);
     zipBtn.addEventListener('click', () => onZipContentsClick(row));
+    row.querySelector('.admin-zip-row-clear').addEventListener('click', () => {
+        removeScannedZip(row, '');
+        showToast('ZIP list clear hoyeche. Update/Add Content chapo save korle database theke-o muche jabe.');
+    });
     // Database-e age save kora ZIP file list thakle sheta load kore (abar zip bachhar lagbe na)
     if (Array.isArray(data.zipFiles) && data.zipFiles.length) {
         const files = data.zipFiles.map(f => ({ zip: f.zip || data.zipName || 'ZIP', name: f.name, size: Number(f.size) || 0 }));
@@ -8968,6 +8973,8 @@ function updateZipButtonText(row) {
     btn.textContent = row._zipListing
         ? `📦 ZIP contents (${row._zipListing.count})`
         : '📦 Choose ZIP';
+    const clearBtn = row.querySelector('.admin-zip-row-clear');
+    if (clearBtn) clearBtn.style.display = row._zipListing ? '' : 'none';
 }
 
 function onZipContentsClick(row) {
