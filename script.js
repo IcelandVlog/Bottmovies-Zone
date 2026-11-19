@@ -9041,12 +9041,22 @@ function ensureZipContentsModal() {
             <div class="zip-contents-body"></div>
             <div class="zip-contents-foot">
                 <span class="zip-contents-legend"></span>
-                <button type="button" class="admin-mini-btn zip-contents-rechoose">Add another ZIP</button>
+                <div class="zip-contents-actions">
+                    <button type="button" class="admin-mini-btn zip-contents-rechoose">Add another ZIP</button>
+                    <button type="button" class="zip-contents-save">Save</button>
+                </div>
             </div>
         </div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeZipContentsModal(); });
     overlay.querySelector('.zip-contents-close').addEventListener('click', closeZipContentsModal);
+    overlay.querySelector('.zip-contents-save').addEventListener('click', () => {
+        const row = overlay._row;
+        if (!row || !row._zipListing) { closeZipContentsModal(); return; }
+        updateZipButtonText(row);
+        closeZipContentsModal();
+        showToast('✅ ZIP list ei row-e save hoyeche. Content database-e save korte Update/Add Content chapo.');
+    });
     overlay.querySelector('.zip-contents-rechoose').addEventListener('click', () => {
         const row = overlay._row;
         closeZipContentsModal();
@@ -9093,6 +9103,7 @@ function showZipListingModal(listing, row) {
     const overlay = ensureZipContentsModal();
     overlay._row = row || null;
     overlay.querySelector('.zip-contents-rechoose').style.display = row ? '' : 'none';
+    overlay.querySelector('.zip-contents-save').style.display = row ? '' : 'none';
 
     overlay.querySelector('.zip-contents-pill').textContent =
         `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.totalSize)}`;

@@ -6248,3 +6248,17 @@ html.light-mode .zip-serial { background-color: #f3f4f6; border-color: #e5e7eb; 
 .zip-folder-head > * { flex-shrink: 0; }
 .zip-folder-head > .zip-folder-name { flex: 1 1 auto; flex-shrink: 1; }
 .zip-file-row { grid-template-columns: 22px minmax(0, 1fr) auto auto; }
+
+/* ZIP popup footer: Add another ZIP + Save */
+.zip-contents-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.zip-contents-save {
+    padding: 7px 16px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #ffffff;
+    background-color: #2563eb;
+    border: 1px solid #1d4ed8;
+    border-radius: 7px;
+    cursor: pointer;
+}
+.zip-contents-save:hover { background-color: #1d4ed8; }
