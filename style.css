@@ -6143,3 +6143,42 @@ html.light-mode .zip-legend-item { color: #374151; }
     .zip-file-row .zip-ext-badge { display: none; }
     .zip-folder-items { padding-left: 0; }
 }
+
+/* ZIP popup: close button-er background/border + folder row divider (collapsed screenshot-er moto) */
+.zip-contents-close {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 14px;
+    color: #e5e7eb;
+    background-color: #2a2a31;
+    border: 1px solid #3a3a43;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.zip-contents-close:hover { background-color: #34343d; color: #ffffff; }
+html.light-mode .zip-contents-close { background-color: #f3f4f6; border-color: #e5e7eb; color: #111827; }
+html.light-mode .zip-contents-close:hover { background-color: #e5e7eb; }
+
+.zip-contents-body { padding: 0; }
+.zip-folder-head {
+    margin: 0;
+    padding: 16px 18px;
+    border-radius: 0;
+    border-bottom: 1px solid #2c2c33;
+}
+.zip-folder-head:hover { background-color: #26262d; }
+.zip-folder-items { padding-left: 0; }
+.zip-file-row {
+    margin-left: 0;
+    padding: 10px 18px 10px 52px;
+}
+html.light-mode .zip-folder-head { border-color: #e5e7eb; }
+
+@media (max-width: 480px) {
+    .zip-folder-head { padding: 14px 14px; }
+    .zip-file-row { padding: 10px 14px 10px 40px; }
+}
