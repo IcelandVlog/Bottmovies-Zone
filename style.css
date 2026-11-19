@@ -5990,23 +5990,24 @@ html.light-mode .zip-folder-head:hover { background-color: #e6ebf3; }
 .zip-public-btn {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    margin: 4px 6px 4px 4px;
-    padding: 6px 12px;
+    gap: 5px;
+    margin: 0 4px 0 2px;
+    padding: 2px 7px;
+    line-height: 1.2;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-size: clamp(11px, 1.4vw, 13px);
     font-weight: 700;
     letter-spacing: .3px;
     color: #e5e7eb;
     background: transparent;
     border: 1px solid #7f3b3b;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     vertical-align: middle;
     transition: border-color .15s, color .15s;
 }
 .zip-public-btn:hover { border-color: #f87171; color: #ffffff; }
-.zip-public-icon { flex-shrink: 0; color: #e5e7eb; }
+.zip-public-icon { flex-shrink: 0; color: #e5e7eb; width: 11px; height: 11px; }
 html.light-mode .zip-public-btn { color: #14161c; border-color: #b91c1c; }
 html.light-mode .zip-public-btn:hover { color: #7f1d1d; border-color: #dc2626; }
 html.light-mode .zip-public-icon { color: #14161c; }
