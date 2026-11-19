@@ -5986,18 +5986,22 @@ html.light-mode .zip-folder-head:hover { background-color: #e6ebf3; }
 .zip-folder-name { flex: 1; word-break: break-all; margin-right: auto; padding-left: 4px; }
 .zip-folder-items.collapsed { display: none; }
 
-/* Details page: Quality-r pashe ZIP contents button */
+/* Details page: Quality badge-er pashe ZIP contents (plain icon + text, screenshot-er moto) */
 .zip-public-btn {
-    display: inline-block;
-    margin: 2px 4px 2px 0;
-    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin: 2px 6px 2px 4px;
+    padding: 2px 4px;
     font-size: 12px;
     font-weight: 600;
-    color: #e2e8f0;
-    background-color: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 6px;
+    color: #cbd5e1;
+    background: none;
+    border: none;
+    border-radius: 4px;
     cursor: pointer;
+    vertical-align: middle;
 }
-.zip-public-btn:hover { border-color: #38bdf8; }
-html.light-mode .zip-public-btn { background-color: #eef2f7; border-color: #dde1e8; color: #14161c; }
+.zip-public-btn:hover { color: #38bdf8; }
+html.light-mode .zip-public-btn { color: #334155; }
+html.light-mode .zip-public-btn:hover { color: #2563eb; }
