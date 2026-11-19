@@ -9,7 +9,24 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bottmovies Zone</title>
 
-<script src="coi-serviceworker.js"></script>
+<script>
+  // coi-serviceworker live site-e (vercel.json / _headers-e COOP/COEP header ache) lagbe na.
+  // Localhost (Live Server ba python server)-e eta cross-origin request (Supabase, ipapi)
+  // bhenge "Failed to fetch" dey, tai localhost-e eta load hoy na ar age theke register kora
+  // thakle unregister kora hoy.
+  (function () {
+    var isLocal = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    if (isLocal) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        }).catch(function () {});
+      }
+    } else {
+      document.write('<script src="coi-serviceworker.js"><\/script>');
+    }
+  })();
+</script>
 <script>
   (function(){
       try {

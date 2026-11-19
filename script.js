@@ -2600,7 +2600,10 @@ function renderMoviesByPage(movies, page) {
     renderPaginationControls(movies, page);
 }
 
-function getFileTypeBadge(link, label = '') {
+function getFileTypeBadge(link, label = '', fileType = '') {
+    // Admin file type select-e jei type deya hoyeche sheta-i age use hoy
+    const explicit = String(fileType || '').toLowerCase();
+    if (['zip', 'mkv', 'mp4', 'rar'].includes(explicit)) return explicit.toUpperCase();
     const fullText = (String(link || '') + ' ' + String(label || '')).toLowerCase();
 
     if (fullText.includes('mkv')) return 'MKV';
@@ -2725,7 +2728,7 @@ let downloadHTML = '';
                 
                 const sizeText = it.size ? ` [${it.size}]` : '';
                 
-                const fileTypeLabel = getFileTypeBadge(it.link, `${sec.label || ''} ${it.quality || ''}`);
+                const fileTypeLabel = getFileTypeBadge(it.link, `${sec.label || ''} ${it.quality || ''}`, it.fileType);
 
                 downloadHTML += `
                 <div class="season-box-item">
@@ -2761,7 +2764,7 @@ let downloadHTML = '';
                 }
                 const sizeText = sec.size ? ` [${sec.size}]` : '';
    
-                const fileTypeLabel = getFileTypeBadge(sec.link, sec.label || '');
+                const fileTypeLabel = getFileTypeBadge(sec.link, sec.label || '', sec.fileType);
 
                 downloadHTML += `
                 <div class="season-box-item">
@@ -8570,28 +8573,82 @@ function updateAdminPosterPreview() {
 
 // ---------- Movie download link rows ----------
 
-function addMovieLinkRow(data) {
+// Link row-er file type (ZIP / MKV / MP4 / RAR). Purono record-e type field na thakle
+// link/label theke detect kora hoy, na paile ZIP.
+const LINK_FILE_TYPES = ['zip', 'mkv', 'mp4', 'rar'];
+
+function detectLinkFileType(data) {
+    const explicit = String((data && data.fileType) || '').toLowerCase();
+    if (LINK_FILE_TYPES.includes(explicit)) return explicit;
+    const text = (String((data && data.link) || '') + ' ' + String((data && data.label) || '')).toLowerCase();
+    for (const t of ['mkv', 'mp4', 'rar']) {
+        if (text.includes(t)) return t;
+    }
+    return 'zip';
+}
+
+// Movie ba season file-link row-er shared builder.
+// Row: link | file type | quality | size | ZIP contents (zip hole-i dekhay) | remove
+function buildLinkRowElement(data, options) {
     data = data || {};
-    const list = document.getElementById('adminMovieLinksList');
-    if (!list) return;
+    options = options || {};
     const row = document.createElement('div');
     row.className = 'admin-link-row admin-movie-link-row';
-
-    // Purono record-e sudhu label text-e "720p"/"1080p" lekha thakto, kono
-    // shara quality field chhilo na. Notun quality dropdown-e purono record
-    // edit korte gele label theke quality auto-detect kore select kore dey,
-    // notun row-e default 720p thake.
-    const quality = data.quality || (data.label && /1080p/i.test(data.label) ? '1080p' : '720p');
+    const quality = data.quality || options.defaultQuality || '720p';
+    const fileType = detectLinkFileType(data);
 
     row.innerHTML = `
         <input type="text" class="admin-link-url" placeholder="Download link" value="${escapeAttr(data.link)}">
+        <select class="admin-link-filetype" title="File type">
+            ${LINK_FILE_TYPES.map(t => `<option value="${t}"${fileType === t ? ' selected' : ''}>${t.toUpperCase()}</option>`).join('')}
+        </select>
         <select class="admin-link-quality" title="Quality">
             <option value="720p"${quality === '720p' ? ' selected' : ''}>720p</option>
             <option value="1080p"${quality === '1080p' ? ' selected' : ''}>1080p</option>
         </select>
-        <input type="text" class="admin-link-size" placeholder="Size (e.g. 1.2GB)" value="${escapeAttr(data.size)}">
+        <input type="text" class="admin-link-size" placeholder="${escapeAttr(options.sizePlaceholder || 'Size (e.g. 1.2GB)')}" value="${escapeAttr(data.size)}">
+        <div class="admin-link-zip-cell">
+            <button type="button" class="admin-zip-contents-btn" title="Choose a ZIP file to see what is inside">📦 Choose ZIP</button>
+        </div>
         <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
     `;
+
+    const typeSel = row.querySelector('.admin-link-filetype');
+    const zipBtn = row.querySelector('.admin-zip-contents-btn');
+    const zipCell = row.querySelector('.admin-link-zip-cell');
+    const syncZipUi = () => {
+        const isZip = typeSel.value === 'zip';
+        zipCell.style.display = isZip ? '' : 'none';
+        if (!isZip) row._zipListing = null;
+        updateZipButtonText(row);
+    };
+    typeSel.addEventListener('change', syncZipUi);
+    zipBtn.addEventListener('click', () => onZipContentsClick(row));
+    // Database-e age save kora ZIP file list thakle sheta load kore (abar zip bachhar lagbe na)
+    if (Array.isArray(data.zipFiles) && data.zipFiles.length) {
+        const files = data.zipFiles.map(f => ({ name: f.name, size: Number(f.size) || 0 }));
+        row._zipListing = {
+            zipName: data.zipName || 'ZIP',
+            zipSize: Number(data.zipSize) || 0,
+            files,
+            count: files.length,
+            totalSize: files.reduce((sum, f) => sum + f.size, 0)
+        };
+    }
+    syncZipUi();
+    return row;
+}
+
+function addMovieLinkRow(data) {
+    data = data || {};
+    const list = document.getElementById('adminMovieLinksList');
+    if (!list) return;
+    // Purono record-e sudhu label text-e "720p"/"1080p" lekha thakto, kono
+    // shara quality field chhilo na. Notun quality dropdown-e purono record
+    // edit korte gele label theke quality auto-detect kore select kore dey,
+    // notun row-e default 720p thake.
+    const defaultQuality = (data.label && /1080p/i.test(data.label)) ? '1080p' : '720p';
+    const row = buildLinkRowElement(data, { defaultQuality, sizePlaceholder: 'Size (e.g. 1.2GB)' });
     list.appendChild(row);
 }
 
@@ -8606,9 +8663,11 @@ function collectMovieLinks() {
         const size = row.querySelector('.admin-link-size').value.trim();
         const qualitySelect = row.querySelector('.admin-link-quality');
         const quality = qualitySelect ? qualitySelect.value : '720p';
+        const typeSelect = row.querySelector('.admin-link-filetype');
+        const fileType = typeSelect ? typeSelect.value : 'zip';
 
         const label = size ? `Download Link ${quality} [${size}]` : `Download Link ${quality}`;
-        result.push({ label, link, size, quality });
+        result.push({ label, link, size, quality, fileType, ...zipFieldsForRow(row) });
     });
     return result;
 }
@@ -8675,19 +8734,263 @@ function addSeasonBlock(data) {
 
 function addSeasonLinkRow(container, data) {
     data = data || {};
-    const row = document.createElement('div');
-    row.className = 'admin-link-row admin-movie-link-row';
-    const quality = data.quality || '720p';
-    row.innerHTML = `
-        <input type="text" class="admin-link-url" placeholder="Download link" value="${escapeAttr(data.link)}">
-        <select class="admin-link-quality" title="Quality">
-            <option value="720p"${quality === '720p' ? ' selected' : ''}>720p</option>
-            <option value="1080p"${quality === '1080p' ? ' selected' : ''}>1080p</option>
-        </select>
-        <input type="text" class="admin-link-size" placeholder="Size (e.g. 350MB)" value="${escapeAttr(data.size)}">
-        <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-link-row').remove()">✕</button>
-    `;
+    const row = buildLinkRowElement(data, { defaultQuality: '720p', sizePlaceholder: 'Size (e.g. 350MB)' });
     container.appendChild(row);
+}
+
+// ---------- ZIP contents (admin-e shudhu preview, DB-te save hoy na) ----------
+// ZIP-er poro central directory (file list) browser-e shudhu header ta pore parse kora hoy,
+// tai pura ZIP (3-4 GB-o) memory-te load hoy na. Ekta row-er jonno ekta ZIP.
+function zipEntryKind(name) {
+    const ext = String(name || '').split('.').pop().toLowerCase();
+    if (['mkv', 'mp4', 'avi', 'mov', 'wmv', 'm4v', 'ts', 'webm', 'flv', 'mpg', 'mpeg'].includes(ext)) return 'video';
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext)) return 'image';
+    if (['txt', 'srt', 'ass', 'ssa', 'sub', 'vtt', 'nfo', 'md'].includes(ext)) return 'text';
+    return 'other';
+}
+
+const ZIP_KIND_LABELS = { video: 'Video', image: 'Image', text: 'Text', other: 'Other' };
+
+function formatZipBytes(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return '';
+    const MB = 1024 * 1024, GB = MB * 1024;
+    if (n >= GB) return (n / GB).toFixed(2) + ' GB';
+    if (n >= MB) return (n / MB).toFixed(1) + ' MB';
+    return Math.max(1, Math.round(n / 1024)) + ' KB';
+}
+
+async function readZipCentralDirectory(file) {
+    const size = file.size;
+    if (!size || size < 22) throw new Error('File is too small to be a ZIP archive.');
+
+    // End-of-central-directory record ekhon file-er shesh 64KB-er moddhe thake
+    const tailLen = Math.min(size, 22 + 65535);
+    const tail = new DataView(await file.slice(size - tailLen, size).arrayBuffer());
+    let eocd = -1;
+    for (let i = tail.byteLength - 22; i >= 0; i--) {
+        if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('Not a valid ZIP file (end record not found).');
+
+    let entryCount = tail.getUint16(eocd + 10, true);
+    let cdSize = tail.getUint32(eocd + 12, true);
+    let cdOffset = tail.getUint32(eocd + 16, true);
+
+    // ZIP64 (4GB-er boro archive) hole alada record theke sothik value neya
+    if ((entryCount === 0xFFFF || cdSize === 0xFFFFFFFF || cdOffset === 0xFFFFFFFF) && eocd >= 20 && tail.getUint32(eocd - 20, true) === 0x07064b50) {
+        const z64Start = Number(tail.getBigUint64(eocd - 20 + 8, true));
+        const rec = new DataView(await file.slice(z64Start, z64Start + 56).arrayBuffer());
+        entryCount = Number(rec.getBigUint64(32, true));
+        cdSize = Number(rec.getBigUint64(40, true));
+        cdOffset = Number(rec.getBigUint64(48, true));
+    }
+
+    const cd = new DataView(await file.slice(cdOffset, cdOffset + cdSize).arrayBuffer());
+    const decoder = new TextDecoder('utf-8');
+    const entries = [];
+    let p = 0;
+    while (p + 46 <= cd.byteLength && cd.getUint32(p, true) === 0x02014b50) {
+        const method = cd.getUint16(p + 10, true);
+        let compSize = cd.getUint32(p + 20, true);
+        let uncompSize = cd.getUint32(p + 24, true);
+        const nameLen = cd.getUint16(p + 28, true);
+        const extraLen = cd.getUint16(p + 30, true);
+        const commentLen = cd.getUint16(p + 32, true);
+        const name = decoder.decode(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen));
+
+        // File size 4GB-er beshi hole ZIP64 extra field theke
+        if (uncompSize === 0xFFFFFFFF || compSize === 0xFFFFFFFF) {
+            let e = p + 46 + nameLen;
+            const end = e + extraLen;
+            while (e + 4 <= end) {
+                const id = cd.getUint16(e, true);
+                const len = cd.getUint16(e + 2, true);
+                if (id === 0x0001) {
+                    let q = e + 4;
+                    if (uncompSize === 0xFFFFFFFF) { uncompSize = Number(cd.getBigUint64(q, true)); q += 8; }
+                    if (compSize === 0xFFFFFFFF) { compSize = Number(cd.getBigUint64(q, true)); q += 8; }
+                }
+                e += 4 + len;
+            }
+        }
+
+        entries.push({ name, size: uncompSize, compSize, method, isDir: name.endsWith('/') });
+        p += 46 + nameLen + extraLen + commentLen;
+    }
+    return entries;
+}
+
+// Row-er ZIP file list database-e save hobe (downloadBlocks JSON-er moddhe, notun column lage na).
+// Shudhu ZIP type-er row-er jonno; onno type hole kichu save hoy na.
+function zipFieldsForRow(row) {
+    const listing = row && row._zipListing;
+    const typeSel = row && row.querySelector('.admin-link-filetype');
+    if (!listing || !Array.isArray(listing.files) || !typeSel || typeSel.value !== 'zip') return {};
+    return {
+        zipName: listing.zipName,
+        zipSize: listing.zipSize,
+        zipFiles: listing.files.map(f => ({ name: f.name, size: f.size }))
+    };
+}
+
+function buildZipListing(file, entries) {
+    // Mac-er hidden metadata (__MACOSX, ._file) ar folder entry badd
+    const files = entries.filter(e => !e.isDir
+        && !e.name.startsWith('__MACOSX/')
+        && !e.name.split('/').pop().startsWith('._'));
+    const totalSize = files.reduce((sum, e) => sum + (e.size || 0), 0);
+    return { zipName: file.name, zipSize: file.size, files, count: files.length, totalSize };
+}
+
+function updateZipButtonText(row) {
+    const btn = row && row.querySelector('.admin-zip-contents-btn');
+    if (!btn) return;
+    btn.textContent = row._zipListing
+        ? `📦 ZIP contents (${row._zipListing.count})`
+        : '📦 Choose ZIP';
+}
+
+function onZipContentsClick(row) {
+    if (row._zipListing) {
+        openZipContentsModal(row);
+    } else {
+        pickZipForRow(row);
+    }
+}
+
+function pickZipForRow(row) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.zip,application/zip,application/x-zip-compressed';
+    input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const btn = row.querySelector('.admin-zip-contents-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Reading ZIP...'; }
+        try {
+            const entries = await readZipCentralDirectory(file);
+            row._zipListing = buildZipListing(file, entries);
+            // Size field khali thakle ZIP-er size auto boshe
+            const sizeInput = row.querySelector('.admin-link-size');
+            if (sizeInput && !sizeInput.value.trim()) sizeInput.value = formatZipBytes(file.size);
+            openZipContentsModal(row);
+        } catch (err) {
+            showToast('❌ ZIP read failed: ' + (err && err.message ? err.message : err), 'error');
+        } finally {
+            if (btn) btn.disabled = false;
+            updateZipButtonText(row);
+        }
+    };
+    input.click();
+}
+
+function closeZipContentsModal() {
+    const overlay = document.getElementById('zipContentsOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function ensureZipContentsModal() {
+    let overlay = document.getElementById('zipContentsOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'zipContentsOverlay';
+    overlay.className = 'zip-contents-overlay';
+    overlay.style.display = 'none';
+    overlay.innerHTML = `
+        <div class="zip-contents-box" role="dialog" aria-modal="true" aria-labelledby="zipContentsTitle">
+            <div class="zip-contents-head">
+                <div class="zip-contents-head-text">
+                    <div class="zip-contents-title" id="zipContentsTitle"></div>
+                    <div class="zip-contents-sub"></div>
+                </div>
+                <button type="button" class="zip-contents-close" aria-label="Close">✕</button>
+            </div>
+            <div class="zip-contents-body"></div>
+            <div class="zip-contents-foot">
+                <span class="zip-contents-legend"></span>
+                <button type="button" class="admin-mini-btn zip-contents-rechoose">Choose another ZIP</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeZipContentsModal(); });
+    overlay.querySelector('.zip-contents-close').addEventListener('click', closeZipContentsModal);
+    // Folder header toggle (click ba Enter/Space)
+    const toggleFolder = (head) => {
+        const items = head.nextElementSibling;
+        if (!items || !items.classList.contains('zip-folder-items')) return;
+        const collapsed = items.classList.toggle('collapsed');
+        head.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        head.querySelector('.zip-folder-toggle').textContent = collapsed ? '▸' : '▾';
+    };
+    overlay.querySelector('.zip-contents-body').addEventListener('click', (e) => {
+        const head = e.target.closest('.zip-folder-head');
+        if (head) toggleFolder(head);
+    });
+    overlay.querySelector('.zip-contents-body').addEventListener('keydown', (e) => {
+        const head = e.target.closest && e.target.closest('.zip-folder-head');
+        if (head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleFolder(head); }
+    });
+    overlay.querySelector('.zip-contents-rechoose').addEventListener('click', () => {
+        const row = overlay._row;
+        closeZipContentsModal();
+        if (row) pickZipForRow(row);
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.style.display !== 'none') closeZipContentsModal();
+    });
+    return overlay;
+}
+
+function openZipContentsModal(row) {
+    const listing = row && row._zipListing;
+    if (!listing) return;
+    const overlay = ensureZipContentsModal();
+    overlay._row = row;
+    overlay.querySelector('.zip-contents-title').textContent = listing.zipName;
+    overlay.querySelector('.zip-contents-sub').textContent =
+        `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.totalSize)} inside · ZIP ${formatZipBytes(listing.zipSize)}`;
+
+    const body = overlay.querySelector('.zip-contents-body');
+    if (!listing.files.length) {
+        body.innerHTML = '<div class="zip-contents-empty">No files found in this ZIP.</div>';
+    } else {
+        // Folder onujayi group kora (folder na thakle ZIP-er nam)
+        const groups = new Map();
+        listing.files.forEach(entry => {
+            const slash = entry.name.lastIndexOf('/');
+            const folder = slash >= 0 ? entry.name.slice(0, slash) : '';
+            const base = slash >= 0 ? entry.name.slice(slash + 1) : entry.name;
+            if (!groups.has(folder)) groups.set(folder, []);
+            groups.get(folder).push({ base, size: entry.size, kind: zipEntryKind(base) });
+        });
+        let html = '';
+        groups.forEach((items, folder) => {
+            // Folder na thakle (zip-er root-e file) ZIP-er nam-i folder-er jaigay dekhay.
+            // Folder header-e click korle ei folder-er file gulo hide/show hoy.
+            html += `<div class="zip-folder-head" role="button" tabindex="0" aria-expanded="true"><span class="zip-folder-toggle">▾</span><span class="zip-folder-name">📁 ${escapeHtml(folder || listing.zipName)}</span><span class="zip-folder-count">${items.length} item${items.length === 1 ? '' : 's'}</span></div>`;
+            html += '<div class="zip-folder-items">';
+            items.forEach(it => {
+                const ext = (it.base.split('.').pop() || '').toUpperCase();
+                html += `
+                    <div class="zip-file-row">
+                        <span class="zip-kind-dot ${it.kind}"></span>
+                        <span class="zip-file-name">${escapeHtml(it.base)}</span>
+                        <span class="zip-file-size">${formatZipBytes(it.size)}</span>
+                        <span class="zip-ext-badge">${escapeHtml(ext)}</span>
+                    </div>`;
+            });
+            html += '</div>';
+        });
+        body.innerHTML = html;
+
+        // Shudhu je kind-gulo ZIP-e ache, legend-e sheta-i dekhabe
+        const presentKinds = ['video', 'image', 'text', 'other'].filter(k => listing.files.some(f => zipEntryKind(f.name.split('/').pop()) === k));
+        overlay.querySelector('.zip-contents-legend').innerHTML = presentKinds
+            .map(k => `<span class="zip-kind-dot ${k}"></span>${ZIP_KIND_LABELS[k]}`)
+            .join('');
+    }
+    overlay.style.display = 'flex';
 }
 
 // ---------- Season trailer rows (TV) ----------
@@ -8770,7 +9073,9 @@ function collectSeasons() {
             const size = row.querySelector('.admin-link-size').value.trim();
             const qualitySelect = row.querySelector('.admin-link-quality');
             const quality = qualitySelect ? qualitySelect.value : '720p';
-            items.push({ link, size, quality });
+            const typeSelect = row.querySelector('.admin-link-filetype');
+            const fileType = typeSelect ? typeSelect.value : 'zip';
+            items.push({ link, size, quality, fileType, ...zipFieldsForRow(row) });
         });
         if (items.length > 0) result.push({ label, season: idx + 1, items });
     });
