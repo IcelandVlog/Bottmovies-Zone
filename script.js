@@ -1017,7 +1017,8 @@ function buildPublicZipButtonsHTML(movie) {
         });
         merged = {
             zipName: String(movie.title || 'ZIP contents'),
-            zipSize: 0,
+            // Sob ZIP archive-er mot size (season/quality onujayi)
+            zipSize: listings.reduce((sum, l) => sum + (l.zipSize || 0), 0),
             files,
             count: files.length,
             totalSize: files.reduce((sum, f) => sum + f.size, 0),
@@ -9214,8 +9215,9 @@ function showZipListingModal(listing, row) {
     overlay.querySelector('.zip-contents-rechoose').style.display = row ? '' : 'none';
     overlay.querySelector('.zip-contents-save').style.display = row ? '' : 'none';
 
+    // Pill-e ZIP archive-er mot size (na thakle file-gulor size-er jog)
     overlay.querySelector('.zip-contents-pill').textContent =
-        `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.totalSize)}`;
+        `${listing.count} file${listing.count === 1 ? '' : 's'} · ${formatZipBytes(listing.zipSize || listing.totalSize)}`;
     overlay.querySelector('.zip-contents-zipname').textContent = listing.zipName;
 
     const body = overlay.querySelector('.zip-contents-body');
