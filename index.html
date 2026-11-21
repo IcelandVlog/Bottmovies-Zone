@@ -19,7 +19,16 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
     if (isLocal) {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function (regs) {
+          if (!regs.length) return;
+          var controlled = !!navigator.serviceWorker.controller;
           regs.forEach(function (r) { r.unregister(); });
+          // Purono SW ekhono page-ke control korle ekbar reload kori, jate page SW-chara load hoy
+          try {
+            if (controlled && !sessionStorage.getItem('bm_sw_reloaded')) {
+              sessionStorage.setItem('bm_sw_reloaded', '1');
+              location.reload();
+            }
+          } catch (e) {}
         }).catch(function () {});
       }
     } else {

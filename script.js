@@ -2745,7 +2745,22 @@ async function openMovieModal(movie) {
 let downloadHTML = '';
     if (Array.isArray(movie.downloadBlocks) && movie.downloadBlocks.length > 0) {
         movie.downloadBlocks.forEach((sec, idx) => {
-            
+
+            // 0. Coming soon season: download/copy button-er jaygay "Waiting" message
+            if (sec.comingSoon) {
+                const cLabel = comingSoonLabel(String(sec.label || '').replace(/^⚡\s*/g, ''), sec.season || idx + 1);
+                const cNote = sec.comingSoonNote || 'Waiting - this season will be uploaded soon.';
+                downloadHTML += `
+                <div class="season-box-item season-coming-soon">
+                    <div class="season-box-header" style="cursor:default;">
+                        <span>${DOWNLOAD_HEADER_ICON} ${escapeHtml(cLabel)}</span>
+                    </div>
+                    <div class="season-coming-soon-body">⏳ ${escapeHtml(cNote)}</div>
+                </div>
+                `;
+                return;
+            }
+
             // 1. (Multiple Items in Season)
         if (Array.isArray(sec.items) && sec.items.length > 0) {
             sec.items.forEach((it, iIdx) => {
@@ -4883,11 +4898,22 @@ function initApp() {
 
     const menuToggleBtn = document.getElementById('menuToggleBtn');
     if (menuToggleBtn) {
+        // Mobile menu-r height screen-er bhitore thakbe, jate neeche-r item (Sony LIV ইত্যাদি) scroll kore dekha jay
+        const fitMobileNavHeight = function () {
+            const nav = document.getElementById('mainNav');
+            if (!nav) return;
+            if (!nav.classList.contains('show-menu')) { nav.style.maxHeight = ''; return; }
+            const top = nav.getBoundingClientRect().top;
+            const vh = window.innerHeight || document.documentElement.clientHeight;
+            nav.style.maxHeight = Math.max(160, vh - top - 8) + 'px';
+        };
         menuToggleBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             document.getElementById('mainNav').classList.toggle('show-menu');
             document.body.classList.toggle('menu-open');
+            fitMobileNavHeight();
         });
+        window.addEventListener('resize', fitMobileNavHeight);
     }
 }
 
@@ -6855,6 +6881,7 @@ let categoryBannerLabels = {};
 let adminTmdbType = 'movie';
 let adminPosterMode = 'link';
 let adminOriginalPosterUrl = null; // Edit-er shomoy khali field-e save korleo ei poster-i use hobe
+let adminOriginalPosterIsAuto = false; // Edit-er shomoy poster ta ki TMDB theke auto (true) na manual (false)
 let adminOriginalImdbId = null; // Edit load-er shomoy-kar IMDb ID - submit-e compare kore bujhte je ID change hoyeche kina
 let adminOriginalTmdbId = null; // Edit load-er shomoy-kar TMDB ID - upore-r moto-i use hoy
 let adminCategoriesLoaded = false;
@@ -8567,7 +8594,8 @@ function selectTmdbType(value) {
     if (seasonsField) seasonsField.style.display = value === 'tv' ? 'flex' : 'none';
 
     const seasonTrailersField = document.getElementById('adminSeasonTrailersField');
-    if (seasonTrailersField) seasonTrailersField.style.display = value === 'tv' ? 'flex' : 'none';
+    // Season Trailers box ar add content-e dekhano hoy na (purono data edit-e thakle save hoy, muche jay na)
+    if (seasonTrailersField) seasonTrailersField.style.display = 'none';
 }
 
 function setPosterMode(mode) {
@@ -8728,7 +8756,8 @@ function selectTmdbType(value) {
     if (seasonsField) seasonsField.style.display = value === 'tv' ? 'flex' : 'none';
 
     const seasonTrailersField = document.getElementById('adminSeasonTrailersField');
-    if (seasonTrailersField) seasonTrailersField.style.display = value === 'tv' ? 'flex' : 'none';
+    // Season Trailers box ar add content-e dekhano hoy na (purono data edit-e thakle save hoy, muche jay na)
+    if (seasonTrailersField) seasonTrailersField.style.display = 'none';
 
     if (value === 'movie') {
         const list = document.getElementById('adminMovieLinksList');
@@ -8736,14 +8765,31 @@ function selectTmdbType(value) {
             addMovieLinkRow();
         }
     } else if (value === 'tv') {
-        const trailerList = document.getElementById('adminSeasonTrailersList');
-        if (trailerList && trailerList.children.length === 0) {
-            addSeasonTrailerRow();
-        }
+        // Series select korle sob-sheye ekta Season block thakbe (ekhon add na korleo)
+        const seasonList = document.getElementById('adminSeasonsList');
+        if (seasonList && seasonList.children.length === 0) addSeasonBlock();
     }
 }
 
 // ---------- Season blocks (TV) ----------
+
+// Coming soon season-er label: "Season N {Coming Soon}" (Complete/quality ar thake na)
+function comingSoonLabel(label, seasonNo) {
+    const base = String(label || '')
+        .replace(/\s*Complete\b.*$/i, '')
+        .replace(/\s*\{[^}]*\}\s*$/, '')
+        .replace(/\s*\[[^\]]*\]\s*$/, '')
+        .trim() || `Season ${seasonNo}`;
+    return `${base} {Coming Soon}`;
+}
+
+// Season remove korle; sob season chole gele abar ekta khali season block boshe (sob-sheye ekta thakbe)
+function removeSeasonBlock(btn) {
+    const block = btn && btn.closest('.admin-season-block');
+    if (block) block.remove();
+    const list = document.getElementById('adminSeasonsList');
+    if (list && list.children.length === 0) addSeasonBlock();
+}
 
 function addSeasonBlock(data) {
     data = data || {};
@@ -8752,13 +8798,18 @@ function addSeasonBlock(data) {
     const block = document.createElement('div');
     block.className = 'admin-season-block';
     
-    const defaultLabel = data.label || `Season ${list.children.length + 1} Complete 720p`;
+    const defaultLabel = data.label || `Season ${list.children.length + 1} Complete`;
     
     block.innerHTML = `
         <div class="admin-season-header">
             <input type="text" class="admin-season-label" value="${escapeAttr(defaultLabel)}">
-            <button type="button" class="admin-row-remove-btn" onclick="this.closest('.admin-season-block').remove()">✕ Remove Season</button>
+            <label class="admin-coming-soon-toggle" title="Ei season-er file ekhono upload hoyni">
+                <input type="checkbox" class="admin-season-coming-soon"${data.comingSoon ? ' checked' : ''}>
+                <span>Coming soon</span>
+            </label>
+            <button type="button" class="admin-row-remove-btn" onclick="removeSeasonBlock(this)">✕ Remove Season</button>
         </div>
+        <input type="text" class="admin-season-coming-note" placeholder="Note (optional) e.g. Season 2 coming soon" value="${escapeAttr(data.comingSoonNote)}">
         <div class="admin-season-links"></div>
         <button type="button" class="admin-add-row-btn admin-add-season-link-btn">+ Add File Link</button>
     `;
@@ -8767,6 +8818,26 @@ function addSeasonBlock(data) {
     const linksContainer = block.querySelector('.admin-season-links');
     const addBtn = block.querySelector('.admin-add-season-link-btn');
     addBtn.addEventListener('click', () => addSeasonLinkRow(linksContainer));
+
+    // Coming soon on hole file-link ar "+ Add File Link" lukiye dey; note-ta dekhay
+    const comingCb = block.querySelector('.admin-season-coming-soon');
+    const noteInput = block.querySelector('.admin-season-coming-note');
+    const labelInput = block.querySelector('.admin-season-label');
+    const syncComingSoon = (fromUser) => {
+        const on = comingCb.checked;
+        linksContainer.style.display = on ? 'none' : '';
+        addBtn.style.display = on ? 'none' : '';
+        noteInput.style.display = on ? '' : 'none';
+        // Tick dile "{Coming Soon}" boshe; khule dile abar "Complete" label-e firbe
+        if (fromUser && on) {
+            const idx = Array.from(list.children).indexOf(block) + 1;
+            labelInput.value = comingSoonLabel(labelInput.value, idx);
+        } else if (fromUser && !on && !/complete/i.test(labelInput.value)) {
+            labelInput.value = `${labelInput.value.replace(/\s*\{Coming Soon\}\s*$/i, '').trim() || 'Season'} Complete`;
+        }
+    };
+    comingCb.addEventListener('change', () => syncComingSoon(true));
+    syncComingSoon(false);
 
     if (Array.isArray(data.items) && data.items.length > 0) {
         data.items.forEach(it => addSeasonLinkRow(linksContainer, it));
@@ -9255,8 +9326,15 @@ function collectSeasons() {
     blocks.forEach((block, idx) => {
         const labelInput = block.querySelector('.admin-season-label');
         
-        const label = (labelInput.value.trim()) || `Season ${idx + 1} Complete 720p`;
+        const label = (labelInput.value.trim()) || `Season ${idx + 1} Complete`;
         
+        const comingCb = block.querySelector('.admin-season-coming-soon');
+        if (comingCb && comingCb.checked) {
+            const note = (block.querySelector('.admin-season-coming-note') || {}).value || '';
+            result.push({ label: comingSoonLabel(label, idx + 1), season: idx + 1, items: [], comingSoon: true, comingSoonNote: note.trim() });
+            return;
+        }
+
         const items = [];
         block.querySelectorAll('.admin-season-links .admin-link-row').forEach(row => {
             const link = row.querySelector('.admin-link-url').value.trim();
@@ -9402,6 +9480,7 @@ function resetAdminForm() {
     document.getElementById('adminPosterLink').value = '';
     document.getElementById('adminPosterLink').placeholder = 'https://... poster image link';
     adminOriginalPosterUrl = null;
+    adminOriginalPosterIsAuto = false;
     adminOriginalImdbId = null;
     adminOriginalTmdbId = null;
     const fileInput = document.getElementById('adminPosterFile');
@@ -9463,15 +9542,15 @@ function loadMovieIntoAdminForm(movie) {
     const posterLinkInput = document.getElementById('adminPosterLink');
     const isAutoTmdbPoster = !!(movie.poster && /image\.tmdb\.org/i.test(movie.poster));
     adminOriginalPosterUrl = movie.poster || null;
+    adminOriginalPosterIsAuto = isAutoTmdbPoster;
     adminOriginalImdbId = movie.imdbId || null;
     adminOriginalTmdbId = movie.tmdbId || null;
-    if (isAutoTmdbPoster) {
-        posterLinkInput.value = '';
-        posterLinkInput.placeholder = '✓ Auto TMDB poster already set - leave empty to keep it, or add a new link to replace it';
-    } else {
-        posterLinkInput.value = movie.poster || '';
-        posterLinkInput.placeholder = 'https://... poster image link';
-    }
+    // Poster link field-e save-kora poster-i sob somoy dekhano hoy (auto ba manual - hide hoy na).
+    // Field khali korle: manual poster hole TMDB theke auto nibe; auto poster hole oita-i thakbe.
+    posterLinkInput.value = movie.poster || '';
+    posterLinkInput.placeholder = isAutoTmdbPoster
+        ? '✓ Auto TMDB poster - leave as it is to keep it, or clear it to fetch again, or paste a new link'
+        : 'https://... poster image link';
     updateAdminPosterPreview();
 
     document.getElementById('adminMovieLinksList').innerHTML = '';
@@ -9493,6 +9572,8 @@ function loadMovieIntoAdminForm(movie) {
             blocks.forEach(sec => {
                 addSeasonBlock({
                     label: sec.label,
+                    comingSoon: !!sec.comingSoon,
+                    comingSoonNote: sec.comingSoonNote || '',
                     items: Array.isArray(sec.items) ? sec.items : (sec.link ? [{ link: sec.link, size: sec.size || '' }] : [])
                 });
             });
@@ -9546,7 +9627,11 @@ async function submitAdminContent() {
     submitBtn.textContent = 'Saving...';
 
     try {
-        const posterFieldValue = document.getElementById('adminPosterLink').value.trim();
+        const rawPosterField = document.getElementById('adminPosterLink').value.trim();
+        // Auto TMDB poster jemon ache temon-i thakle (field-e change nei) eta "khali" dhora hoy,
+        // jate auto-logic (ID change hole refresh) ager moto kaj kore
+        const posterUnchangedAuto = adminOriginalPosterIsAuto && rawPosterField === String(adminOriginalPosterUrl || '');
+        const posterFieldValue = posterUnchangedAuto ? '' : rawPosterField;
         let posterUrl = posterFieldValue || adminOriginalPosterUrl || null;
         let posterRefreshFailed = false;
 
@@ -9563,6 +9648,15 @@ async function submitAdminContent() {
 
         if (editingId && !posterFieldValue && wasAutoTmdbPoster && (imdbIdChanged || tmdbIdChanged) && adminPosterMode !== 'file') {
             submitBtn.textContent = 'Refreshing poster...';
+            const freshPoster = await fetchFreshTmdbPoster({ imdbId, tmdbId, tmdbType: adminTmdbType, title, searchName }).catch(() => null);
+            posterUrl = freshPoster;
+            posterRefreshFailed = !freshPoster;
+            submitBtn.textContent = 'Saving...';
+        }
+
+        // Manual poster link khali kore dile (edit-e) abar TMDB theke auto poster nibe
+        if (editingId && !posterFieldValue && !adminOriginalPosterIsAuto && adminOriginalPosterUrl && adminPosterMode !== 'file') {
+            submitBtn.textContent = 'Fetching TMDB poster...';
             const freshPoster = await fetchFreshTmdbPoster({ imdbId, tmdbId, tmdbType: adminTmdbType, title, searchName }).catch(() => null);
             posterUrl = freshPoster;
             posterRefreshFailed = !freshPoster;
@@ -13849,3 +13943,324 @@ function formatLinkForDisplay(url) {
     text = text.replace(/\/{2,}/g, '/').replace(/\/+$/, '');
     return text;
 }
+
+// ==================== Offline mini game (net disconnect hole) ====================
+// Internet na thakle site-er upor chhoto ekta game dekhay: popcorn bucket clapperboard 🎬 er
+// upor diye lafiye jay. Level badhe, game over hole popcorn chhitiye porbe, tarpor score dekhabe.
+// Puropuri browser-e cholo, kono network request lage na.
+(function initOfflineGame() {
+    const W = 600, H = 200, GROUND = 160;
+    const BUCKET_W = 30, BUCKET_H = 36;
+    const DEAD_WAIT = 55; // game over-er por kotokkhon animation dekhabe, tarpor restart kora jabe
+    let overlay = null, canvas = null, ctx = null;
+    let running = false, over = true, started = false;
+    let score = 0, best = 0, level = 1, speed = 6;
+    let y = GROUND, vy = 0, obstacles = [], particles = [];
+    let spawnIn = 0, deadT = 0, levelFlash = 0, lastT = 0, rafId = 0;
+    // Movie-themed obstacles: prottek spawn-e ekta random icon
+    const OBSTACLE_ICONS = ['🎬', '🎥', '📽️', '🎞️', '🎟️', '📼', '📀', '🎦'];
+
+    // Ekbar-e ekta group (1, 2, 3 ba 5 ta obstacle ek line-e) spawn kore; group-er span return kore
+    function spawnGroup(x0, sizes) {
+        const n = sizes[Math.floor(Math.random() * sizes.length)];
+        const spacing = 34 + Math.random() * 4;
+        for (let i = 0; i < n; i++) {
+            obstacles.push({
+                x: x0 + i * spacing,
+                w: 26 + Math.random() * 14,
+                h: 26 + Math.random() * 18,
+                icon: OBSTACLE_ICONS[Math.floor(Math.random() * OBSTACLE_ICONS.length)]
+            });
+        }
+        return (n - 1) * spacing + 40;
+    }
+    // Group size speed onujayi: beshi icon-er jonno beshi window (player-er reaction time) dorkar
+    function groupSizes() {
+        if (speed >= 9) return [1, 1, 2, 2, 3, 4, 5];
+        if (speed >= 7.8) return [1, 1, 2, 2, 3, 4];
+        return [1, 1, 2, 2, 3];
+    }
+    // Notun group spawn korar age: agerta-r sobcheye dan-er obstacle kotto dur-e gese (player land korar somoy)
+    let pendingBurst = false;
+    function gateOK() {
+        let maxX = -Infinity;
+        for (const o of obstacles) if (o.x > maxX) maxX = o.x;
+        return maxX <= W + 20 - (speed * 32 + 40);
+    }
+    // Light mode check (draw-er rong theme onujayi)
+    function isLight() { return document.documentElement.classList.contains('light-mode'); }
+
+    try { best = Number(localStorage.getItem('bm_offline_game_best')) || 0; } catch (e) { best = 0; }
+
+    function build() {
+        overlay = document.createElement('div');
+        overlay.id = 'offlineOverlay';
+        overlay.className = 'offline-overlay';
+        overlay.style.display = 'none';
+        overlay.innerHTML = `
+            <div class="offline-box" role="dialog" aria-modal="true" aria-labelledby="offlineTitle">
+                <div class="offline-head">
+                    <div>
+                        <div class="offline-title" id="offlineTitle">📡 No internet connection</div>
+                        <div class="offline-sub">Play until your connection returns - jump the popcorn over the clapperboards 🍿🎬</div>
+                    </div>
+                    <button type="button" class="offline-close" aria-label="Hide">✕</button>
+                </div>
+                <canvas class="offline-canvas" width="${W}" height="${H}"></canvas>
+                <div class="offline-hud">
+                    <span class="offline-score">Score: 0</span>
+                    <span class="offline-level">Level: 1</span>
+                    <span class="offline-best">Best: ${best}</span>
+                </div>
+                <div class="offline-hint">Space / ↑ / tap = jump</div>
+            </div>`;
+        document.body.appendChild(overlay);
+        canvas = overlay.querySelector('.offline-canvas');
+        ctx = canvas.getContext('2d');
+        overlay.querySelector('.offline-close').addEventListener('click', hide);
+        canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); act(); });
+        document.addEventListener('keydown', (e) => {
+            if (!overlay || overlay.style.display === 'none') return;
+            if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); act(); }
+            if (e.key === 'Escape') hide();
+        });
+    }
+
+    function reset() {
+        score = 0; level = 1; speed = 6; y = GROUND; vy = 0;
+        obstacles = []; particles = []; spawnIn = 60; over = false; deadT = 0; levelFlash = 0; pendingBurst = false;
+    }
+
+    function act() {
+        if (over) {
+            if (deadT < DEAD_WAIT) return; // popcorn animation sheshe na holei restart na
+            reset(); started = true; return;
+        }
+        if (y >= GROUND - 0.5) vy = -11.5; // jump
+    }
+
+    function explodePopcorn() {
+        const cx = 40 + BUCKET_W / 2, cy = GROUND + 6 - BUCKET_H + 6;
+        for (let k = 0; k < 26; k++) {
+            particles.push({
+                x: cx + (Math.random() - 0.5) * 18,
+                y: cy + (Math.random() - 0.5) * 8,
+                vx: (Math.random() - 0.5) * 9,
+                vy: -(3 + Math.random() * 7),
+                r: 3 + Math.random() * 2.5,
+                life: 70 + Math.random() * 40,
+                rot: Math.random() * 6
+            });
+        }
+    }
+
+    function step(dt) {
+        vy += 0.62 * dt;
+        y += vy * dt;
+        if (y > GROUND) { y = GROUND; vy = 0; }
+
+        spawnIn -= dt;
+        if (spawnIn <= 0) {
+            if (gateOK()) {
+                spawnGroup(W + 20, groupSizes());
+                spawnIn = Math.max(32, 62 - level * 2) + Math.random() * 60;
+            } else {
+                spawnIn = 4; // ager obstacle ekhono kache, ektu pore abar check
+            }
+        }
+        if (pendingBurst && gateOK()) {
+            spawnGroup(W + 20, [2, 3]);
+            pendingBurst = false;
+        }
+        obstacles.forEach(o => { o.x -= speed * dt; });
+        obstacles = obstacles.filter(o => o.x + o.w > -10);
+
+        // Popcorn bucket-er hitbox (ektu chhoto kore dhora)
+        const bx = 40 + 4, bw = BUCKET_W - 8;
+        const bTop = y + 6 - BUCKET_H + 6, bBot = y + 6;
+        for (const o of obstacles) {
+            const oTop = GROUND + 4 - o.h + 4;
+            if (bx + bw > o.x + 4 && bx < o.x + o.w - 4 && bBot > oTop + 4 && bTop < GROUND + 4) {
+                over = true;
+                deadT = 0;
+                explodePopcorn();
+                if (Math.floor(score) > best) {
+                    best = Math.floor(score);
+                    try { localStorage.setItem('bm_offline_game_best', String(best)); } catch (e) { /* skip */ }
+                }
+                return;
+            }
+        }
+
+        score += dt * 0.12;
+        const newLevel = Math.floor(score / 50) + 1;
+        if (newLevel > level) { level = newLevel; levelFlash = 90; pendingBurst = true; }
+        speed = Math.min(14, 6 + (level - 1) * 0.9);
+    }
+
+    function stepParticles(dt) {
+        particles.forEach(p => {
+            p.vy += 0.35 * dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.rot += 0.2 * dt;
+            p.life -= dt;
+            if (p.y > GROUND + 4) { p.y = GROUND + 4; p.vy *= -0.35; p.vx *= 0.7; }
+        });
+        particles = particles.filter(p => p.life > 0);
+    }
+
+    function drawBucket(x, bottom) {
+        const top = bottom - BUCKET_H;
+        const wTop = BUCKET_W, wBot = BUCKET_W - 8;
+        const stripes = 5;
+        const yTop = top + 12;
+        for (let k = 0; k < stripes; k++) {
+            const t0 = k / stripes, t1 = (k + 1) / stripes;
+            ctx.fillStyle = k % 2 === 0 ? '#e11d48' : '#f8fafc';
+            ctx.beginPath();
+            ctx.moveTo(x + t0 * wTop, yTop);
+            ctx.lineTo(x + t1 * wTop, yTop);
+            ctx.lineTo(x + 4 + t1 * wBot, bottom);
+            ctx.lineTo(x + 4 + t0 * wBot, bottom);
+            ctx.closePath();
+            ctx.fill();
+        }
+        // Bucket-er upper rim
+        ctx.fillStyle = '#fde68a';
+        ctx.fillRect(x - 1, top + 10, wTop + 2, 3);
+        // Popcorn kernels upore
+        ctx.fillStyle = '#fff7d6';
+        ctx.strokeStyle = '#f5d68a';
+        ctx.lineWidth = 1;
+        [[6, 7, 4], [13, 4, 4.5], [20, 7, 4], [10, 0, 4], [17, 1, 4]].forEach(([dx, dy, r]) => {
+            ctx.beginPath();
+            ctx.arc(x + dx, top + 9 - dy * 0.6, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        const L = isLight();
+        ctx.fillStyle = L ? '#f1f5f9' : '#111827';
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = L ? '#94a3b8' : '#334155';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, GROUND + 4);
+        ctx.lineTo(W, GROUND + 4);
+        ctx.stroke();
+
+        // Popcorn bucket (player) - game over hole ar draw hobe na (popcorn chhitiye geche)
+        if (!over) drawBucket(40, y + 6);
+        else drawBucket(40, GROUND + 6);
+
+        // Clapperboard obstacles
+        ctx.textBaseline = 'bottom';
+        obstacles.forEach(o => {
+            ctx.font = Math.round(o.h + 6) + 'px serif';
+            ctx.fillText(o.icon || '🎬', o.x, GROUND + 4);
+        });
+
+        // Popcorn kernel animation
+        particles.forEach(p => {
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 40));
+            ctx.fillStyle = '#fff7d6';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#f5d68a';
+            ctx.beginPath();
+            ctx.arc(p.x + 1, p.y - 1, p.r * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+
+        ctx.textBaseline = 'alphabetic';
+        if (levelFlash > 0 && !over) {
+            ctx.globalAlpha = Math.min(1, levelFlash / 30);
+            ctx.fillStyle = L ? '#b45309' : '#facc15';
+            ctx.font = 'bold 26px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Level ' + level + '!', W / 2, 46);
+            ctx.textAlign = 'left';
+            ctx.globalAlpha = 1;
+        }
+
+        if (over && deadT >= 20) {
+            const a = Math.min(1, (deadT - 20) / 25);
+            ctx.globalAlpha = a;
+            ctx.fillStyle = L ? 'rgba(255,255,255,.6)' : 'rgba(0,0,0,.45)';
+            ctx.fillRect(0, 0, W, H);
+            ctx.textAlign = 'center';
+            ctx.fillStyle = L ? '#0f172a' : '#f8fafc';
+            ctx.font = 'bold 22px sans-serif';
+            ctx.fillText('Game Over', W / 2, 62);
+            ctx.font = 'bold 30px sans-serif';
+            ctx.fillStyle = L ? '#b45309' : '#facc15';
+            ctx.fillText('Score: ' + Math.floor(score), W / 2, 104);
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = L ? '#334155' : '#e2e8f0';
+            ctx.fillText('Level ' + level + '  ·  Best ' + best, W / 2, 128);
+            if (deadT >= DEAD_WAIT) {
+                ctx.fillStyle = L ? '#475569' : '#cbd5e1';
+                ctx.fillText('Press Space / tap to play again', W / 2, 160);
+            }
+            ctx.textAlign = 'left';
+            ctx.globalAlpha = 1;
+        } else if (!started && over) {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = L ? '#0f172a' : '#f8fafc';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.fillText('Press Space / tap to start', W / 2, H / 2 + 26);
+            ctx.textAlign = 'left';
+        }
+
+        const scoreEl = overlay.querySelector('.offline-score');
+        const levelEl = overlay.querySelector('.offline-level');
+        const bestEl = overlay.querySelector('.offline-best');
+        if (scoreEl) scoreEl.textContent = 'Score: ' + Math.floor(score);
+        if (levelEl) levelEl.textContent = 'Level: ' + level;
+        if (bestEl) bestEl.textContent = 'Best: ' + Math.max(best, Math.floor(score));
+    }
+
+    function loop(t) {
+        if (!running) return;
+        const dt = Math.min(3, (t - (lastT || t)) / 16.67);
+        lastT = t;
+        if (!over) step(dt);
+        else { deadT += dt; }
+        if (levelFlash > 0) levelFlash -= dt;
+        stepParticles(dt);
+        draw();
+        rafId = requestAnimationFrame(loop);
+    }
+
+    function show() {
+        if (!overlay) build();
+        overlay.style.display = 'flex';
+        if (!running) {
+            running = true;
+            started = false;
+            reset();
+            over = true; // prothome "Shuru korte" dekhabe
+            deadT = DEAD_WAIT;
+            lastT = 0;
+            rafId = requestAnimationFrame(loop);
+        }
+    }
+
+    function hide() {
+        if (overlay) overlay.style.display = 'none';
+        running = false;
+        cancelAnimationFrame(rafId);
+    }
+
+    window.addEventListener('offline', show);
+    window.addEventListener('online', hide);
+    const startIfOffline = () => { if (navigator.onLine === false) show(); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startIfOffline);
+    else startIfOffline();
+})();
