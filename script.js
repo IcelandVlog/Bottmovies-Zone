@@ -4422,7 +4422,29 @@ function countQueryWordHits(query, movie) {
     return qWords.filter(w => tWords.has(w)).length;
 }
 
+// Title theke year/bracket bad diye normal nam (ex: "MobLand (2025-26)" -> "mobland")
+function titleWithoutYearNorm(str) {
+    return normalizeSearchText(String(str || '').replace(/\(\s*(19|20)\d{2}[^)]*\)/g, ' ').replace(/\b(19|20)\d{2}\b/g, ' '));
+}
+
+// Nam-er shobder mil: shudhu poro shobd ba choto bhul (levenshtein) - "includes" dhora hoy na,
+// jate "mobland"-er sathe "and" ba "moana" vul kore mil na
+function nameWordSimilarity(qWord, tWord) {
+    if (!qWord || !tWord) return 0;
+    if (qWord === tWord) return 1;
+    const maxLen = Math.max(qWord.length, tWord.length);
+    if (maxLen < 4) return 0;
+    const dist = levenshteinDistance(qWord, tWord);
+    if (dist <= Math.floor(maxLen * 0.3)) return 1 - dist / maxLen;
+    return 0;
+}
+
 function getSmartMatches(query) {
+    const qWordsAll = normalizeSearchText(query).split(' ').filter(Boolean);
+    const isYear = w => /^(19|20)\d{2}$/.test(w);
+    const qYears = qWordsAll.filter(isYear);
+    const qName = qWordsAll.filter(w => !isYear(w));
+    const qNameText = qName.join(' ');
     return moviesList
         .map(movie => {
             const score = Math.max(
@@ -4436,10 +4458,28 @@ function getSmartMatches(query) {
                 // (originalTitle column) rakha thake.
                 fuzzyMatchScore(query, movie.originalTitle)
             );
-            return { movie, score, hits: countQueryWordHits(query, movie) };
+            // Nam-er shobdo (year chara) kotogulo match hoyeche
+            const tWords = [...new Set([movie.title, movie.searchName, movie.originalTitle]
+                .map(x => titleWithoutYearNorm(x || '')).join(' ').split(' ').filter(Boolean))];
+            // Proti nam-shobder sheraa match (choto bhul/typo-o dhora hoy)
+            const nameRatio = qName.length
+                ? qName.reduce((sum, qw) => sum + tWords.reduce((best, tw) => Math.max(best, nameWordSimilarity(qw, tw)), 0), 0) / qName.length
+                : 0;
+            // Nam hubohu query-r moto kina (year chara)
+            const exact = qNameText && (titleWithoutYearNorm(movie.title) === qNameText || titleWithoutYearNorm(movie.searchName) === qNameText) ? 1 : 0;
+            // Year mille ektu boshe (secondary)
+            const hay = (String(movie.title || '') + ' ' + String(movie.searchName || ''));
+            const yearHit = qYears.length && qYears.some(y => hay.includes(y)) ? 1 : 0;
+            return { movie, score, exact, nameRatio, yearHit };
         })
-        .filter(entry => entry.score >= 0.55)
-        .sort((a, b) => (b.hits - a.hits) || (b.score - a.score))
+        // Nam diye search korle shudhu nam-er sathe mil-gula; shudhu year mile gele bad
+        .filter(entry => (qName.length ? entry.nameRatio >= 0.5 : entry.score >= 0.55))
+        .sort((a, b) =>
+            (b.exact - a.exact) ||
+            (b.nameRatio - a.nameRatio) ||
+            (b.yearHit - a.yearHit) ||
+            (b.score - a.score)
+        )
         .map(entry => entry.movie);
 }
 
