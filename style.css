@@ -6482,3 +6482,30 @@ html.light-mode .ongoing-dot { background: #16a34a; }
     50%  { color: #22c55e; }
     100% { color: #15803d; }
 }
+
+/* Boro device: hero banner-er height barano (width aage-r moto-i thakbe) */
+@media (min-width: 901px) {
+    .hero-border-wrap { aspect-ratio: 16 / 8; }
+}
+@media (min-width: 1400px) {
+    .hero-border-wrap { aspect-ratio: 16 / 7.6; }
+}
+
+/* Hero banner top-left: "5 / 9" counter + pause/play button */
+.hero-ctl {
+    position: absolute; top: 16px; left: 18px; z-index: 4;
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 4px 4px 12px; border-radius: 999px;
+    background: rgba(8, 10, 8, 0.6); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .4px;
+}
+.hero-ctl-count { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+.hero-ctl-btn {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: none;
+    background: transparent; color: #fff;
+    font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    transition: background-color .15s;
+}
+.hero-ctl-btn:hover { background: rgba(126, 211, 33, 0.35); }

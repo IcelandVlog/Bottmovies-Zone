@@ -166,6 +166,10 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
         <button type="button" class="hero-nav-btn hero-nav-next" id="heroNextBtn" aria-label="Next slide">›</button>
         <div class="hero-dots" id="heroDots"></div>
         <div class="hero-slide-counter" id="heroSlideCounter" style="display:none;"></div>
+        <div class="hero-ctl" id="heroCtl" style="display:none;">
+            <span class="hero-ctl-count" id="heroCtlCount"></span>
+            <button type="button" class="hero-ctl-btn" id="heroPlayPauseBtn" aria-label="Pause slideshow" title="Pause"><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><rect x="2" y="1.5" width="2.2" height="7" rx=".5" fill="currentColor"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5" fill="currentColor"/></svg></button>
+        </div>
     </div>
 </section>
 

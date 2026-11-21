@@ -1217,6 +1217,7 @@ let heroSlidesData = [];
 let heroCurrentIndex = 0; // real/logical slide index (0..N-1) - drives the dots
 let heroPos = 1;          // actual position inside the extended DOM track (clone-of-last, slide0..slideN-1, clone-of-first)
 let heroAutoplayTimer = null;
+let heroUserPaused = false; // user nijer hate pause korle autoplay thamo thakbe
 let heroWrapTimeout = null;
 let heroInitialized = false;
 const heroBackdropCache = new Map();
@@ -1476,6 +1477,36 @@ function updateHeroTrackPosition(animate = true) {
     if (counterEl && counterEl.style.display !== 'none') {
         counterEl.textContent = `${heroCurrentIndex + 1} / ${heroSlidesData.length}`;
     }
+    syncHeroCtl();
+}
+
+// Top-left pill: "5 / 9" + pause/play button
+function syncHeroCtl() {
+    const ctl = document.getElementById('heroCtl');
+    if (!ctl) return;
+    const N = heroSlidesData.length;
+    ctl.style.display = N > 1 ? '' : 'none';
+    const countEl = document.getElementById('heroCtlCount');
+    if (countEl) countEl.textContent = `${heroCurrentIndex + 1} / ${N}`;
+    const btn = document.getElementById('heroPlayPauseBtn');
+    // Icon shudhu state bodole bodlabe: prottek drag/mouseup-e DOM bodlale click hariye jay
+    const wantState = heroUserPaused ? 'play' : 'pause';
+    if (btn && btn.dataset.state !== wantState) {
+        btn.dataset.state = wantState;
+        // SVG icon: text-er glyph-er jonno ektu off-centre hoy na
+        btn.innerHTML = heroUserPaused
+            ? '<svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="M2.5 1.2 L8.6 5 L2.5 8.8 Z" fill="currentColor"/></svg>'
+            : '<svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><rect x="2" y="1.5" width="2.2" height="7" rx=".5" fill="currentColor"/><rect x="5.8" y="1.5" width="2.2" height="7" rx=".5" fill="currentColor"/></svg>';
+        btn.setAttribute('aria-label', heroUserPaused ? 'Play slideshow' : 'Pause slideshow');
+        btn.title = heroUserPaused ? 'Play' : 'Pause';
+    }
+}
+
+function toggleHeroPlayPause() {
+    heroUserPaused = !heroUserPaused;
+    if (heroUserPaused) stopHeroAutoplay();
+    else { stopHeroAutoplay(); heroAutoplayTimer = setInterval(heroGoNext, 6000); }
+    syncHeroCtl();
 }
 
 function goToHeroSlide(i) {
@@ -1530,6 +1561,7 @@ function heroGoPrev() {
 function startHeroAutoplay() {
     stopHeroAutoplay();
     if (heroSlidesData.length <= 1) return;
+    if (heroUserPaused) return; // user pause korle abar chalu hobe na
     heroAutoplayTimer = setInterval(heroGoNext, 6000);
 }
 function stopHeroAutoplay() {
@@ -1546,6 +1578,8 @@ function setupHeroBannerControls() {
     const nextBtn = document.getElementById('heroNextBtn');
     if (prevBtn) prevBtn.addEventListener('click', heroGoPrev);
     if (nextBtn) nextBtn.addEventListener('click', heroGoNext);
+    const ppBtn = document.getElementById('heroPlayPauseBtn');
+    if (ppBtn) ppBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleHeroPlayPause(); });
     if (!heroSection) return;
 
     heroSection.addEventListener('mouseenter', stopHeroAutoplay);
