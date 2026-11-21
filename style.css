@@ -6433,3 +6433,52 @@ html.light-mode .offline-overlay { background-color: rgba(233, 236, 241, 0.92); 
     .theme-toggle-btn { left: 16px; }
     .chat-widget-btn { right: 16px; }
 }
+
+/* Coming soon season: "Uploading" badge (Ongoing-er moto text colour animation) + ghurte thaka hourglass */
+.uploading-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+    color: #f59e0b;
+    animation: uploadingTextColor 2.4s ease-in-out infinite;
+}
+.uploading-icon {
+    display: inline-block; font-size: 14px; line-height: 1;
+    transform-origin: 50% 50%;
+    animation: hourglassFlip 2.4s ease-in-out infinite;
+}
+@keyframes hourglassFlip {
+    0%, 40%   { transform: rotate(0deg); }
+    55%, 90%  { transform: rotate(180deg); }
+    100%      { transform: rotate(360deg); }
+}
+@keyframes uploadingTextColor {
+    0%   { color: #b45309; }
+    50%  { color: #fcd34d; }
+    100% { color: #b45309; }
+}
+html.light-mode .uploading-badge { color: #b45309; }
+.uploading-note { margin-top: 6px; font-size: 12.5px; color: #94a3b8; }
+html.light-mode .uploading-note { color: #6b7280; }
+
+/* Poster card tag: "UPLOADING" (coming soon season ache) - Ongoing tag-er moto, shudhu rong alada (amber) */
+.uploading-card-tag {
+    position: absolute; right: 8px; bottom: 8px; z-index: 3;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+    color: #fde68a; background: rgba(10, 12, 18, 0.78);
+    border: 1px solid rgba(245, 158, 11, 0.75);
+    pointer-events: none;
+    animation: uploadingTextColor 2.4s ease-in-out infinite;
+}
+html.light-mode .uploading-card-tag { color: #b45309; background: rgba(255, 255, 255, 0.92); border-color: #b45309; }
+.card-poster-side .uploading-card-tag { z-index: 5; }
+
+/* Light mode: ONGOING lekha green-e thakbe (aage orange chhilo) */
+html.light-mode .ongoing-card-tag { color: #15803d; border-color: #16a34a; background: rgba(255, 255, 255, 0.92); }
+html.light-mode .ongoing-badge { color: #15803d; }
+html.light-mode .ongoing-dot { background: #16a34a; }
+@keyframes ongoingTextColorLight {
+    0%   { color: #15803d; }
+    50%  { color: #22c55e; }
+    100% { color: #15803d; }
+}

@@ -611,6 +611,17 @@ function isOngoingActive(movie) {
     return isAutoOngoing(movie);
 }
 
+// Coming soon season ache (series) -> "Uploading" tag; na hole Ongoing tag (jodi ongoing hoy)
+function hasComingSoonSeason(movie) {
+    const blocks = Array.isArray(movie && movie.downloadBlocks) ? movie.downloadBlocks : [];
+    return blocks.some(sec => sec && sec.comingSoon === true);
+}
+function buildStatusTagHTML(movie) {
+    if (hasComingSoonSeason(movie)) return '<span class="uploading-card-tag">Uploading</span>';
+    if (isOngoingActive(movie)) return '<span class="ongoing-card-tag">Ongoing</span>';
+    return '';
+}
+
 // TMDB tv status (per series) - movie.id -> { day, lastAir, lastSeason, nextAir, nextSeason }
 const tvStatusMap = new Map();
 
@@ -835,6 +846,10 @@ function restoreScrollPositionOnce() {
 }
 
 function ongoingBadgeHTML(movie) {
+    // Coming soon season thakle details header-e hourglass + UPLOADING (amber); na hole ONGOING
+    if (hasComingSoonSeason(movie)) {
+        return '<span class="uploading-badge"><span class="uploading-icon">⏳</span>Uploading</span>';
+    }
     return isOngoingActive(movie)
         ? '<span class="ongoing-badge"><span class="ongoing-dot"></span>Ongoing</span>'
         : '';
@@ -2615,7 +2630,7 @@ function renderMoviesByPage(movies, page) {
                 <span>★</span> N/A
             </div>
             <button type="button" class="card-fav-btn${isFav ? ' active' : ''}" id="card-fav-${index}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${isFav ? '❤️' : '🤍'}</button>
-            ${isOngoingActive(movie) ? '<span class="ongoing-card-tag">Ongoing</span>' : ''}
+            ${buildStatusTagHTML(movie)}
             <img src="${upgradePosterQuality(movie.poster) || POSTER_PLACEHOLDER_LOADING}" id="card-poster-${index}" alt="${escapeAttr(stripYearSuffix(movie.title))}" referrerpolicy="no-referrer" decoding="async" onerror="handlePosterImgError(this)">
         </div>
         <div class="movie-details"><p class="movie-title">${serialNumber}. ${escapeHtml(stripYearSuffix(movie.title) || 'Untitled')}${getCardYearLabel(movie) ? ` <span class="movie-card-year">(${escapeHtml(getCardYearLabel(movie))})</span>` : ''}</p></div>
@@ -2766,13 +2781,12 @@ let downloadHTML = '';
             // 0. Coming soon season: download/copy button-er jaygay "Waiting" message
             if (sec.comingSoon) {
                 const cLabel = comingSoonLabel(String(sec.label || '').replace(/^⚡\s*/g, ''), sec.season || idx + 1);
-                const cNote = sec.comingSoonNote || 'Waiting - this season will be uploaded soon.';
                 downloadHTML += `
                 <div class="season-box-item season-coming-soon">
                     <div class="season-box-header" style="cursor:default;">
                         <span>${DOWNLOAD_HEADER_ICON} ${escapeHtml(cLabel)}</span>
                     </div>
-                    <div class="season-coming-soon-body">⏳ ${escapeHtml(cNote)}</div>
+                    <div class="season-coming-soon-body"><span class="uploading-badge"><span class="uploading-icon">⏳</span>Uploading</span></div>
                 </div>
                 `;
                 return;
@@ -3008,7 +3022,7 @@ fastServersList.forEach((fs, fIdx) => {
                     <span class="star-icon">★</span>
                     <span id="modalRatingVal">${finalRating}</span>/10
                 </div>
-                ${isOngoingActive(movie) ? '<span class="ongoing-card-tag">Ongoing</span>' : ''}
+                ${buildStatusTagHTML(movie)}
                 <img src="${upgradePosterQuality(poster)}" id="modalPosterImg" alt="${title}" referrerpolicy="no-referrer" onerror="handlePosterImgError(this)">
             </div>
             <div class="card-header-info">
