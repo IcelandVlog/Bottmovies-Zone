@@ -8354,8 +8354,9 @@ async function handleMediaScanFile(file) {
 function generateSearchNameFromTitle(title) {
     if (!title) return '';
     return title
-        .replace(/\s*\(\d{4}\)\s*$/, '')   // "Inception (2010)" -> "Inception"
-        .replace(/\s+\d{4}\s*$/, '')       // "Inception 2010"   -> "Inception"
+        // "Inception (2010)" / "Fullmetal Alchemist (2009-10)" / "(2025–26)" -> year bad
+        .replace(/\s*\(\s*\d{4}(?:\s*[-–]\s*\d{2,4})?\s*\)\s*$/, '')
+        .replace(/\s+\d{4}(?:\s*[-–]\s*\d{2,4})?\s*$/, '')  // "Inception 2010" -> "Inception"
         .trim();
 }
 
