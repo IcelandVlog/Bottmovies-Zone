@@ -988,12 +988,29 @@ function buildPublicZipButtonsHTML(movie) {
             });
         });
     });
-    publicZipListings = listings;
-    if (!listings.length) return '';
-    // Button-e shudhu "ZIP contents" lekha thake; quality/season tooltip-e (hover korle) dekha jay
-    return listings.map((l, i) =>
-        `<button type="button" class="zip-public-btn" title="${escapeAttr(l.label)}" onclick="openPublicZipContents(${i})"><svg class="zip-public-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 12h2v2h-2z"/><path d="M10 16h2v2h-2z"/></svg><span>ZIP contents</span></button>`
-    ).join(' ');
+    if (!listings.length) { publicZipListings = []; return ''; }
+
+    // Ekta-i button: sob season/quality-r ZIP ekta popup-e serial onujayi dekhano hoy
+    let merged;
+    if (listings.length === 1) {
+        merged = listings[0];
+    } else {
+        // Proti season/quality-r ZIP ekta alada group (1, 2, 3...) hishebe dekhabe
+        const files = [];
+        listings.forEach(l => {
+            l.files.forEach(f => files.push({ zip: l.label || f.zip, name: f.name, size: f.size }));
+        });
+        merged = {
+            zipName: String(movie.title || 'ZIP contents'),
+            zipSize: 0,
+            files,
+            count: files.length,
+            totalSize: files.reduce((sum, f) => sum + f.size, 0),
+            label: ''
+        };
+    }
+    publicZipListings = [merged];
+    return `<button type="button" class="zip-public-btn" title="ZIP contents" onclick="openPublicZipContents(0)"><svg class="zip-public-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 12h2v2h-2z"/><path d="M10 16h2v2h-2z"/></svg><span>ZIP contents</span></button>`;
 }
 
 function openPublicZipContents(index) {
