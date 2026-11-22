@@ -179,7 +179,7 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
 
 <section class="massive-watch-section" id="massiveWatchSection">
     <div class="massive-watch-heading">
-        <h2>⚡ 500K+ Movies &amp; TV Shows</h2>
+        <h2>⚡ 1M+ Movies &amp; TV Shows</h2>
         <p>Search any title by name — watch it instantly, even if it isn't in our library yet.</p>
     </div>
     <div class="massive-watch-search-row">
@@ -637,19 +637,24 @@ if (location.protocol !== 'file:') { document.write('<base href="/">'); }
                             <div class="admin-stat-icon">🗑</div>
                             <div><div class="admin-stat-value" id="adminStatTrash">—</div><div class="admin-stat-label">Recycle Bin</div></div>
                         </div>
+                        <div class="admin-stat-card admin-traffic-card" id="adminTrafficCard" role="button" tabindex="0" title="Click to see daily traffic">
+                            <div class="admin-stat-icon">📈</div>
+                            <div><div class="admin-stat-value" id="adminStatTraffic">—</div><div class="admin-stat-label">Traffic</div></div>
+                        </div>
                     </div>
+                    <div class="admin-traffic-panel" id="adminTrafficPanel" style="display:none;"></div>
 
                     <div class="admin-dash-panels">
-                        <div class="admin-dash-box">
-                            <h3>🆕 Recently Added</h3>
+                        <div class="admin-dash-box is-collapsed">
+                            <h3 class="admin-dash-toggle" role="button" tabindex="0" onclick="this.parentElement.classList.toggle('is-collapsed')">🆕 Recently Added</h3>
                             <div id="adminDashRecent"></div>
                         </div>
-                        <div class="admin-dash-box">
-                            <h3>👁️ Top Views</h3>
+                        <div class="admin-dash-box is-collapsed">
+                            <h3 class="admin-dash-toggle" role="button" tabindex="0" onclick="this.parentElement.classList.toggle('is-collapsed')">👁️ Top Views</h3>
                             <div id="adminDashTopViews"></div>
                         </div>
-                        <div class="admin-dash-box">
-                            <h3>🏷️ Top Categories</h3>
+                        <div class="admin-dash-box is-collapsed">
+                            <h3 class="admin-dash-toggle" role="button" tabindex="0" onclick="this.parentElement.classList.toggle('is-collapsed')">🏷️ Top Categories</h3>
                             <div id="adminDashCategories"></div>
                         </div>
                     </div>

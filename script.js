@@ -2722,7 +2722,7 @@ function getFileTypeBadge(link, label = '', fileType = '') {
 // ==================== MODAL WINDOW (BULLETPROOF & NON-BLOCKING) ====================
 
 async function openMovieModal(movie) {
-    // Homepage-er "500K+ Movies & TV Shows" search player-e (jodi kono
+    // Homepage-er "1M+ Movies & TV Shows" search player-e (jodi kono
     // alada window/tab na, ei-i page-e) video chalu thakte thakte user onno
     // kono movie/series-er details page (ei modal) khulle - shei video-take
     // pause/stop kore deya hoy, jate background-e onno video-o baja-i na
@@ -3356,7 +3356,7 @@ function toggleAccordion(id) {
     //
     // Query-ta shudhu ei accordion je modal-box-er (movie details page)
     // bhitore ache, shei modal-box-er bhitore-i scope kora hoy - shompurno
-    // "document" jure query korle, homepage-er "500K+ Movies & TV Shows"
+    // "document" jure query korle, homepage-er "1M+ Movies & TV Shows"
     // (massive-watch player, jar nijer-o ekta "open" .season-download-body
     // thake) er moto modal-er BAIRE thaka, shompurno onno ekta section-o
     // bhul kore bondho/collapse hoye jeto - jemon: kono content search kore
@@ -3933,7 +3933,7 @@ function changeModalWatchEpisode(selectEl) {
     resetWatchBoxToThumbnail(box);
 }
 
-// ==================== "500K+ Movies & TV Shows" homepage search-and-watch
+// ==================== "1M+ Movies & TV Shows" homepage search-and-watch
 // section ====================
 // Admin panel-e database-e add kora na thakleও - je kono movie/TV series
 // nam diye search korle, TMDB theke shei content-er ID ber kore, "Online
@@ -4003,14 +4003,15 @@ async function runMassiveWatchSearch(query) {
         return;
     }
     try {
-        const url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false`;
+        const pq = parseWatchQuery(query);
+        const url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(pq.name || query)}&include_adult=false`;
         const res = await fetch(url);
         if (myRequestId !== massiveWatchRequestId) return; // ei shomoy-e user aro likhe felle, ei purono result-ta ar dorkar nei
         if (!res.ok) throw new Error('TMDB search failed: ' + res.status);
         const data = await res.json();
         if (myRequestId !== massiveWatchRequestId) return;
 
-        const items = (data.results || [])
+        const items = sortWatchResultsByYear(data.results || [], pq.year)
             .filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path)
             .slice(0, 8);
 
@@ -4279,7 +4280,7 @@ function closeMassiveWatch(el) {
     resetMassiveWatchBoxToThumbnail(el.closest('.massive-watch-box'));
 }
 
-// Homepage-er "500K+ Movies & TV Shows" search player-e video chalu thakte
+// Homepage-er "1M+ Movies & TV Shows" search player-e video chalu thakte
 // thakte user onno kono movie/series-er details page (modal) khulle - shei
 // video-take pause/stop kore deya hoy (background-e chalu thaka video
 // atkate), kintu shompurno massive-watch section-take hide/collapse kora hoy
@@ -4536,6 +4537,73 @@ function searchMovies() {
 
     if (currentFilteredMovies.length === 0) {
         sendMissingMovieEmail(query);
+        showWatchFallbackForQuery(query);
+    }
+}
+
+// Website-e naam na thakle: grid-e note dekhay ar niche "1M+ Movies & TV Shows" search-e
+// same query boshiye nam-gulo dekhay; nam-e click korle oi section-er player-e play hoy
+// "1899 (2022)" / "Inception 2010" -> { name: "1899", year: "2022" } (TMDB-te naam diye khunjar jonno)
+function parseWatchQuery(query) {
+    const raw = String(query || '').trim();
+    const m = raw.match(/^(.*?)[\s(]*((?:19|20)\d{2})\)?\s*$/);
+    if (m && m[1].trim()) return { name: m[1].replace(/[()\s]+$/, '').trim(), year: m[2] };
+    return { name: raw, year: '' };
+}
+function tmdbResultYear(r) {
+    return String((r && (r.release_date || r.first_air_date)) || '').slice(0, 4);
+}
+// TMDB result-er moddhe jei year-er sathe query-r year mil, shegulo age
+function sortWatchResultsByYear(results, year) {
+    if (!year) return results;
+    return [...results].sort((a, b) => (tmdbResultYear(b) === year) - (tmdbResultYear(a) === year));
+}
+
+let watchDropdownRequestId = 0;
+
+// Search dropdown-er "Only Watch" section-er jonno TMDB theke naam (choto list)
+async function fetchWatchSuggestionItems(query) {
+    if (!TMDB_API_KEY || !query) return [];
+    try {
+        const pq = parseWatchQuery(query);
+        const url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(pq.name || query)}&include_adult=false`;
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return sortWatchResultsByYear(data.results || [], pq.year)
+            .filter(r => (r.media_type === 'movie' || r.media_type === 'tv') && r.poster_path)
+            .slice(0, 6)
+            .map(r => ({
+                id: r.id,
+                type: r.media_type,
+                title: r.title || r.name || 'Untitled',
+                year: ((r.release_date || r.first_air_date || '').slice(0, 4)) || '',
+                release: r.release_date || r.first_air_date || '',
+                poster: `https://image.tmdb.org/t/p/w342${r.poster_path}`,
+                backdrop: r.backdrop_path ? `https://image.tmdb.org/t/p/w780${r.backdrop_path}` : ''
+            }));
+    } catch (e) {
+        return [];
+    }
+}
+
+function showWatchFallbackForQuery(query) {
+    const grid = document.getElementById('movieGrid');
+    if (grid) {
+        const safe = escapeHtml(query);
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 30px 10px; line-height: 1.6;">
+            <div style="font-size: 14px; color: #e2e8f0; margin-bottom: 4px;">"${safe}" is not available on the website</div>
+            <div style="font-size: 12.5px;">Check the "1M+ Movies &amp; TV Shows" section below. Click a title to play it there.</div>
+        </div>`;
+    }
+    const mInput = document.getElementById('massiveWatchInput');
+    if (!mInput) return;
+    if (mInput.value.trim() !== query) {
+        mInput.value = query;
+        const clearBtn = document.getElementById('massiveWatchClearBtn');
+        if (clearBtn) clearBtn.style.display = 'flex';
+        clearTimeout(massiveWatchDebounceTimer);
+        massiveWatchDebounceTimer = setTimeout(() => runMassiveWatchSearch(query), 350);
     }
 }
 
@@ -4605,7 +4673,7 @@ function markActiveNavTrail(link) {
     }
 }
 
-// "Browse by genre / OTT" ar "500K+ Movies & TV Shows" section sudhu home page-e (category 'all') dekhabe
+// "Browse by genre / OTT" ar "1M+ Movies & TV Shows" section sudhu home page-e (category 'all') dekhabe
 function updateBrowseSectionVisibility(category) {
     const isHome = category === 'all';
     ['browseTmdbSection', 'massiveWatchSection'].forEach(id => {
@@ -4979,9 +5047,16 @@ function initApp() {
             const matches = getSmartMatches(query);
             currentFilteredMovies = matches;
             renderMoviesByPage(currentFilteredMovies, 1);
+            const watchReqId = ++watchDropdownRequestId;
             if (matches.length === 0) {
                 searchSuggestions.style.display = 'none';
-                return;
+            }
+            if (matches.length) {
+                // Website-e ache emon naam-er section-er heading
+                const dlHead = document.createElement('div');
+                dlHead.className = 'watch-suggest-head';
+                dlHead.textContent = 'Download and Watch';
+                searchSuggestions.appendChild(dlHead);
             }
             matches.forEach(movie => {
                 const item = document.createElement('div');
@@ -4989,7 +5064,17 @@ function initApp() {
                 const suggestionYear = getCardYearLabel(movie);
                 // Title + year duitai highlight hobe (jemon "2018" likhle year-o green hobe)
                 const fullLabel = stripYearSuffix(movie.title) + (suggestionYear ? ` (${suggestionYear})` : '');
-                item.innerHTML = highlightSuggestionText(fullLabel, query);
+                const siteTypeLabel = movie.tmdbType === 'tv' ? 'TV Series' : 'Movie';
+                const sitePosterUrl = movie.poster ? upgradePosterQuality(movie.poster) : '';
+                const siteThumb = `<img class="sugg-thumb" ${sitePosterUrl ? `src="${escapeAttr(sitePosterUrl)}"` : ''} alt="" loading="lazy" referrerpolicy="no-referrer">`;
+                item.innerHTML = `${siteThumb}<div class="sugg-info"><div class="sugg-title">${highlightSuggestionText(stripYearSuffix(movie.title), query)}</div><div class="sugg-meta">${siteTypeLabel}${suggestionYear ? ' • ' + suggestionYear : ''}</div></div>`;
+                // Database-e poster na thakle TMDB theke poster nie ashe
+                if (!sitePosterUrl) {
+                    const thumbEl = item.querySelector('img.sugg-thumb');
+                    fetchFreshTmdbPoster({ imdbId: movie.imdbId, tmdbId: movie.tmdbId, tmdbType: movie.tmdbType, title: movie.title, searchName: movie.searchName })
+                        .then(url => { if (url && thumbEl && thumbEl.isConnected) thumbEl.src = upgradePosterQuality(url); })
+                        .catch(() => {});
+                }
                 item.addEventListener('click', function() {
                     // Suggestion-e click korle sorasori oi content-er details page khule jabe
                     searchSuggestions.style.display = 'none';
@@ -4997,9 +5082,54 @@ function initApp() {
                 });
                 searchSuggestions.appendChild(item);
             });
-            searchSuggestions.style.display = 'block';
+            if (matches.length) searchSuggestions.style.display = 'block';
+
+            // Website-er naam-er niche "Only Watch" section: TMDB theke naam (je content site-e nei)
+            fetchWatchSuggestionItems(query).then(items => {
+                if (watchReqId !== watchDropdownRequestId) return;
+                const matchKeys = new Set(matches.map(m => titleWithoutYearNorm(m.title)));
+                const fresh = items.filter(it => !matchKeys.has(titleWithoutYearNorm(it.title)));
+                if (!fresh.length) return;
+                const header = document.createElement('div');
+                header.className = 'watch-suggest-head';
+                header.textContent = 'Only Watch';
+                searchSuggestions.appendChild(header);
+                fresh.forEach(it => {
+                    const el = document.createElement('div');
+                    el.className = 'suggestion-item watch-suggest-item';
+                    const label = it.title + (it.year ? ` (${it.year})` : '');
+                    const wTypeLabel = it.type === 'tv' ? 'TV Series' : 'Movie';
+                    el.innerHTML = `<img class="sugg-thumb" src="${escapeAttr(it.poster)}" alt="" loading="lazy" referrerpolicy="no-referrer"><div class="sugg-info"><div class="sugg-title">${highlightSuggestionText(it.title, query)}</div><div class="sugg-meta">${wTypeLabel}${it.year ? ' • ' + it.year : ''}</div></div>`;
+                    el.addEventListener('click', function() {
+                        searchSuggestions.style.display = 'none';
+                        const fake = document.createElement('div');
+                        fake.setAttribute('data-id', it.id);
+                        fake.setAttribute('data-type', it.type);
+                        fake.setAttribute('data-title', it.title);
+                        fake.setAttribute('data-poster', it.poster);
+                        fake.setAttribute('data-backdrop', it.backdrop);
+                        fake.setAttribute('data-release', it.release);
+                        selectMassiveWatchResult(fake);
+                        const sec = document.getElementById('massiveWatchSection');
+                        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                    searchSuggestions.appendChild(el);
+                });
+                searchSuggestions.style.display = 'block';
+            });
         }, 350);
         searchInput.addEventListener('input', handleSearchInput);
+
+        // Content-e click kore details page bondho korar pore search bar-e kichu lekha thakle
+        // bar-e click/focus korle abar suggestion dekhabe
+        const reopenSuggestions = () => {
+            const q = searchInput.value.trim();
+            if (!q) return;
+            if (searchSuggestions.childElementCount) searchSuggestions.style.display = 'block';
+            else handleSearchInput();
+        };
+        searchInput.addEventListener('focus', reopenSuggestions);
+        searchInput.addEventListener('click', reopenSuggestions);
     }
 
     const menuToggleBtn = document.getElementById('menuToggleBtn');
@@ -5302,6 +5432,8 @@ async function resolveLoginEmail(identifier) {
 
 function updateAuthUI(session) {
     currentAuthSession = session;
+    // Admin login kora device-e visit track hobe na (traffic-e admin-er nijer visit dhukbe na)
+    if (isCurrentUserAdmin(session)) { try { localStorage.setItem('bm_admin_device', '1'); } catch (e) {} }
     const loggedOutBox = document.getElementById('authActionsLoggedOut');
     const loggedInBox = document.getElementById('authActionsLoggedIn');
     const emailLabel = document.getElementById('authUserEmail');
@@ -5344,6 +5476,7 @@ async function initAuth() {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
         updateAuthUI(session);
+        logSiteVisit();
         syncGoogleAvatarIfNeeded(session); // পুরনো Google ইউজার (যাদের avatar_url এখনো ফাঁকা) পেজ লোড হওয়ার সময়ও sync হয়ে যাবে
 
         const params = new URLSearchParams(window.location.search);
@@ -7203,6 +7336,7 @@ async function autoFillMissingTmdbIds() {
 
 // ---------- Dashboard tab: real stats from the site's own database (no fake earning/premium numbers) ----------
 async function loadAdminDashboardStats() {
+    loadTrafficTotal();
     autoFillMissingTmdbIds();
     const movies = Array.isArray(allMovies) ? allMovies : [];
     const movieCount = movies.filter(m => m.tmdbType !== 'tv').length;
@@ -7282,6 +7416,270 @@ async function loadAdminDashboardStats() {
     fetchAdminMessages().then(() => setAdminStat('adminStatMessages', Array.isArray(allAdminMessages) ? allAdminMessages.length : 0));
 }
 
+// ---------- Traffic tracking ----------
+// Proti browser-session (tab) e ekbar visit record hoy. Admin login kora device-e hoy na.
+function todayDhaka() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+}
+function dhakaDayOffset(daysAgo) {
+    return new Date(Date.now() - daysAgo * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+}
+function logSiteVisit() {
+    try {
+        if (localStorage.getItem('bm_admin_device') === '1') return;
+        if (sessionStorage.getItem('bm_visit_logged') === '1') return;
+        sessionStorage.setItem('bm_visit_logged', '1');
+        let vid = localStorage.getItem('bm_visitor_id');
+        if (!vid) {
+            vid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+            localStorage.setItem('bm_visitor_id', vid);
+        }
+        if (!supabaseClient) return;
+        const send = (country) => {
+            supabaseClient.from('site_visits')
+                .insert({ visitor_id: vid, day: todayDhaka(), path: String(location.pathname || '/').slice(0, 200), country: country || null })
+                .then(() => {}, () => {});
+        };
+        // Country ekhono na pele ektu opekkha kore (max 5s), na paile country-chara-i save hobe
+        if (window.bmCountryCode) { send(window.bmCountryCode); return; }
+        let sent = false;
+        const onReady = () => { if (sent) return; sent = true; send(window.bmCountryCode); };
+        window.addEventListener('bm-country-ready', onReady, { once: true });
+        setTimeout(onReady, 5000);
+    } catch (e) { /* traffic track na holeo site chalbe */ }
+}
+async function loadTrafficTotal() {
+    try {
+        const { count, error } = await supabaseClient.from('site_visits').select('*', { count: 'exact', head: true });
+        if (!error) setAdminStat('adminStatTraffic', count || 0);
+    } catch (e) { /* skip */ }
+}
+// Shob row (chunk kore) - day + visitor_id
+async function fetchTrafficRowsSince(fromDay) {
+    const PAGE = 1000;
+    const all = [];
+    for (let from = 0; from < 100000; from += PAGE) {
+        const { data, error } = await supabaseClient
+            .from('site_visits')
+            .select('day, visitor_id, country')
+            .gte('day', fromDay)
+            .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || !data.length) break;
+        all.push(...data);
+        if (data.length < PAGE) break;
+    }
+    return all;
+}
+let trafficState = { rows: null, range: '30', from: '', to: '' };
+
+function shiftDay(dayStr, n) {
+    const d = new Date(dayStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+}
+function daysBetween(a, b) {
+    return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000);
+}
+function weekStartOf(dayStr) {
+    const d = new Date(dayStr + 'T00:00:00Z');
+    const wd = (d.getUTCDay() + 6) % 7; // Monday = 0
+    d.setUTCDate(d.getUTCDate() - wd);
+    return d.toISOString().slice(0, 10);
+}
+function trafficRangeBounds() {
+    const today = todayDhaka();
+    const r = trafficState.range;
+    let from, to = today;
+    if (r === 'custom') {
+        from = trafficState.from || today;
+        to = trafficState.to || today;
+    } else if (r.startsWith('y:')) {
+        const y = r.slice(2);
+        from = y + '-01-01';
+        to = y + '-12-31';
+    } else if (r === '0') {
+        from = today;
+    } else if (r === 'all') {
+        from = today;
+        (trafficState.rows || []).forEach(x => { if (x.day < from) from = x.day; });
+    } else {
+        const n = r === '12m' ? 365 : parseInt(r, 10);
+        from = shiftDay(today, -(n - 1));
+    }
+    if (to > today) to = today;
+    if (from > to) from = to;
+    return { from, to };
+}
+// Range onujayi bucket: <=62 din → proti din, <=400 din → proti hoptа, na hole proti mash
+function buildTrafficBuckets(from, to) {
+    const span = daysBetween(from, to) + 1;
+    const mode = span <= 62 ? 'day' : (span <= 400 ? 'week' : 'month');
+    const keyOf = mode === 'day' ? (d => d) : (mode === 'week' ? weekStartOf : (d => d.slice(0, 7) + '-01'));
+    const keys = [];
+    const seen = new Set();
+    let cur = from;
+    for (let i = 0; i < span; i++) {
+        const k = keyOf(cur);
+        if (!seen.has(k)) { seen.add(k); keys.push(k); }
+        cur = shiftDay(cur, 1);
+    }
+    return { mode, keys, keyOf };
+}
+function trafficLabel(key, mode) {
+    if (mode === 'month') {
+        const d = new Date(key + 'T00:00:00Z');
+        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+    }
+    if (mode === 'week') return 'W ' + key.slice(5);
+    return key.slice(5);
+}
+function buildTrafficChartSVG(items) {
+    const W = 640, H = 200, PL = 36, PB = 26, PT = 10, PR = 10;
+    const n = items.length || 1;
+    const maxV = Math.max(1, ...items.map(i => i.visits));
+    const innerW = W - PL - PR, innerH = H - PT - PB;
+    const slot = innerW / n;
+    const barW = Math.max(2, slot * 0.66);
+    let grid = '';
+    [0, 0.5, 1].forEach(f => {
+        const y = PT + innerH - innerH * f;
+        grid += `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}" stroke="#1e293b" stroke-width="1"/>`;
+        grid += `<text x="${PL - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#64748b">${Math.round(maxV * f)}</text>`;
+    });
+    let bars = '', dots = '', pts = [], labels = '';
+    const step = Math.max(1, Math.ceil(n / 8));
+    items.forEach((it, i) => {
+        const x = PL + slot * i + (slot - barW) / 2;
+        const h = (it.visits / maxV) * innerH;
+        const y = PT + innerH - h;
+        bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0, h).toFixed(1)}" rx="2" fill="#7ed321" opacity="${it.visits ? 0.9 : 0.15}"><title>${it.label}: ${it.visits} visits, ${it.uniques} unique</title></rect>`;
+        const cx = x + barW / 2;
+        const cy = PT + innerH - (it.uniques / maxV) * innerH;
+        pts.push(`${cx.toFixed(1)},${cy.toFixed(1)}`);
+        if (i % step === 0 || i === n - 1) {
+            labels += `<text x="${cx.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#64748b">${it.short}</text>`;
+        }
+    });
+    if (pts.length > 1) dots = `<polyline points="${pts.join(' ')}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linejoin="round"/>`;
+    return `<svg viewBox="0 0 ${W} ${H}" class="admin-traffic-svg" role="img" aria-label="Traffic chart">${grid}${bars}${dots}${labels}</svg>`;
+}
+function renderTrafficPanel() {
+    const panel = document.getElementById('adminTrafficPanel');
+    if (!panel || !trafficState.rows) return;
+    const rows = trafficState.rows;
+    const { from, to } = trafficRangeBounds();
+    const { mode, keys, keyOf } = buildTrafficBuckets(from, to);
+    const buckets = new Map(keys.map(k => [k, { visits: 0, visitors: new Set() }]));
+    const allVisitors = new Set();
+    let totalVisits = 0;
+    rows.forEach(r => {
+        if (r.day < from || r.day > to) return;
+        const b = buckets.get(keyOf(r.day));
+        if (!b) return;
+        b.visits++; b.visitors.add(r.visitor_id);
+        allVisitors.add(r.visitor_id);
+        totalVisits++;
+    });
+    const items = keys.map(k => {
+        const b = buckets.get(k);
+        return { key: k, label: k, short: trafficLabel(k, mode), visits: b.visits, uniques: b.visitors.size };
+    });
+    // Country onujayi (range-er moddhe)
+    const byCountry = new Map();
+    rows.forEach(r => {
+        if (r.day < from || r.day > to) return;
+        const c = (r.country || 'Unknown').toUpperCase();
+        if (!byCountry.has(c)) byCountry.set(c, { visits: 0, visitors: new Set() });
+        const x = byCountry.get(c);
+        x.visits++; x.visitors.add(r.visitor_id);
+    });
+    const countryList = [...byCountry.entries()].map(([code, v]) => ({ code, visits: v.visits, uniques: v.visitors.size })).sort((a, b) => b.visits - a.visits);
+    const maxCountry = Math.max(1, ...countryList.map(c => c.visits));
+    const countryRows = countryList.map(c => `
+        <div class="admin-traffic-country-row">
+            <span class="admin-traffic-country-code">${escapeHtml(c.code)}</span>
+            <div class="admin-traffic-country-bar"><div style="width:${Math.round(c.visits / maxCountry * 100)}%;"></div></div>
+            <span class="admin-traffic-country-num">${c.visits} <small>visits · ${c.uniques} unique</small></span>
+        </div>`).join('') || '<div class="admin-db-empty">No data</div>';
+    const opt = (v, l) => `<option value="${v}" ${trafficState.range === v ? 'selected' : ''}>${l}</option>`;
+    const custom = trafficState.range === 'custom';
+    const tableRows = items.slice().reverse().map(it => {
+        const isToday = it.key <= todayDhaka() && todayDhaka() >= it.key && mode === 'day' && it.key === todayDhaka();
+        return `<tr class="${isToday ? 'admin-traffic-today' : ''}"><td>${it.key}${isToday ? ' <span class="admin-traffic-tag">Today</span>' : ''}</td><td>${it.visits}</td><td>${it.uniques}</td></tr>`;
+    }).join('');
+    const modeLabel = mode === 'day' ? 'per day' : (mode === 'week' ? 'per week' : 'per month');
+    panel.innerHTML = `
+        <div class="admin-traffic-head">
+            <div class="admin-traffic-title">📈 Traffic <span>(Dhaka time, ${modeLabel})</span></div>
+            <button type="button" class="admin-traffic-close" onclick="document.getElementById('adminTrafficPanel').style.display='none'" aria-label="Close">✕</button>
+        </div>
+        <div class="admin-traffic-controls">
+            <select class="admin-traffic-select" onchange="trafficSetRange(this.value)">
+                ${opt('0', 'Today')}${opt('7', 'Last 7 days')}${opt('30', 'Last 30 days')}${opt('90', 'Last 90 days')}${opt('12m', 'Last 1 year')}
+                ${custom ? '<option value="custom" selected hidden>Custom range</option>' : ''}
+            </select>
+            <div class="admin-traffic-dates">
+                <span class="admin-traffic-cal" aria-hidden="true">📅</span>
+                <input type="date" class="admin-traffic-date" id="trafficFrom" value="${from}" onchange="trafficApplyCustom()" aria-label="From date">
+                <span class="admin-traffic-to">to</span>
+                <input type="date" class="admin-traffic-date" id="trafficTo" value="${to}" onchange="trafficApplyCustom()" aria-label="To date">
+            </div>
+        </div>
+        <div class="admin-traffic-summary">
+            <span>Range: <b>${from}</b> → <b>${to}</b></span>
+            <span>Visits: <b>${totalVisits}</b></span>
+            <span>Unique visitors: <b>${allVisitors.size}</b></span>
+        </div>
+        <div class="admin-traffic-chart">
+            <div class="admin-traffic-legend"><span><i class="lg-bar"></i>Visits</span><span><i class="lg-line"></i>Unique visitors</span></div>
+            ${buildTrafficChartSVG(items)}
+        </div>
+        <div class="admin-traffic-countries">
+            <div class="admin-traffic-subtitle">🌍 By country</div>
+            ${countryRows}
+        </div>
+        <div class="admin-traffic-scroll">
+            <table class="admin-traffic-table">
+                <thead><tr><th>Period</th><th>Visits</th><th>Unique visitors</th></tr></thead>
+                <tbody>${tableRows || '<tr><td colspan="3">No data</td></tr>'}</tbody>
+            </table>
+        </div>`;
+}
+function trafficSetRange(value) {
+    if (value === 'custom') {
+        const t = todayDhaka();
+        trafficState.from = trafficState.from || shiftDay(t, -29);
+        trafficState.to = trafficState.to || t;
+    }
+    trafficState.range = value;
+    renderTrafficPanel();
+}
+function trafficApplyCustom() {
+    const f = document.getElementById('trafficFrom');
+    const t = document.getElementById('trafficTo');
+    if (!f || !t || !f.value || !t.value) return;
+    trafficState.from = f.value <= t.value ? f.value : t.value;
+    trafficState.to = f.value <= t.value ? t.value : f.value;
+    trafficState.range = 'custom';
+    renderTrafficPanel();
+}
+async function toggleTrafficPanel() {
+    const panel = document.getElementById('adminTrafficPanel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    panel.innerHTML = '<div class="admin-db-empty">Loading traffic...</div>';
+    try {
+        // Shob-time-er data ek-bar anbo; range-select korle client-e filter hobe
+        trafficState.rows = await fetchTrafficRowsSince('2000-01-01');
+        renderTrafficPanel();
+    } catch (e) {
+        console.error('Traffic load error:', e);
+        panel.innerHTML = '<div class="admin-db-empty">Could not load traffic. Check whether traffic-setup.sql has been run.</div>';
+    }
+}
+
 function setAdminStat(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -7290,6 +7688,11 @@ function setAdminStat(id, value) {
 // ---------- One-time wiring ----------
 
 function setupAdminPanel() {
+    const trafficCard = document.getElementById('adminTrafficCard');
+    if (trafficCard) {
+        trafficCard.addEventListener('click', toggleTrafficPanel);
+        trafficCard.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTrafficPanel(); } });
+    }
     const titleInput = document.getElementById('adminTitle');
     if (titleInput) {
         titleInput.addEventListener('input', function() {
@@ -8800,7 +9203,7 @@ function buildLinkRowElement(data, options) {
     zipBtn.addEventListener('click', () => onZipContentsClick(row));
     row.querySelector('.admin-zip-row-clear').addEventListener('click', () => {
         removeScannedZip(row, '');
-        showToast('ZIP list clear hoyeche. Update/Add Content chapo save korle database theke-o muche jabe.');
+        showToast('ZIP list cleared. It will be removed from the database when you save with Update/Add Content.');
     });
     // Database-e age save kora ZIP file list thakle sheta load kore (abar zip bachhar lagbe na)
     if (Array.isArray(data.zipFiles) && data.zipFiles.length) {
@@ -8910,7 +9313,7 @@ function addSeasonBlock(data) {
     block.innerHTML = `
         <div class="admin-season-header">
             <input type="text" class="admin-season-label" value="${escapeAttr(defaultLabel)}">
-            <label class="admin-coming-soon-toggle" title="Ei season-er file ekhono upload hoyni">
+            <label class="admin-coming-soon-toggle" title="This season's files have not been uploaded yet">
                 <input type="checkbox" class="admin-season-coming-soon"${data.comingSoon ? ' checked' : ''}>
                 <span>Coming soon</span>
             </label>
@@ -9240,7 +9643,7 @@ function ensureZipContentsModal() {
         if (!row || !row._zipListing) { closeZipContentsModal(); return; }
         updateZipButtonText(row);
         closeZipContentsModal();
-        showToast('✅ ZIP list ei row-e save hoyeche. Content database-e save korte Update/Add Content chapo.');
+        showToast('✅ ZIP list saved to this row. Click Update/Add Content to save it to the database.');
     });
     overlay.querySelector('.zip-contents-rechoose').addEventListener('click', () => {
         const row = overlay._row;
@@ -11799,7 +12202,7 @@ function renderAdminOngoingList(filter) {
                     <button type="button" class="admin-ongoing-toggle on ${state === 'on' ? 'active' : ''}" data-mode="on" title="Force ongoing">ON</button>
                     <button type="button" class="admin-ongoing-toggle off ${state === 'off' ? 'active' : ''}" data-mode="off" title="Force NOT ongoing">OFF</button>
                 </div>
-                <button type="button" class="admin-ongoing-bump" title="Ekhon click korle 1 no position-e jabe">Update ↑</button>
+                <button type="button" class="admin-ongoing-bump" title="Click to move to position 1">Update ↑</button>
                 <input type="number" min="1" class="admin-ongoing-season" placeholder="Season (latest)" value="${movie.ongoingSeason != null ? escapeAttr(movie.ongoingSeason) : ''}">
                 <span class="admin-server-save-status" aria-live="polite"></span>
             </div>
@@ -11836,7 +12239,7 @@ function renderAdminOngoingList(filter) {
 async function bumpMovieToTop(movie, statusEl) {
     if (!movie || !movie.id) return false;
     if (!linkUpdatedColumnExists()) {
-        showToast('linkUpdatedAt column database-e nei - SQL run koro.', 'error');
+        showToast('linkUpdatedAt column is missing in the database. Run the SQL first.', 'error');
         return false;
     }
     if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Updating...'; }
@@ -11848,7 +12251,7 @@ async function bumpMovieToTop(movie, statusEl) {
         movie.linkUpdatedAt = nowIso;
         movie.display_order = null;
         if (statusEl) { statusEl.classList.add('ok'); statusEl.textContent = 'Moved to #1'; }
-        showToast('"' + (movie.title || 'this item') + '" ekhon 1 no-te gechhe');
+        showToast('"' + (movie.title || 'this item') + '" moved to position 1');
         // Update-er pore sorasori 1 no page-e niye jai, jate ei content-ta sheshe chokhe pore
         await refreshOngoingData();
         sortAllMoviesByDisplayOrder();
@@ -11868,7 +12271,7 @@ async function bumpMovieToTop(movie, statusEl) {
 async function saveAdminOngoing(movie, patch, statusEl) {
     if (!movie || !movie.id) return false;
     if (!ongoingColumnExists()) {
-        showToast('Ongoing column database-e nei - upore-r SQL ekbar run koro.', 'error');
+        showToast('Ongoing column is missing in the database. Run the SQL above once.', 'error');
         return false;
     }
     if (statusEl) { statusEl.className = 'admin-server-save-status'; statusEl.textContent = 'Saving...'; }
@@ -13438,6 +13841,9 @@ document.addEventListener('click', (e) => {
             badge.classList.add('show');
         });
         currentCode = code;
+        // Traffic tracking-er jonno: visitor-er country
+        window.bmCountryCode = code;
+        window.dispatchEvent(new Event('bm-country-ready'));
     }
 
     // order[] = kon provider-er por kon provider try hobe. Protibar shuru-r provider

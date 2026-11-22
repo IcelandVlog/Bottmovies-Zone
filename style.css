@@ -6509,3 +6509,99 @@ html.light-mode .ongoing-dot { background: #16a34a; }
     transition: background-color .15s;
 }
 .hero-ctl-btn:hover { background: rgba(126, 211, 33, 0.35); }
+
+/* Search dropdown: "Only Watch" section */
+.watch-suggest-head {
+    padding: 8px 14px 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase;
+    color: #f59e0b; border-top: 1px solid rgba(255,255,255,.06);
+}
+.watch-suggest-item { display: flex; align-items: center; gap: 8px; }
+.watch-suggest-tag {
+    flex: 0 0 auto; font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 6px; color: #0b0d12; background: #f59e0b;
+}
+
+/* Search dropdown: poster thumbnail + title + "TV Series • year" (500K+ result-er moto) */
+.suggestion-item.watch-suggest-item,
+.suggestion-item:not(.watch-suggest-item) { display: flex; align-items: center; gap: 12px; padding: 9px 14px; }
+.sugg-thumb {
+    flex: 0 0 auto; width: 40px; height: 58px; object-fit: cover; border-radius: 6px;
+    background: #1a1f2b;
+}
+.sugg-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sugg-title { font-size: 14px; font-weight: 700; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sugg-meta { font-size: 12px; color: #94a3b8; }
+.watch-suggest-item .sugg-title mark, .suggestion-item .sugg-title mark { background: transparent; color: #7ed321; padding: 0; }
+
+/* ---------- Traffic (admin dashboard) ---------- */
+.admin-traffic-card { cursor: pointer; }
+.admin-traffic-card:hover, .admin-traffic-card:focus-visible { border-color: #7ed321; outline: none; }
+.admin-traffic-panel {
+    margin: 12px 0 14px; padding: 14px; border-radius: 12px;
+    background: #111521; border: 1px solid #1e293b;
+}
+.admin-traffic-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.admin-traffic-title { font-weight: 800; font-size: 14px; color: #e2e8f0; }
+.admin-traffic-title span { font-weight: 500; color: #7c8aa3; font-size: 12px; }
+.admin-traffic-close {
+    width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #2a3142; background: #171e2e; color: #cbd5e1; font-size: 13px;
+}
+.admin-traffic-summary { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: #94a3b8; margin-bottom: 10px; }
+.admin-traffic-summary b { color: #7ed321; }
+.admin-traffic-scroll { max-height: 320px; overflow: auto; border-radius: 8px; border: 1px solid #1e293b; }
+.admin-traffic-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-traffic-table th, .admin-traffic-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #1e293b; }
+.admin-traffic-table th { position: sticky; top: 0; background: #171e2e; color: #94a3b8; font-weight: 700; font-size: 12px; }
+.admin-traffic-table td { color: #e2e8f0; }
+.admin-traffic-today td { background: rgba(126, 211, 33, 0.08); }
+.admin-traffic-tag {
+    font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
+    background: #7ed321; color: #0b0d12; text-transform: uppercase; letter-spacing: .4px;
+}
+
+/* Traffic: controls, chart */
+.admin-traffic-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.admin-traffic-select, .admin-traffic-date {
+    height: 34px; padding: 0 10px; border-radius: 8px; font-size: 13px;
+    background: #0b0e14; color: #e2e8f0; border: 1px solid #2a3142;
+}
+.admin-traffic-to { font-size: 12px; color: #7c8aa3; }
+.admin-traffic-apply {
+    height: 34px; padding: 0 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12.5px;
+    background: #7ed321; color: #0b0d12; border: none;
+}
+.admin-traffic-chart { margin: 6px 0 12px; padding: 10px; border-radius: 10px; background: #0b0e14; border: 1px solid #1e293b; }
+.admin-traffic-legend { display: flex; gap: 14px; font-size: 11.5px; color: #94a3b8; margin-bottom: 4px; }
+.admin-traffic-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.admin-traffic-legend .lg-bar { background: #7ed321; }
+.admin-traffic-legend .lg-line { background: #f59e0b; height: 3px; width: 14px; border-radius: 2px; }
+.admin-traffic-svg { width: 100%; height: auto; display: block; }
+
+/* Traffic: country breakdown */
+.admin-traffic-countries { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #0b0e14; border: 1px solid #1e293b; }
+.admin-traffic-subtitle { font-size: 12px; font-weight: 800; color: #cbd5e1; margin-bottom: 8px; letter-spacing: .3px; }
+.admin-traffic-country-row { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center; margin: 6px 0; font-size: 12.5px; }
+.admin-traffic-country-code { font-weight: 800; color: #e2e8f0; }
+.admin-traffic-country-bar { height: 8px; border-radius: 6px; background: #1e293b; overflow: hidden; }
+.admin-traffic-country-bar div { height: 100%; background: linear-gradient(90deg, #7ed321, #4d9a12); border-radius: 6px; }
+.admin-traffic-country-num { color: #e2e8f0; font-weight: 700; white-space: nowrap; }
+.admin-traffic-country-num small { color: #7c8aa3; font-weight: 500; }
+
+/* Traffic: date pickers beside the range select */
+.admin-traffic-dates { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.admin-traffic-cal { font-size: 15px; line-height: 1; margin-right: 2px; }
+.admin-traffic-date { color-scheme: dark; }
+
+/* Admin dashboard: Recently Added / Top Views / Top Categories - show/hide (default hidden) */
+.admin-dash-box.is-collapsed { padding-bottom: 12px; }
+.admin-dash-box.is-collapsed > div[id] { display: none; }
+.admin-dash-box > h3.admin-dash-toggle {
+    cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; margin-bottom: 0;
+}
+.admin-dash-box > h3.admin-dash-toggle::after {
+    content: "▾"; font-size: 13px; color: #7c8aa3; transition: transform .2s ease;
+}
+.admin-dash-box:not(.is-collapsed) > h3.admin-dash-toggle { margin-bottom: 12px; }
+.admin-dash-box:not(.is-collapsed) > h3.admin-dash-toggle::after { transform: rotate(180deg); }
+.admin-dash-box > h3.admin-dash-toggle:hover { color: #7ed321; }
