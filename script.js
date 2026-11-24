@@ -8604,8 +8604,21 @@ function mediaScanMergeHistory(historyKey) {
     // Movie hole: ekadhik video scan korle (ekta movie-r ekadhik file) sob audio/subtitle
     // ek-i set-e mile jabe - kono "(S01 Only)" tag ba duplicate thakbe na
     if (adminTmdbType === 'movie') {
-        const uniq = [...new Set(mediaScanHistory.flatMap(scan => scan[historyKey] || []))];
-        return { labels: uniq, count: uniq.length, commonCount: uniq.length };
+        // Ekta file-e ekই naam-er ekadhik track thakle (jemon 2-3 ta English) sob-gulo-i dekhabe.
+        // Ekadhik file scan-e file-gulo-r moddhe sorbochcho count-ta-i nebe (jate duibar jog na hoy).
+        const maxCount = new Map();
+        const order = [];
+        mediaScanHistory.forEach(scan => {
+            const local = new Map();
+            (scan[historyKey] || []).forEach(item => local.set(item, (local.get(item) || 0) + 1));
+            local.forEach((c, item) => {
+                if (!maxCount.has(item)) { order.push(item); maxCount.set(item, c); }
+                else maxCount.set(item, Math.max(maxCount.get(item), c));
+            });
+        });
+        const labels = [];
+        order.forEach(item => { for (let k = 0; k < maxCount.get(item); k++) labels.push(item); });
+        return { labels, count: labels.length, commonCount: labels.length };
     }
 
     const order = []; // item naam-gulo prothom dekha jawar order-e
