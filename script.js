@@ -4231,8 +4231,11 @@ function buildWatchPlayerInner(url, server, poster) {
             <a class="watch-server3-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">▶ Watch</a>
         </div>`;
     }
-    // Loading panel: shows until the player frame reports load; after 12s a hint suggests Server 02
-    return `<div class="watch-frame-wrap" data-started="${Date.now()}"><div class="watch-frame-loader" aria-live="polite"><span class="watch-loading-spinner"></span><span class="watch-frame-text">Loading player...</span><a class="watch-frame-slow watch-frame-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div><iframe src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless onload="if(Date.now()-Number(this.parentNode.dataset.started)>1500)this.parentNode.classList.add('is-loaded')"></iframe></div>`;
+    const frameAttrs = `src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless`;
+    // Server 02: plain player, no loading panel
+    if (server === 2) return `<iframe ${frameAttrs}></iframe>`;
+    // Server 01: loading panel until the frame loads (ignores the early about:blank load within 1.5s)
+    return `<div class="watch-frame-wrap" data-started="${Date.now()}"><div class="watch-frame-loader" aria-live="polite"><span class="watch-loading-spinner"></span><span class="watch-frame-text">Loading player...</span><a class="watch-frame-slow watch-frame-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div><iframe ${frameAttrs} onload="if(Date.now()-Number(this.parentNode.dataset.started)>1500)this.parentNode.classList.add('is-loaded')"></iframe></div>`;
 }
 function switchWatchServer(btnEl) {
     const box = btnEl.closest('.watch-box');
