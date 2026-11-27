@@ -4529,8 +4529,15 @@ async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster, releas
         </div>
     `;
 
-    const ok = await checkWatchLinkReachable(link, () => requestId === massiveWatchRequestId);
+    // Player ekhoni dekhano hobe; reachability check background-e cole (2.5 minute retry hote pare, tar jonno UI atke thakbe na).
+    // Check fail korle Server 01 "down" hisebe mark hobe, user Server 02 e switch korte parbe.
+    const ok = true;
     if (requestId !== massiveWatchRequestId) return; // ei shomoy-e user notun kichu select/search kore fellে, ei result-ta ar dorkar nei
+    checkWatchLinkReachable(link, () => requestId === massiveWatchRequestId).then(reachable => {
+        if (reachable || requestId !== massiveWatchRequestId) return;
+        const box = document.querySelector('#massiveWatchPlayer .massive-watch-box');
+        if (box) box.setAttribute('data-server1-down', '1');
+    });
 
     // Server 01 unreachable hole-o player dekhano hoy (default Server 01 thake),
     // user chaile Server 02 (nxsha) te switch korte pare.
