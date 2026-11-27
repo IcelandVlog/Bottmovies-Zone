@@ -3955,6 +3955,19 @@ const WATCH_CHECK_ATTEMPT_TIMEOUT_MS = 6000;
 const WATCH_CHECK_RETRY_DELAY_MS = 8000;
 const WATCH_CHECK_MAX_WINDOW_MS = 150000; // ~2.5 minutes total retry window
 
+// Watch server-er host-e age-bhage connection khule rakha - play click korle DNS/TLS handshake-er somoy bache
+function warmWatchOrigin(url) {
+    try {
+        const origin = new URL(url).origin;
+        if (document.querySelector(`link[rel="preconnect"][href="${origin}"]`)) return;
+        const l = document.createElement('link');
+        l.rel = 'preconnect';
+        l.href = origin;
+        l.crossOrigin = 'anonymous';
+        document.head.appendChild(l);
+    } catch (e) { /* invalid url - skip */ }
+}
+
 async function checkWatchLinkReachable(url, shouldContinue) {
     if (!url) return false;
     if (watchLinkAvailabilityCache.has(url)) return watchLinkAvailabilityCache.get(url);
@@ -4056,17 +4069,15 @@ async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
         const overlay = document.getElementById('movieModalOverlay');
         return !!overlay && overlay.style.display === 'flex';
     };
-    const ok = await checkWatchLinkReachable(link, stillRelevant);
-    if (!stillRelevant()) return;
-    if (!ok) {
-        // 2-3 minute retry window-er modheeo kono active server paoa na gele
-        // "Online Watch"-er jonno banano khali alada box-taও (border/padding
-        // shoho) hide/remove kore dao, na hole content chara-i ekta khali box
-        // dekha jeto.
+    // Box ekhoni render hobe; reachability check background-e cholbe (2-3 minute retry hote pare).
+    // Shei window-er modhe kono active server na paoa gele box-ta remove kore dewa hobe.
+    warmWatchOrigin(link);
+    checkWatchLinkReachable(link, stillRelevant).then(reachable => {
+        if (reachable) return;
         const emptyWrap = document.querySelector('.watch-accordion-group');
         if (emptyWrap) emptyWrap.remove();
-        return;
-    }
+    });
+    if (!stillRelevant()) return;
     const overlay = document.getElementById('movieModalOverlay');
     if (!overlay || overlay.style.display !== 'flex') return;
     const container = document.getElementById('watchBoxContainer');
@@ -4532,6 +4543,7 @@ async function renderMassiveWatchPlayer(tmdbId, mediaType, title, poster, releas
     // Player ekhoni dekhano hobe; reachability check background-e cole (2.5 minute retry hote pare, tar jonno UI atke thakbe na).
     // Check fail korle Server 01 "down" hisebe mark hobe, user Server 02 e switch korte parbe.
     const ok = true;
+    warmWatchOrigin(link);
     if (requestId !== massiveWatchRequestId) return; // ei shomoy-e user notun kichu select/search kore fellে, ei result-ta ar dorkar nei
     checkWatchLinkReachable(link, () => requestId === massiveWatchRequestId).then(reachable => {
         if (reachable || requestId !== massiveWatchRequestId) return;

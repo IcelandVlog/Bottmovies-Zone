@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- Open connections early so posters and the watch player start sooner -->
+<link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+<link rel="preconnect" href="https://embed.filmu.in" crossorigin>
+<link rel="preconnect" href="https://nxsha.space" crossorigin>
+<link rel="dns-prefetch" href="https://embed.filmu.in">
+<link rel="dns-prefetch" href="https://nxsha.space">
 <script>
 /* /movie/<name> ar /series/<name> URL-e relative asset (style.css, logo.png...) ঠিক path-e load korar jonno base */
 if (location.protocol !== 'file:') { document.write('<base href="/">'); }
