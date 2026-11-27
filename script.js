@@ -4072,10 +4072,11 @@ async function verifyAndRenderWatchBox(movie, link, title, poster, tmdbInfo) {
     // Box ekhoni render hobe; reachability check background-e cholbe (2-3 minute retry hote pare).
     // Shei window-er modhe kono active server na paoa gele box-ta remove kore dewa hobe.
     warmWatchOrigin(link);
+    // Check fail korleo box hide kora hobe na - player shobshomoy dekhano thakbe, shudhu Server 01 "slow/down" hishebe mark hobe
     checkWatchLinkReachable(link, stillRelevant).then(reachable => {
         if (reachable) return;
-        const emptyWrap = document.querySelector('.watch-accordion-group');
-        if (emptyWrap) emptyWrap.remove();
+        const box = document.querySelector('.watch-accordion-group .watch-box');
+        if (box) box.setAttribute('data-server1-down', '1');
     });
     if (!stillRelevant()) return;
     const overlay = document.getElementById('movieModalOverlay');
