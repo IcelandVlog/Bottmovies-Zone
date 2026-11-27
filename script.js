@@ -4232,7 +4232,7 @@ function buildWatchPlayerInner(url, server, poster) {
         </div>`;
     }
     // Loading panel: shows until the player frame reports load; after 12s a hint suggests Server 02
-    return `<div class="watch-frame-wrap" data-started="${Date.now()}"><div class="watch-frame-loader" aria-live="polite"><span class="watch-loading-spinner"></span><span class="watch-frame-text">Loading player...</span><span class="watch-frame-slow">Taking longer than usual. If it stays blank, try Server 02 above.</span></div><iframe src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless onload="if(Date.now()-Number(this.parentNode.dataset.started)>1500)this.parentNode.classList.add('is-loaded')"></iframe></div>`;
+    return `<div class="watch-frame-wrap" data-started="${Date.now()}"><div class="watch-frame-loader" aria-live="polite"><span class="watch-loading-spinner"></span><span class="watch-frame-text">Loading player...</span><a class="watch-frame-slow watch-frame-open" href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">Open in new tab</a></div><iframe src="${url}" width="100%" height="100%" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen credentialless onload="if(Date.now()-Number(this.parentNode.dataset.started)>1500)this.parentNode.classList.add('is-loaded')"></iframe></div>`;
 }
 function switchWatchServer(btnEl) {
     const box = btnEl.closest('.watch-box');

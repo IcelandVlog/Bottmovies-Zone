@@ -6691,3 +6691,4 @@ html.light-mode .section-confirm-box { background: #ffffff; color: #14161c; }
 
 /* Slower loading spinner */
 .watch-frame-loader .watch-loading-spinner { animation-duration: 1.6s; }
+.watch-frame-open { color: #7ed321; text-decoration: underline; pointer-events: auto; }
