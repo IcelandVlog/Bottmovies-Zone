@@ -526,8 +526,8 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const DOWNLOAD_HEADER_ICON = '⚡';
 
 const DEFAULT_FAST_SERVERS = [
-    { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://sechno.com/tools/terabox-downloader" },
-    { label: "Server 02: Terabox Link To Fast Downloader WEB", link: "https://teraboxdl.site" }
+    // { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://1024teradownloader.com/" },
+    { label: "Server 01: Terabox Link To Fast Downloader WEB", link: "https://teraboxdl.site/" }
 ];
 
 const CATEGORY_ALIAS_MAP = {
@@ -2619,9 +2619,430 @@ function renderPaginationControls(movies, page) {
     container.appendChild(nextBtn);
 }
 
+// ===== Page Sections: admin-defined sections (name + serial + sub-boxes of content), shown only on selected category pages (not home) =====
+var pageSectionsCache = [];
+var pageSectionsLoaded = false;
+var pageSectionsLoading = null;
+var adminSectionsDraft = null;
+// Section page values are compared with the same slug rule the grid uses (raw "Hindi Series" == "hindi-series")
+function sectionPageSlug(p) {
+    return normalizeCategorySlug(slugifyCategory(String(p || '')));
+}
+
+var lastGridSourceMovies = null; // last full movie list given to the grid (used to re-render after section changes)
+
+// Movies placed in a section of this category are shown in that section, so they are left out of the grid
+function sectionMovieIdsForCategory(cat) {
+    const ids = new Set();
+    if (!cat || cat === 'all' || !pageSectionsLoaded) return ids;
+    pageSectionsCache.forEach(sec => {
+        if (!sec.pages.some(p => sectionPageSlug(p) === cat)) return;
+        sec.groups.forEach(g => g.movie_ids.forEach(id => ids.add(String(id))));
+    });
+    return ids;
+}
+
+// Re-draw the grid for the current category after section data changes
+function refreshCategoryGrid() {
+    if (lastGridSourceMovies) renderMoviesByPage(lastGridSourceMovies, currentPage);
+}
+
+var lastGridMoviesCount = 0; // how many movies the main grid has for the current category
+
+function sectionAllMovieIds(sec) {
+    const out = [];
+    sec.groups.forEach(g => g.movie_ids.forEach(id => out.push(id)));
+    return out;
+}
+
+function cloneSectionData(s) {
+    return {
+        id: s.id,
+        name: s.name,
+        serial: s.serial,
+        pages: s.pages.slice(),
+        groups: s.groups.map(g => ({ title: g.title, movie_ids: g.movie_ids.slice() }))
+    };
+}
+
+function sortedPageSections() {
+    return pageSectionsCache.slice().sort((a, b) => (a.serial - b.serial) || (Number(a.id) - Number(b.id)));
+}
+
+async function loadPageSections(force) {
+    if (pageSectionsLoading) return pageSectionsLoading;
+    if (pageSectionsLoaded && !force) return;
+    pageSectionsLoading = (async () => {
+        try {
+            if (!supabaseClient) return;
+            const { data, error } = await supabaseClient.from('page_sections').select('*');
+            if (error) throw error;
+            pageSectionsCache = (data || []).map(r => {
+                const legacyIds = Array.isArray(r.movie_ids) ? r.movie_ids : [];
+                const groups = Array.isArray(r.groups) && r.groups.length
+                    ? r.groups.map(g => ({ title: g.title || '', movie_ids: Array.isArray(g.movie_ids) ? g.movie_ids : [] }))
+                    : [{ title: '', movie_ids: legacyIds }];
+                return {
+                    id: r.id,
+                    name: r.name || '',
+                    serial: Number(r.serial) || 0,
+                    pages: Array.isArray(r.pages) ? r.pages : [],
+                    groups: groups
+                };
+            });
+            pageSectionsLoaded = true;
+        } catch (err) {
+            console.warn('Page sections load failed:', err && err.message ? err.message : err);
+        } finally {
+            pageSectionsLoading = null;
+            renderPageSections();
+            refreshCategoryGrid();
+        }
+    })();
+    return pageSectionsLoading;
+}
+
+function buildSectionTile(m) {
+    const card = document.createElement('div');
+    card.className = 'movie-card page-section-item';
+    const title = stripYearSuffix(m.title) || 'Untitled';
+    const poster = upgradePosterQuality(m.poster) || POSTER_PLACEHOLDER_LOADING;
+    const yearLabel = getCardYearLabel(m);
+    const yearHTML = yearLabel ? ` <span class="movie-card-year">(${escapeHtml(String(yearLabel))})</span>` : '';
+    card.innerHTML = `<div class="poster-wrapper"><img src="${escapeAttr(poster)}" alt="${escapeAttr(title)}" referrerpolicy="no-referrer"></div><div class="movie-details"><p class="movie-title">${escapeHtml(title)}${yearHTML}</p></div>`;
+    card.addEventListener('click', () => openMovieModal(m));
+    if (!m.poster) {
+        // Same poster fallback the normal grid uses: TMDB, then OMDb
+        const img = card.querySelector('img');
+        Promise.all([
+            getFullTMDBDetails(m).catch(() => null),
+            getOMDbDetails(m).catch(() => null)
+        ]).then(([tmdb, omdb]) => {
+            const resolved = (tmdb && tmdb.poster) || (omdb && omdb.poster) || null;
+            if (resolved && img.isConnected) img.src = upgradePosterQuality(resolved);
+        });
+    }
+    return card;
+}
+
+var pageSectionBoxPages = {};
+
+function renderPageSections() {
+    const box = document.getElementById('pageSectionsBox');
+    if (!box) return;
+    box.innerHTML = '';
+    const cat = document.body.getAttribute('data-category') || 'all';
+    if (cat === 'all' || !pageSectionsLoaded) return;
+    // Sections show on page 1 of a selected category, whatever the grid's page numbers
+    if ((Number(currentPage) || 1) !== 1) return;
+
+    const perPage = getMoviesPerPage();
+    // Same movie is shown only once per page: the section with the lower serial wins
+    const seen = new Set();
+
+    sortedPageSections()
+        .filter(sec => sec.pages.some(p => sectionPageSlug(p) === cat))
+        .forEach(sec => {
+            // Flatten all boxes of this section into one list, so each page holds perPage items in total
+            const entries = [];
+            sec.groups.forEach((g, gi) => {
+                g.movie_ids.forEach(id => {
+                    const key = String(id);
+                    if (seen.has(key)) return;
+                    const m = allMovies.find(x => String(x.id) === key);
+                    if (!m) return;
+                    seen.add(key);
+                    entries.push({ movie: m, gi: gi, title: g.title });
+                });
+            });
+            if (!entries.length) return;
+
+            const wrap = document.createElement('section');
+            wrap.className = 'page-section';
+            wrap.innerHTML = `<h2 class="page-section-title"><span class="page-section-serial">${escapeHtml(String(sec.serial))}.</span> ${escapeHtml(sec.name)}</h2>`;
+
+            // Sections have no pages of their own: all of a section's content is shown
+            const pageEntries = entries;
+
+            // Consecutive items from the same box share one box heading and one grid
+            let currentGroup = null;
+            let grid = null;
+            pageEntries.forEach(en => {
+                if (!currentGroup || currentGroup.gi !== en.gi) {
+                    currentGroup = { gi: en.gi };
+                    const gw = document.createElement('div');
+                    gw.className = 'page-section-group';
+                    if (en.title) gw.innerHTML = `<h3 class="page-section-group-title">----- ${escapeHtml(en.title)} -----</h3>`;
+                    grid = document.createElement('div');
+                    grid.className = 'movie-grid page-section-grid';
+                    gw.appendChild(grid);
+                    wrap.appendChild(gw);
+                }
+                grid.appendChild(buildSectionTile(en.movie));
+            });
+
+            box.appendChild(wrap);
+        });
+}
+
+// ---- Admin: Page Sections tab ----
+function renderAdminSectionsTab() {
+    if (adminSectionsDraft) {
+        drawAdminSections();
+        return;
+    }
+    const list = document.getElementById('adminSectionsList');
+    if (list) list.innerHTML = '<p class="admin-empty-note">Loading sections...</p>';
+    loadPageSections(true).then(() => {
+        whenMoviesReady(() => {
+            adminSectionsDraft = pageSectionsCache.map(cloneSectionData);
+            drawAdminSections();
+        });
+    });
+}
+
+// The movie list loads asynchronously; the editor must not decide "not on site" before it is ready
+function whenMoviesReady(cb) {
+    if (moviesDataLoaded) return cb();
+    setTimeout(() => whenMoviesReady(cb), 300);
+}
+
+function drawAdminSections() {
+    const list = document.getElementById('adminSectionsList');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!adminSectionsDraft.length) {
+        list.innerHTML = '<p class="admin-empty-note">No sections yet. Click "Add Section" to create one.</p>';
+        return;
+    }
+    adminSectionsDraft.forEach((sec, idx) => list.appendChild(buildAdminSectionCard(sec, idx)));
+}
+
+function addAdminSection() {
+    if (!adminSectionsDraft) adminSectionsDraft = [];
+    const maxSerial = adminSectionsDraft.reduce((mx, s) => Math.max(mx, Number(s.serial) || 0), 0);
+    adminSectionsDraft.push({ id: null, name: '', serial: maxSerial + 1, pages: [], groups: [{ title: '', movie_ids: [] }] });
+    drawAdminSections();
+}
+
+function setAdminSectionStatus(card, text, isError) {
+    const el = card.querySelector('.admin-section-status');
+    if (!el) return;
+    el.textContent = text || '';
+    el.style.color = isError ? '#e74c3c' : '';
+}
+
+function buildAdminSectionCard(sec, idx) {
+    const card = document.createElement('div');
+    card.className = 'admin-section-card';
+
+    const cats = Array.from(new Set(getAllKnownCategories().concat(sec.pages).map(sectionPageSlug).filter(Boolean))).sort();
+
+    const groupsHTML = sec.groups.map((g, gi) => {
+        const chips = g.movie_ids.map(id => {
+            const m = allMovies.find(x => String(x.id) === String(id));
+            const label = m ? (stripYearSuffix(m.title) || 'Untitled') : (moviesDataLoaded ? `Not on site (#${id}, maybe in Recycle Bin)` : `Loading... (#${id})`);
+            return `<span class="admin-section-chip">${escapeHtml(label)}<button type="button" data-act="remove" data-gi="${gi}" data-id="${escapeAttr(String(id))}" title="Remove">×</button></span>`;
+        }).join('');
+        return `
+        <div class="admin-section-group">
+            <div class="admin-section-group-head">
+                <input type="text" class="admin-section-group-title" data-gi="${gi}" placeholder="Box title (optional), e.g. Phase One" value="${escapeAttr(g.title)}">
+                <button type="button" class="admin-section-group-del" data-act="delbox" data-gi="${gi}">✕ Remove box</button>
+            </div>
+            <div class="admin-section-chips">${chips || '<span class="admin-empty-note">No content in this box yet.</span>'}</div>
+            <input type="text" class="admin-section-search" data-gi="${gi}" placeholder="Search movie/series to add in this box...">
+            <div class="admin-section-results" data-gi="${gi}"></div>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `
+        <div class="admin-section-head">
+            <input type="number" class="admin-section-serial" min="0" value="${escapeAttr(String(sec.serial))}" title="Serial">
+            <input type="text" class="admin-section-name" placeholder="Section name, e.g. FANTASTIC FOUR (PRE-MCU)" value="${escapeAttr(sec.name)}">
+            <button type="button" class="admin-ongoing-toggle admin-section-del">🗑 Delete</button>
+        </div>
+        <div class="admin-section-label">Show on these pages:</div>
+        <div class="admin-section-pages">
+            ${cats.length ? cats.map(c => `<label><input type="checkbox" value="${escapeAttr(c)}" ${sec.pages.some(p => sectionPageSlug(p) === c) ? 'checked' : ''}> ${escapeHtml(c)}</label>`).join('') : '<span class="admin-empty-note">No categories found yet.</span>'}
+        </div>
+        <div class="admin-section-label">Boxes in this section:</div>
+        ${groupsHTML}
+        <div class="admin-section-foot">
+            <button type="button" class="admin-ongoing-toggle admin-section-addbox">➕ Add Box</button>
+            <button type="button" class="admin-ongoing-toggle admin-section-prune">🧹 Remove not-on-site</button>
+            <button type="button" class="admin-ongoing-toggle admin-section-save">💾 Save Section</button>
+            <span class="admin-section-status"></span>
+        </div>`;
+
+    card.querySelector('.admin-section-serial').addEventListener('input', e => { sec.serial = Number(e.target.value) || 0; });
+    card.querySelector('.admin-section-name').addEventListener('input', e => { sec.name = e.target.value; });
+
+    card.querySelectorAll('.admin-section-pages input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            if (cb.checked) { if (!sec.pages.some(p => sectionPageSlug(p) === cb.value)) sec.pages.push(cb.value); }
+            else sec.pages = sec.pages.filter(p => sectionPageSlug(p) !== cb.value);
+        });
+    });
+
+    card.querySelectorAll('.admin-section-group-title').forEach(inp => {
+        inp.addEventListener('input', () => { sec.groups[Number(inp.dataset.gi)].title = inp.value; });
+    });
+
+    card.querySelectorAll('.admin-section-search').forEach(searchEl => {
+        searchEl.addEventListener('input', () => {
+            const gi = Number(searchEl.dataset.gi);
+            const resultsEl = card.querySelector(`.admin-section-results[data-gi="${gi}"]`);
+            const q = searchEl.value.trim().toLowerCase();
+            resultsEl.innerHTML = '';
+            if (!q) return;
+            const used = sectionAllMovieIds(sec).map(String);
+            const matches = allMovies
+                .filter(m => !used.includes(String(m.id)))
+                .filter(m => String(stripYearSuffix(m.title) || '').toLowerCase().includes(q))
+                .slice(0, 8);
+            matches.forEach(m => {
+                const row = document.createElement('div');
+                row.className = 'admin-section-result';
+                row.innerHTML = `<span>${escapeHtml(stripYearSuffix(m.title) || 'Untitled')}</span><button type="button" class="admin-ongoing-toggle" data-act="add" data-gi="${gi}" data-id="${escapeAttr(String(m.id))}">+ Add</button>`;
+                resultsEl.appendChild(row);
+            });
+            if (!matches.length) resultsEl.innerHTML = '<span class="admin-empty-note">No match.</span>';
+        });
+    });
+
+    // Chip removal, box add/remove and movie add: delegated, then the card is rebuilt
+    card.addEventListener('click', e => {
+        const btn = e.target.closest('[data-act]');
+        if (btn) {
+            const act = btn.dataset.act;
+            const gi = Number(btn.dataset.gi);
+            if (act === 'remove') {
+                sec.groups[gi].movie_ids = sec.groups[gi].movie_ids.filter(id => String(id) !== String(btn.dataset.id));
+            } else if (act === 'add') {
+                sec.groups[gi].movie_ids.push(btn.dataset.id);
+            } else if (act === 'delbox') {
+                const g = sec.groups[gi];
+                if (g.movie_ids.length && !confirm('This box has content. Remove the whole box?')) return;
+                sec.groups.splice(gi, 1);
+                if (!sec.groups.length) sec.groups.push({ title: '', movie_ids: [] });
+            }
+            refreshAdminSectionCard(idx, card);
+            return;
+        }
+        if (e.target.closest('.admin-section-prune')) {
+            if (!moviesDataLoaded) { setAdminSectionStatus(card, 'Movie list still loading, try again.', true); return; }
+            const missing = sectionAllMovieIds(sec).filter(id => !allMovies.some(m => String(m.id) === String(id)));
+            if (!missing.length) { setAdminSectionStatus(card, 'Nothing to remove.'); return; }
+            sec.groups.forEach(g => { g.movie_ids = g.movie_ids.filter(id => allMovies.some(m => String(m.id) === String(id))); });
+            const fresh = refreshAdminSectionCard(idx, card);
+            setAdminSectionStatus(fresh, `Removed ${missing.length} not-on-site item(s). Click Save.`);
+            return;
+        }
+        if (e.target.closest('.admin-section-addbox')) {
+            sec.groups.push({ title: '', movie_ids: [] });
+            refreshAdminSectionCard(idx, card);
+            return;
+        }
+        if (e.target.closest('.admin-section-save')) { saveAdminSection(idx, card); return; }
+        if (e.target.closest('.admin-section-del')) { deleteAdminSection(idx); }
+    });
+
+    return card;
+}
+
+function refreshAdminSectionCard(idx, oldCard) {
+    const sec = adminSectionsDraft[idx];
+    if (!sec) return;
+    const newCard = buildAdminSectionCard(sec, idx);
+    oldCard.replaceWith(newCard);
+    return newCard;
+}
+
+async function saveAdminSection(idx, card) {
+    const sec = adminSectionsDraft[idx];
+    if (!sec) return;
+    const name = (sec.name || '').trim();
+    if (!name) { setAdminSectionStatus(card, 'Section name lekhun.', true); return; }
+    if (!sec.pages.length) { setAdminSectionStatus(card, 'Kono page select korun (tick din).', true); return; }
+    if (!supabaseClient) { setAdminSectionStatus(card, 'Database connect hoy nai.', true); return; }
+
+    const groups = sec.groups.map(g => ({ title: (g.title || '').trim(), movie_ids: g.movie_ids.slice() }));
+    const row = {
+        name: name,
+        serial: Number(sec.serial) || 0,
+        pages: sec.pages.slice(),
+        groups: groups,
+        movie_ids: groups.reduce((acc, g) => acc.concat(g.movie_ids), [])
+    };
+    setAdminSectionStatus(card, 'Saving...');
+    try {
+        let res;
+        if (sec.id) {
+            res = await supabaseClient.from('page_sections').update(row).eq('id', sec.id).select().single();
+        } else {
+            res = await supabaseClient.from('page_sections').insert(row).select().single();
+        }
+        if (res.error) throw res.error;
+
+        sec.id = res.data.id;
+        const saved = { id: sec.id, name: name, serial: row.serial, pages: row.pages.slice(), groups: groups.map(g => ({ title: g.title, movie_ids: g.movie_ids.slice() })) };
+        const pos = pageSectionsCache.findIndex(s => String(s.id) === String(sec.id));
+        if (pos >= 0) pageSectionsCache[pos] = saved; else pageSectionsCache.push(saved);
+
+        setAdminSectionStatus(card, 'Saved ✓');
+        renderPageSections();
+        refreshCategoryGrid();
+        if (typeof showToast === 'function') showToast('Section saved', 'success');
+    } catch (err) {
+        console.error('Section save failed:', err);
+        setAdminSectionStatus(card, 'Save hoy nai. Supabase e page-sections-setup.sql run kora ache kina check korun.', true);
+    }
+}
+
+// Centered confirm dialog for section delete (replaces the browser's native confirm box)
+function showSectionConfirm(message) {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'section-confirm-overlay';
+        overlay.innerHTML = `<div class="section-confirm-box" role="dialog" aria-modal="true"><p class="section-confirm-text">${escapeHtml(message)}</p><div class="section-confirm-actions"><button type="button" class="section-confirm-cancel">Cancel</button><button type="button" class="section-confirm-ok">Delete</button></div></div>`;
+        const done = (value) => { overlay.remove(); resolve(value); };
+        overlay.querySelector('.section-confirm-cancel').addEventListener('click', () => done(false));
+        overlay.querySelector('.section-confirm-ok').addEventListener('click', () => done(true));
+        overlay.addEventListener('click', e => { if (e.target === overlay) done(false); });
+        document.body.appendChild(overlay);
+    });
+}
+
+async function deleteAdminSection(idx) {
+    const sec = adminSectionsDraft[idx];
+    if (!sec) return;
+    const ok = await showSectionConfirm(`Delete section "${sec.name || 'Untitled'}"?`);
+    if (!ok) return;
+    if (sec.id && supabaseClient) {
+        // Supabase does not return an error when row-level security blocks a delete, so check the deleted rows
+        const { data, error } = await supabaseClient.from('page_sections').delete().eq('id', sec.id).select('id');
+        if (error || !data || !data.length) {
+            const msg = error ? error.message : 'No row was deleted (check admin login / page_sections policies)';
+            if (typeof showToast === 'function') showToast('Delete hoy nai: ' + msg, 'error');
+            return;
+        }
+    }
+    adminSectionsDraft.splice(idx, 1);
+    pageSectionsCache = pageSectionsCache.filter(s => String(s.id) !== String(sec.id));
+    renderPageSections();
+    refreshCategoryGrid();
+    drawAdminSections();
+    if (typeof showToast === 'function') showToast('Section deleted', 'success');
+    loadPageSections(true);
+}
+
 function renderMoviesByPage(movies, page) {
     const grid = document.getElementById('movieGrid');
     if (!grid) return;
+    lastGridSourceMovies = movies;
+    const hiddenBySections = sectionMovieIdsForCategory(document.body.getAttribute('data-category') || 'all');
+    if (hiddenBySections.size) movies = movies.filter(m => !hiddenBySections.has(String(m.id)));
     // Grid khali kore notun card bosanor majhe page-er height hothat kome gele browser scroll-ta
     // nicher section (Browse/500K+) e tene niye jay. Tai age-r height dhore rakha hoy, render shesh hole chharha hoy.
     const keepHeight = grid.offsetHeight;
@@ -2629,6 +3050,9 @@ function renderMoviesByPage(movies, page) {
     requestAnimationFrame(() => { grid.style.minHeight = ''; });
     grid.innerHTML = '';
     currentPage = page;
+    lastGridMoviesCount = movies.length;
+    loadPageSections();
+    renderPageSections();
 
     const pageUrlParams = new URLSearchParams(window.location.search);
     if (!pageUrlParams.has('dashboard') && !pageUrlParams.has('auth') && !isMoviePathname(window.location.pathname)) {
@@ -7223,6 +7647,7 @@ function closeAdminPanel() {
 
 const ADMIN_TAB_TITLES = {
     dashboard: 'Dashboard',
+    sections: 'Page Sections',
     add: 'Add / Edit Content',
     manage: 'Database',
     trailer: 'Trailer / Teaser',
@@ -7240,7 +7665,7 @@ const ADMIN_TAB_TITLES = {
 };
 
 function switchAdminTab(tab) {
-    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'original', 'ongoing', 'banner', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
+    const tabs = ['dashboard', 'add', 'manage', 'trailer', 'watch', 'server', 'original', 'ongoing', 'banner', 'sections', 'navigation', 'comments', 'requests', 'messages', 'alerts', 'trash'];
     const validTab = tabs.includes(tab) ? tab : 'dashboard';
     currentAdminTab = validTab;
     setAdminTabUrlParam(validTab); // URL এ ট্যাব সেভ করে রাখো, refresh করলেও এই ট্যাবেই থাকবে
@@ -7254,6 +7679,7 @@ function switchAdminTab(tab) {
 
     const titleEl = document.getElementById('adminTopbarTitle');
     if (titleEl) titleEl.textContent = ADMIN_TAB_TITLES[validTab] || 'Dashboard';
+    if (validTab === 'sections') renderAdminSectionsTab();
 
     if (validTab === 'dashboard') {
         loadAdminDashboardStats();

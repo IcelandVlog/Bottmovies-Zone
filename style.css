@@ -6605,3 +6605,73 @@ html.light-mode .ongoing-dot { background: #16a34a; }
 .admin-dash-box:not(.is-collapsed) > h3.admin-dash-toggle { margin-bottom: 12px; }
 .admin-dash-box:not(.is-collapsed) > h3.admin-dash-toggle::after { transform: rotate(180deg); }
 .admin-dash-box > h3.admin-dash-toggle:hover { color: #7ed321; }
+
+
+/* ===== Page Sections (public) ===== */
+.page-sections-box:empty { display: none; }
+.page-section { margin: 0 0 28px; }
+.page-section-title { font-size: 1.2rem; font-weight: 800; margin: 0 0 12px; letter-spacing: 0.3px; }
+.page-section-serial { opacity: 0.6; margin-right: 4px; }
+
+/* ===== Page Sections (admin editor) ===== */
+.admin-section-card { border: 1px solid rgba(128,128,128,0.3); border-radius: 12px; padding: 14px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+.admin-section-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.admin-section-serial { width: 90px; }
+.admin-section-name { flex: 1; min-width: 200px; }
+.admin-section-card input[type="text"], .admin-section-card input[type="number"] { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(128,128,128,0.4); background: transparent; color: inherit; }
+.admin-section-del { color: #e74c3c; }
+.admin-section-label { font-size: 0.85rem; opacity: 0.75; font-weight: 600; }
+.admin-section-pages { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.admin-section-pages label { display: inline-flex; gap: 6px; align-items: center; font-size: 0.9rem; cursor: pointer; }
+.admin-section-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-section-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(128,128,128,0.18); font-size: 0.85rem; }
+.admin-section-chip button { background: none; border: 0; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; }
+.admin-section-chip button:hover { color: #e74c3c; }
+.admin-section-results { display: flex; flex-direction: column; gap: 6px; }
+.admin-section-result { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.9rem; }
+.admin-section-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.admin-section-status { font-size: 0.85rem; opacity: 0.85; }
+
+.page-section-group + .page-section-group { margin-top: 18px; }
+.page-section-group-title { font-size: 1rem; font-weight: 700; margin: 0 0 10px; opacity: 0.9; }
+.admin-section-group { border: 1px dashed rgba(128,128,128,0.35); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.admin-section-group-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-section-group-title { flex: 1; min-width: 180px; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(128,128,128,0.4); background: transparent; color: inherit; }
+.admin-section-group-del { background: none; border: 0; color: #e74c3c; cursor: pointer; font-size: 0.85rem; }
+.admin-section-group .admin-section-search { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(128,128,128,0.4); background: transparent; color: inherit; }
+
+
+/* Page sections: centered titles, tiles use the normal movie-card size */
+.page-section-title,
+.page-section-group-title { text-align: center; }
+
+/* Page sections: header framed by rules like the text layout, and no gap between sub-box title and posters */
+.page-section-title {
+    border-top: 2px solid rgba(128,128,128,0.6);
+    border-bottom: 2px solid rgba(128,128,128,0.6);
+    padding: 10px 0;
+    margin: 0 0 8px;
+}
+.page-section-group { margin: 0; }
+.page-section-group + .page-section-group { margin-top: 16px; }
+.page-section-group-title { margin: 0 0 4px; line-height: 1.3; }
+.page-section-group > .page-section-grid { margin: 0; padding-top: 0; }
+
+/* Sub-box title: "--- Phase One ---" with a gap above and below */
+.page-section-group-title { margin: 18px 0 12px; }
+
+/* Sub-box title: larger text and more space around it */
+.page-section-group-title { font-size: 1.3rem; font-weight: 700; margin: 30px 0 22px; }
+
+
+/* Section delete confirm: centered dialog */
+.section-confirm-overlay { position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.section-confirm-box { background: #171a21; color: #e5e7eb; border: 1px solid rgba(128,128,128,0.35); border-radius: 12px; padding: 22px 24px; width: 100%; max-width: 380px; text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
+.section-confirm-text { margin: 0 0 18px; font-size: 1rem; line-height: 1.45; text-align: center; word-break: break-word; }
+.section-confirm-actions { display: flex; justify-content: center; gap: 10px; }
+.section-confirm-actions button { padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; border: 1px solid rgba(128,128,128,0.45); background: transparent; color: inherit; }
+.section-confirm-ok { background: #e74c3c !important; border-color: #e74c3c !important; color: #fff !important; }
+html.light-mode .section-confirm-box { background: #ffffff; color: #14161c; }
+
+/* Section header framed by a double rule, like the "=====" lines of the text layout */
+.page-section-title { border-top: 4px double rgba(128,128,128,0.7); border-bottom: 4px double rgba(128,128,128,0.7); }
