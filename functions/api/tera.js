@@ -2,7 +2,7 @@
 // Multi-API pool: Supabase table "tera_apis" theke active API-r list (priority order-e) pore,
 // ekta fail (401/403/429) korle exhausted mark kore porer ta try kore. Success hole used_count barano hoy.
 const FALLBACK_ENDPOINT = 'https://api.playterabox.com/api/proxy';
-const FALLBACK_KEY = 'pk_cltx4au47sqf03z97t9tl';
+const FALLBACK_KEY = process.env.TERABOX_API_KEY || ''; // secret: Vercel/host env var e rakho, code-e nay
 const SUPABASE_URL = 'https://borglnmrvjafodkqhhhv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Q3WcdMEHLJO7SkO3Sd7BDQ_Ohu8xAp9';
 const TERA_RE = /(terabox|1024tera|teraboxapp|terafileshare|teraboxlink|4funbox|mirrobox|teraboxshare|momerybox|tibibox|nephobox|freeterabox)/i;
