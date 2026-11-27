@@ -6684,3 +6684,7 @@ html.light-mode .section-confirm-box { background: #ffffff; color: #14161c; }
 .watch-frame-text { font-weight: 600; letter-spacing: 0.3px; }
 .watch-frame-slow { max-width: 340px; font-size: 12.5px; color: #94a3b8; opacity: 0; animation: watchFrameSlowIn 0.4s ease 12s forwards; }
 @keyframes watchFrameSlowIn { to { opacity: 1; } }
+
+/* Big spinner in the watch player loading panel */
+.watch-frame-loader .watch-loading-spinner { width: 56px; height: 56px; border-width: 5px; border-color: rgba(126, 211, 33, 0.25); border-top-color: #7ed321; }
+.watch-frame-text { font-size: 16px; }
